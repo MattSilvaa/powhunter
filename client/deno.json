@@ -2,28 +2,39 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "jsxImportSource": "react",
-    "lib": ["dom", "dom.iterable", "esnext", "deno.ns"]
-  },
-  "lint": {
-    "include": ["single-quote"]
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext",
+      "deno.ns"
+    ],
+    "allowJs": true,
+    "checkJs": true
   },
   "tasks": {
     "build": "cross-env NODE_ENV=production react-router build",
     "dev": "react-router dev",
-    "start": "cross-env NODE_ENV=production react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc"
+    "start": "cross-env NODE_ENV=production react-router-serve ./build/server/index.js"
   },
-  "imports": {
-    "@react-router/dev": "npm:@react-router/dev@^7.4.0",
-    "@react-router/node": "npm:@react-router/node@^7.4.0",
-    "@types/react-dom": "npm:@types/react-dom@^19.0.1",
-    "@types/react-router": "npm:@types/react-router@^5.1.20",
-    "@types/react": "npm:@types/react@^19.0.12",
-    "cross-env": "npm:cross-env@^7.0.3",
-    "isbot": "npm:isbot@^5.1.17",
-    "react-dom": "npm:react-dom@^19.0.0",
-    "react-router": "npm:react-router@^7.4.0",
-    "react": "npm:react@19.0",
-    "vite": "npm:vite@^6.2.3"
+  "fmt": {
+    "include": [
+      "src/**/*"
+    ],
+    "exclude": [
+      "node_modules",
+      ".git"
+    ],
+    "useTabs": true,
+    "semiColons": false,
+    "singleQuote": true,
+    "proseWrap": "always"
+  },
+  "lint": {
+    "rules": {
+      "tags": [
+        "recommended",
+        "react"
+      ]
+    }
   }
 }
