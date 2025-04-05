@@ -16,6 +16,8 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/resorts", h.Resort.GetAllResorts)
+	mux.HandleFunc("api/createAlert", h.Alert.CreateAlert)
+
 	handler := corsMiddleware(mux)
 
 	port := os.Getenv("PORT")
@@ -32,19 +34,18 @@ func main() {
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		allowedOrigin := "http://localhost:5173"
+		allowedOrigin := "*"
 		if os.Getenv("ENVIRONMENT") == "production" {
 			allowedOrigin = "https://powhunter.onrender.com"
 		}
 		origin := r.Header.Get("Origin")
-		if origin == allowedOrigin {
+		if origin == allowedOrigin || allowedOrigin == "*" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, Authorization")
 
-		// Handle preflight requests (OPTIONS method)
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return

@@ -1,4 +1,3 @@
-import _React from 'react'
 import { Link } from 'react-router'
 import {
 	Box,
@@ -15,6 +14,7 @@ import {
 	Favorite as FavoriteIcon,
 	Notifications as NotificationsIcon,
 } from '@mui/icons-material'
+import React from 'react'
 
 export default function Home() {
 	const theme = useTheme()

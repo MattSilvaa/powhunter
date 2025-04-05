@@ -3,7 +3,6 @@ import { Resort } from './types.ts'
 
 const API_BASE_URL = 'http://localhost:8080/api'
 
-// Fetch function separated for better reusability
 const fetchResorts = async (): Promise<Resort[]> => {
 	const response = await fetch(`${API_BASE_URL}/resorts`, {
 		method: 'GET',
