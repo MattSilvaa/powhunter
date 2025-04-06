@@ -1,15 +1,24 @@
 import { useMutation } from '@tanstack/react-query'
-import { Resort } from './types.ts'
 
 const API_BASE_URL = 'http://localhost:8080/api'
 
-const createAlert = async (): Promise<void> => {
+type AlertData = {
+	email: string;
+	phone: string;
+	notificationDays: number;
+	minSnowAmount: number;
+	resorts: string[];
+  }
+
+
+const createAlert = async (data: AlertData): Promise<void> => {
 	const response = await fetch(`${API_BASE_URL}/createAlert`, {
 		method: 'PUT',
 		headers: {
 			'Content-Type': 'application/json',
 		},
 		credentials: 'include',
+		body: JSON.stringify(data)
 	})
 
 	if (!response.ok) {
@@ -23,7 +32,7 @@ export function useCreateAlert() {
 		isPending,
 		isError,
 		error,
-	} = useMutation<void, Error>({
+	} = useMutation<void, Error, AlertData>({
 		mutationFn: createAlert,
 		retry: 3,
 	})

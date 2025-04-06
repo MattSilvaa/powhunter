@@ -27,8 +27,6 @@ export default function SignUpPage() {
   const [formData, setFormData] = useState({
     email: "",
     phone: "",
-    password: "",
-    confirmPassword: "",
     notificationDays: 3,
     minSnowAmount: 6,
     resorts: [] as string[],
@@ -59,7 +57,13 @@ export default function SignUpPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createAlert();
+    createAlert({
+      email: formData.email,
+      phone: formData.phone,
+      minSnowAmount: formData.minSnowAmount,
+      notificationDays: formData.notificationDays,
+      resorts: formData.resorts,
+    });
   };
 
   return (
@@ -104,27 +108,6 @@ export default function SignUpPage() {
                   value={formData.phone}
                   onChange={handleChange}
                   helperText="We'll send SMS alerts to this number"
-                />
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <TextField
-                  required
-                  fullWidth
-                  label="Password"
-                  name="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                />
-                <TextField
-                  required
-                  fullWidth
-                  label="Confirm Password"
-                  name="confirmPassword"
-                  type="password"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
                 />
               </Grid>
 
@@ -191,6 +174,7 @@ export default function SignUpPage() {
                   {error && <Alert severity="error">{error}</Alert>}
 
                   <Select
+                    required
                     multiple
                     name="resorts"
                     value={formData.resorts}
@@ -207,19 +191,15 @@ export default function SignUpPage() {
               </Grid>
 
               <Grid size={{ xs: 12 }}>
-                <FormControlLabel
-                  control={<Switch />}
-                  label="I agree to receive SMS alerts about powder conditions"
-                />
-              </Grid>
-
-              <Grid size={{ xs: 12 }}>
                 <Button
                   type="submit"
                   variant="contained"
                   size="large"
                   fullWidth
                   sx={{ mt: 2 }}
+                  disabled={
+                    !formData.email || !formData.phone || !formData.resorts
+                  }
                   onClick={handleSubmit}
                 >
                   Create Alert
