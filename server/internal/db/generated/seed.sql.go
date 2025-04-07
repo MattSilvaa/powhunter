@@ -31,13 +31,13 @@ RETURNING id, uuid, name, url_host, url_pathname, latitude, longitude, noaa_stat
 `
 
 type InsertResortParams struct {
-	Uuid        uuid.UUID      `json:"uuid"`
-	Name        string         `json:"name"`
-	UrlHost     sql.NullString `json:"url_host"`
-	UrlPathname sql.NullString `json:"url_pathname"`
-	Latitude    sql.NullString `json:"latitude"`
-	Longitude   sql.NullString `json:"longitude"`
-	NoaaStation sql.NullString `json:"noaa_station"`
+	Uuid        uuid.UUID       `json:"uuid"`
+	Name        string          `json:"name"`
+	UrlHost     sql.NullString  `json:"url_host"`
+	UrlPathname sql.NullString  `json:"url_pathname"`
+	Latitude    sql.NullFloat64 `json:"latitude"`
+	Longitude   sql.NullFloat64 `json:"longitude"`
+	NoaaStation sql.NullString  `json:"noaa_station"`
 }
 
 func (q *Queries) InsertResort(ctx context.Context, arg InsertResortParams) (Resort, error) {

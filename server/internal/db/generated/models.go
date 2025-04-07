@@ -21,14 +21,14 @@ type AlertHistory struct {
 }
 
 type Resort struct {
-	ID          int32          `json:"id"`
-	Uuid        uuid.UUID      `json:"uuid"`
-	Name        string         `json:"name"`
-	UrlHost     sql.NullString `json:"url_host"`
-	UrlPathname sql.NullString `json:"url_pathname"`
-	Latitude    sql.NullString `json:"latitude"`
-	Longitude   sql.NullString `json:"longitude"`
-	NoaaStation sql.NullString `json:"noaa_station"`
+	ID          int32           `json:"id"`
+	Uuid        uuid.UUID       `json:"uuid"`
+	Name        string          `json:"name"`
+	UrlHost     sql.NullString  `json:"url_host"`
+	UrlPathname sql.NullString  `json:"url_pathname"`
+	Latitude    sql.NullFloat64 `json:"latitude"`
+	Longitude   sql.NullFloat64 `json:"longitude"`
+	NoaaStation sql.NullString  `json:"noaa_station"`
 }
 
 type SnowForecast struct {

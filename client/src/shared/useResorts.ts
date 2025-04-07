@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { Resort } from './types.ts'
+import { Resort, ResortApiResponse } from './types'
 
 const API_BASE_URL = 'http://localhost:8080/api'
 
-const fetchResorts = async (): Promise<Resort[]> => {
+const fetchResorts = async (): Promise<ResortApiResponse[]> => {
 	const response = await fetch(`${API_BASE_URL}/resorts`, {
 		method: 'GET',
 		headers: {
@@ -19,14 +19,27 @@ const fetchResorts = async (): Promise<Resort[]> => {
 	return response.json()
 }
 
+const transformResortData = (data?: ResortApiResponse[]): Resort[] => {
+	return data?.map((resort) => ({
+		id: resort.id,
+		uuid: resort.uuid,
+		name: resort.name,
+		urlHost: resort.url_host.Valid ? resort.url_host.String : null,
+		urlPathname: resort.url_pathname.Valid ? resort.url_pathname.String : null,
+		latitude: resort.latitude.Valid ? resort.latitude.Float64 : null,
+		longitude: resort.longitude.Valid ? resort.longitude.Float64 : null,
+		noaaStation: resort.noaa_station.Valid ? resort.noaa_station.String : null,
+	})) || [] // Default to empty array if data is undefined
+}
+
 export function useResorts() {
 	const {
-		data = [],
+		data,
 		isLoading,
 		isError,
 		error,
 		refetch,
-	} = useQuery<Resort[], Error>({
+	} = useQuery<ResortApiResponse[]>({
 		queryKey: ['resorts'],
 		queryFn: fetchResorts,
 		staleTime: 5 * 60 * 1000,
@@ -34,7 +47,7 @@ export function useResorts() {
 	})
 
 	return {
-		resorts: data,
+		resorts: transformResortData(data),
 		loading: isLoading,
 		error: isError ? error?.message || 'An error occurred' : null,
 		refresh: refetch,

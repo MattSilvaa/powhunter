@@ -2,17 +2,14 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"embed"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/MattSilvaa/powhunter/internal/db"
-	dbgen "github.com/MattSilvaa/powhunter/internal/db/generated"
 )
 
 type Resort struct {
@@ -78,37 +75,29 @@ func NewHandlers() (*Handlers, error) {
 }
 
 func NewResortHandler(store *db.Store) (*ResortHandler, error) {
-	// For now, keep using the embedded JSON file
-	// In the future, you'll want to migrate this data to the database
-	data, err := resortsFS.ReadFile("data/resorts.json")
-	if err != nil {
-		return nil, errors.New("failed to read resorts data: " + err.Error())
-	}
-
-	var resorts []Resort
-	if err := json.Unmarshal(data, &resorts); err != nil {
-		return nil, errors.New("failed to parse resorts data: " + err.Error())
-	}
-
 	return &ResortHandler{
-		resorts: resorts,
-		store:   store,
+		store: store,
 	}, nil
 }
 
-func (h *ResortHandler) GetAllResorts(w http.ResponseWriter, r *http.Request) {
+func (h *ResortHandler) ListAllResorts(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
 	setSecurityHeaders(w)
 
-	// In the future, fetch from database instead
-	// resorts, err := h.store.Queries.ListResorts(r.Context())
+	resorts, err := h.store.ListAllResorts(ctx)
+	if err != nil {
+		http.Error(w, "Failed to retrieve resorts", http.StatusInternalServerError)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(h.resorts); err != nil {
+	if err := json.NewEncoder(w).Encode(resorts); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
 }
@@ -118,7 +107,7 @@ type CreateAlertRequest struct {
 	Phone            string   `json:"phone"`
 	NotificationDays int      `json:"notificationDays"`
 	MinSnowAmount    int      `json:"minSnowAmount"`
-	Resorts          []string `json:"resorts"`
+	ResortsUuids     []string `json:"resortsUuids"`
 }
 
 func NewAlertHandler(store *db.Store) (*AlertHandler, error) {
@@ -141,30 +130,26 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Input validation
-	if req.Email == "" || len(req.Resorts) == 0 {
+	if req.Email == "" || len(req.ResortsUuids) == 0 {
 		http.Error(w, "Email and at least one resort are required", http.StatusBadRequest)
 		return
 	}
 
-	// Set a timeout for the database operation
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	// Create user and alerts in the database
 	err := h.store.CreateUserWithAlerts(
 		ctx,
 		req.Email,
 		req.Phone,
 		int32(req.MinSnowAmount),
 		int32(req.NotificationDays),
-		req.Resorts,
+		req.ResortsUuids,
 	)
 
 	if err != nil {
 		log.Printf("Failed to create alert: %v", err)
 
-		// Check for duplicate email
 		if err.Error() == "error creating user: ERROR: duplicate key value violates unique constraint \"users_email_key\"" {
 			http.Error(w, "User with this email already exists", http.StatusConflict)
 			return
@@ -174,7 +159,6 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Respond with success
 	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{

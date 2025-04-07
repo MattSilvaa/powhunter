@@ -35,13 +35,13 @@ test:
 
 # Database commands
 db-setup:
-	@echo "Creating database..."
-	@createdb -U postgres powhunter || echo "Database may already exist"
-	@make db-migrate
+	@cd server && docker compose up -d postgres
+	sleep 2
+	./server/scripts/create_db.sh
 
 db-migrate:
 	@echo "Running database migrations..."
-	@cd server && goose -dir internal/db/migrations postgres "user=postgres password=postgres dbname=powhunter sslmode=disable" up
+	@cd server && goose -dir internal/db/migrations postgres "host=localhost port=5432 user=postgres password=postgres dbname=powhunter sslmode=disable" up
 
 db-reset:
 	@echo "Resetting database..."
@@ -50,7 +50,7 @@ db-reset:
 
 generate-db-code:
 	@echo "Generating database code..."
-	@cd server && sqlc generate 
+	@cd server && sqlc generate
 
 db-seed:
 	@echo "Seeding database with initial data..."

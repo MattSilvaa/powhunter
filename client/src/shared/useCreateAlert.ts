@@ -3,22 +3,21 @@ import { useMutation } from '@tanstack/react-query'
 const API_BASE_URL = 'http://localhost:8080/api'
 
 type AlertData = {
-	email: string;
-	phone: string;
-	notificationDays: number;
-	minSnowAmount: number;
-	resorts: string[];
-  }
-
+	email: string
+	phone: string
+	notificationDays: number
+	minSnowAmount: number
+	resortsUuids: string[]
+}
 
 const createAlert = async (data: AlertData): Promise<void> => {
-	const response = await fetch(`${API_BASE_URL}/createAlert`, {
+	const response = await fetch(`${API_BASE_URL}/alerts`, {
 		method: 'PUT',
 		headers: {
 			'Content-Type': 'application/json',
 		},
 		credentials: 'include',
-		body: JSON.stringify(data)
+		body: JSON.stringify(data),
 	})
 
 	if (!response.ok) {
@@ -28,7 +27,7 @@ const createAlert = async (data: AlertData): Promise<void> => {
 
 export function useCreateAlert() {
 	const {
-        mutate,
+		mutate,
 		isPending,
 		isError,
 		error,
@@ -38,7 +37,7 @@ export function useCreateAlert() {
 	})
 
 	return {
-        createAlert: mutate,
+		createAlert: mutate,
 		loading: isPending,
 		error: isError ? error?.message || 'An error occurred' : null,
 	}

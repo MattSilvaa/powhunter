@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -26,7 +27,6 @@ type Resort struct {
 }
 
 func main() {
-	// Read resorts from JSON file
 	data, err := os.ReadFile("internal/handlers/data/resorts.json")
 	if err != nil {
 		log.Fatalf("Failed to read resorts data: %v", err)
@@ -37,17 +37,14 @@ func main() {
 		log.Fatalf("Failed to parse resorts data: %v", err)
 	}
 
-	// Connect to database
 	dbConn, err := db.New()
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer dbConn.Close()
 
-	// Create queries
 	queries := dbgen.New(dbConn)
 
-	// Clear existing resorts
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -56,16 +53,30 @@ func main() {
 		log.Fatalf("Failed to clear resorts: %v", err)
 	}
 
-	// Insert resorts
 	for _, r := range resorts {
 		_, err := queries.InsertResort(ctx, dbgen.InsertResortParams{
-			Uuid:        uuid.New().String(),
-			Name:        r.Name,
-			UrlHost:     r.URL.Host,
-			UrlPathname: r.URL.PathName,
-			Latitude:    r.Lat,
-			Longitude:   r.Lon,
-			NoaaStation: r.Noaa,
+			Uuid: uuid.New(),
+			Name: r.Name,
+			UrlHost: sql.NullString{
+				String: r.URL.Host,
+				Valid:  r.URL.Host != "",
+			},
+			UrlPathname: sql.NullString{
+				String: r.URL.PathName,
+				Valid:  r.URL.PathName != "",
+			},
+			Latitude: sql.NullFloat64{
+				Float64: r.Lat,
+				Valid:   true,
+			},
+			Longitude: sql.NullFloat64{
+				Float64: r.Lon,
+				Valid:   true,
+			},
+			NoaaStation: sql.NullString{
+				String: r.Noaa,
+				Valid:  r.Noaa != "",
+			},
 		})
 		if err != nil {
 			log.Fatalf("Failed to insert resort %s: %v", r.Name, err)

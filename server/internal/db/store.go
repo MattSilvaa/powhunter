@@ -6,31 +6,30 @@ import (
 	"fmt"
 	"time"
 
-	db "github.com/MattSilvaa/powhunter/internal/db/generated"
+	"github.com/google/uuid"
+
+	dbgen "github.com/MattSilvaa/powhunter/internal/db/generated"
 )
 
-// Store handles all database interactions
 type Store struct {
-	db *sql.DB
-	*db.Queries
+	db      *sql.DB
+	queries *dbgen.Queries
 }
 
-// NewStore creates a new store with database connection
 func NewStore(db *sql.DB) *Store {
 	return &Store{
 		db:      db,
-		Queries: db.New(db),
+		queries: dbgen.New(db),
 	}
 }
 
-// ExecTx executes a function within a database transaction
-func (s *Store) ExecTx(ctx context.Context, fn func(*db.Queries) error) error {
+func (s *Store) ExecTx(ctx context.Context, fn func(*dbgen.Queries) error) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %w", err)
 	}
 
-	q := db.New(tx)
+	q := dbgen.New(tx)
 	err = fn(q)
 	if err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
@@ -46,30 +45,51 @@ func (s *Store) ExecTx(ctx context.Context, fn func(*db.Queries) error) error {
 	return nil
 }
 
-// CreateUserWithAlerts creates a user and their resort alerts in a single transaction
+func (s *Store) ListAllResorts(ctx context.Context) ([]dbgen.Resort, error) {
+	resorts, err := s.queries.ListResorts(ctx)
+	if err != nil {
+		return []dbgen.Resort{}, fmt.Errorf("error getting all alerts: %w", err)
+	}
+
+	return resorts, nil
+}
+
 func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
 	minSnowAmount, notificationDays int32, resortUUIDs []string) error {
 
-	return s.ExecTx(ctx, func(q *db.Queries) error {
-		// Create the user
+	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
 		phoneParam := sql.NullString{
 			String: phone,
 			Valid:  phone != "",
 		}
 
-		user, err := q.CreateUser(ctx, db.CreateUserParams{
+		user, err := q.CreateUser(ctx, dbgen.CreateUserParams{
 			Email: email,
 			Phone: phoneParam,
 		})
+
 		if err != nil {
 			return fmt.Errorf("error creating user: %w", err)
 		}
 
-		// Create alerts for each resort
 		for _, resortUUID := range resortUUIDs {
-			_, err = q.CreateUserAlert(ctx, db.CreateUserAlertParams{
-				UserID:           user.ID,
-				ResortUuid:       resortUUID,
+			var ruuid uuid.NullUUID
+			if resortUUID != "" {
+				parsedUUID, err := uuid.Parse(resortUUID)
+				if err != nil {
+					return fmt.Errorf("error parsing resort UUID %s: %w", resortUUID, err)
+				}
+				ruuid = uuid.NullUUID{UUID: parsedUUID, Valid: true}
+			} else {
+				ruuid = uuid.NullUUID{Valid: false}
+			}
+
+			_, err = q.CreateUserAlert(ctx, dbgen.CreateUserAlertParams{
+				UserID: sql.NullInt32{
+					Int32: user.ID,
+					Valid: true,
+				},
+				ResortUuid:       ruuid,
 				MinSnowAmount:    minSnowAmount,
 				NotificationDays: notificationDays,
 			})
@@ -82,14 +102,23 @@ func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
 	})
 }
 
-// UpdateSnowForecasts updates snow forecasts for a resort
 func (s *Store) UpdateSnowForecasts(ctx context.Context, resortUUID string,
 	forecasts map[time.Time]int32) error {
+	var ruuid uuid.NullUUID
+	if resortUUID != "" {
+		parsedUUID, err := uuid.Parse(resortUUID)
+		if err != nil {
+			return fmt.Errorf("error parsing resort UUID %s: %w", resortUUID, err)
+		}
+		ruuid = uuid.NullUUID{UUID: parsedUUID, Valid: true}
+	} else {
+		ruuid = uuid.NullUUID{Valid: false}
+	}
 
-	return s.ExecTx(ctx, func(q *db.Queries) error {
+	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
 		for date, amount := range forecasts {
-			_, err := q.CreateSnowForecast(ctx, db.CreateSnowForecastParams{
-				ResortUuid:          resortUUID,
+			_, err := q.CreateSnowForecast(ctx, dbgen.CreateSnowForecastParams{
+				ResortUuid:          ruuid,
 				ForecastDate:        date,
 				PredictedSnowAmount: amount,
 			})
@@ -104,13 +133,10 @@ func (s *Store) UpdateSnowForecasts(ctx context.Context, resortUUID string,
 
 // FindAlertsToSend finds alerts that should be sent based on forecast data
 func (s *Store) FindAlertsToSend(ctx context.Context, daysAhead int) ([]AlertToSend, error) {
-	// This will be a complex query in the future
-	// For now, we'll return a placeholder
 	alerts := []AlertToSend{}
 	return alerts, nil
 }
 
-// AlertToSend represents a snow alert that should be sent to a user
 type AlertToSend struct {
 	UserEmail    string
 	UserPhone    string

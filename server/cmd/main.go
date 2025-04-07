@@ -17,10 +17,9 @@ func main() {
 		log.Fatalf("Failed to initialize handlers: %v", err)
 	}
 
-	// Set up routes
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/resorts", h.Resort.GetAllResorts)
-	mux.HandleFunc("/api/createAlert", h.Alert.CreateAlert)
+	mux.HandleFunc("/api/resorts", h.Resort.ListAllResorts)
+	mux.HandleFunc("/api/alerts", h.Alert.CreateAlert)
 
 	handler := corsMiddleware(mux)
 
