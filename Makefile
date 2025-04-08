@@ -1,4 +1,4 @@
-.PHONY: dev build clean server client db-setup db-migrate db-reset generate-db-code db-seed
+.PHONY: dev build clean server client db-setup db-migrate db-reset generate-db-code db-seed check-forecasts
 
 dev:
 	@echo "Starting development environment..."
@@ -7,6 +7,7 @@ build:
 	@echo "Building client and server..."
 	@cd client && deno task build
 	@cd server && go build -o bin/powhunter cmd/main.go
+	@cd server && go build -o bin/check_forecasts cmd/check_forecasts/main.go
 
 clean:
 	@echo "Cleaning build artifacts..."
@@ -55,3 +56,11 @@ generate-db-code:
 db-seed:
 	@echo "Seeding database with initial data..."
 	@cd server && go run cmd/seed/main.go
+
+check-forecasts:
+	@echo "Checking snow forecasts..."
+	@cd server && go run cmd/check_forecasts/main.go
+
+check-forecasts-send-sms:
+	@echo "Checking snow forecasts and sending SMS..."
+	@cd server && go run cmd/check_forecasts/main.go -send-sms

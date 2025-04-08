@@ -39,6 +39,11 @@ type Handlers struct {
 	store  *db.Store
 }
 
+// Store returns the store used by the handlers
+func (h *Handlers) Store() *db.Store {
+	return h.store
+}
+
 //go:embed "data/resorts.json"
 var resortsFS embed.FS
 

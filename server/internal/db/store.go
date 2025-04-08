@@ -11,6 +11,34 @@ import (
 	dbgen "github.com/MattSilvaa/powhunter/internal/db/generated"
 )
 
+//go:generate mockgen -destination=mocks/mock_store.go -package=mocks github.com/MattSilvaa/powhunter/internal/db StoreService
+
+// StoreService defines the interface for database operations
+type StoreService interface {
+	// ListAllResorts returns all resorts
+	ListAllResorts(ctx context.Context) ([]dbgen.Resort, error)
+	
+	// GetAlertMatches returns alerts matching forecast criteria
+	GetAlertMatches(
+		ctx context.Context,
+		resortUUID string,
+		forecastDate time.Time,
+		predictedSnowAmount int32,
+		daysAhead int32,
+	) ([]AlertToSend, error)
+	
+	// RecordAlertSent records that an alert was sent
+	RecordAlertSent(ctx context.Context, alert AlertToSend) error
+	
+	// CreateUserWithAlerts creates a new user with alert preferences
+	CreateUserWithAlerts(
+		ctx context.Context, 
+		email, phone string,
+		minSnowAmount, notificationDays int32, 
+		resortUUIDs []string,
+	) error
+}
+
 type Store struct {
 	db      *sql.DB
 	queries *dbgen.Queries
@@ -102,45 +130,113 @@ func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
 	})
 }
 
-func (s *Store) UpdateSnowForecasts(ctx context.Context, resortUUID string,
-	forecasts map[time.Time]int32) error {
-	var ruuid uuid.NullUUID
-	if resortUUID != "" {
-		parsedUUID, err := uuid.Parse(resortUUID)
-		if err != nil {
-			return fmt.Errorf("error parsing resort UUID %s: %w", resortUUID, err)
-		}
-		ruuid = uuid.NullUUID{UUID: parsedUUID, Valid: true}
-	} else {
-		ruuid = uuid.NullUUID{Valid: false}
+// GetAlertMatches finds alerts that match a specific resort, date, and snow amount
+func (s *Store) GetAlertMatches(
+	ctx context.Context,
+	resortUUID string,
+	forecastDate time.Time,
+	predictedSnowAmount int32,
+	daysAhead int32,
+) ([]AlertToSend, error) {
+	parsedUUID, err := uuid.Parse(resortUUID)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing resort UUID %s: %w", resortUUID, err)
 	}
 
-	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
-		for date, amount := range forecasts {
-			_, err := q.CreateSnowForecast(ctx, dbgen.CreateSnowForecastParams{
-				ResortUuid:          ruuid,
-				ForecastDate:        date,
-				PredictedSnowAmount: amount,
-			})
-			if err != nil {
-				return fmt.Errorf("error updating forecast for %s on %s: %w",
-					resortUUID, date.Format("2006-01-02"), err)
-			}
+	query := `
+	SELECT 
+		u.id as user_id,
+		u.email, 
+		u.phone, 
+		r.name as resort_name,
+		r.uuid as resort_uuid,
+		$3 as snow_amount,
+		$2 as forecast_date
+	FROM user_alerts ua
+	JOIN users u ON ua.user_id = u.id
+	JOIN resorts r ON ua.resort_uuid = r.uuid
+	LEFT JOIN alert_history ah ON 
+		ah.user_id = u.id AND 
+		ah.resort_uuid = r.uuid AND 
+		ah.forecast_date = $2
+	WHERE ua.active = TRUE
+	AND r.uuid = $1
+	AND $3 >= ua.min_snow_amount
+	AND $4 <= ua.notification_days
+	AND ah.id IS NULL
+	`
+
+	rows, err := s.db.QueryContext(ctx, query, parsedUUID, forecastDate, predictedSnowAmount, daysAhead)
+	if err != nil {
+		return nil, fmt.Errorf("error querying alert matches: %w", err)
+	}
+	defer rows.Close()
+
+	var alerts []AlertToSend
+	for rows.Next() {
+		var alert AlertToSend
+		var phone sql.NullString
+		
+		if err := rows.Scan(
+			&alert.UserID,
+			&alert.UserEmail,
+			&phone,
+			&alert.ResortName,
+			&alert.ResortUUID,
+			&alert.SnowAmount,
+			&alert.ForecastDate,
+		); err != nil {
+			return nil, fmt.Errorf("error scanning alert row: %w", err)
 		}
-		return nil
-	})
+
+		if phone.Valid {
+			alert.UserPhone = phone.String
+		}
+
+		alerts = append(alerts, alert)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating alert rows: %w", err)
+	}
+
+	return alerts, nil
 }
 
 // FindAlertsToSend finds alerts that should be sent based on forecast data
+// This is kept for backward compatibility
 func (s *Store) FindAlertsToSend(ctx context.Context, daysAhead int) ([]AlertToSend, error) {
 	alerts := []AlertToSend{}
 	return alerts, nil
 }
 
+// RecordAlertSent records that an alert was sent to avoid sending duplicates
+func (s *Store) RecordAlertSent(ctx context.Context, alert AlertToSend) error {
+	query := `
+	INSERT INTO alert_history (user_id, resort_uuid, forecast_date, snow_amount)
+	VALUES ($1, $2, $3, $4)
+	`
+
+	_, err := s.db.ExecContext(ctx, query, 
+		alert.UserID, 
+		alert.ResortUUID,
+		alert.ForecastDate,
+		alert.SnowAmount,
+	)
+
+	if err != nil {
+		return fmt.Errorf("error recording alert sent: %w", err)
+	}
+
+	return nil
+}
+
 type AlertToSend struct {
+	UserID       int32
 	UserEmail    string
 	UserPhone    string
 	ResortName   string
+	ResortUUID   string
 	SnowAmount   int32
 	ForecastDate time.Time
 }

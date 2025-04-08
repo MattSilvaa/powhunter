@@ -1,28 +1,38 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/MattSilvaa/powhunter/internal/handlers"
+	"github.com/MattSilvaa/powhunter/internal/notify"
+	"github.com/MattSilvaa/powhunter/internal/scheduler"
+	"github.com/MattSilvaa/powhunter/internal/weather"
 
 	_ "github.com/lib/pq"
 )
 
 func main() {
+	// Create our API handlers
 	h, err := handlers.NewHandlers()
 	if err != nil {
 		log.Fatalf("Failed to initialize handlers: %v", err)
 	}
 
+	// Set up the router
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/resorts", h.Resort.ListAllResorts)
 	mux.HandleFunc("/api/alerts", h.Alert.CreateAlert)
 
+	// Apply CORS middleware
 	handler := corsMiddleware(mux)
 
+	// Set up the server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -36,10 +46,76 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	log.Printf("Server starting on %s", server.Addr)
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+	// Initialize the weather client
+	weatherClient := weather.NewWeatherGovClient()
+
+	// Initialize Twilio client (if credentials are available)
+	var twilioClient notify.NotificationService
+	twilioAccountSID := os.Getenv("TWILIO_ACCOUNT_SID")
+	twilioAuthToken := os.Getenv("TWILIO_AUTH_TOKEN")
+	twilioFromNumber := os.Getenv("TWILIO_FROM_NUMBER")
+
+	if twilioAccountSID != "" && twilioAuthToken != "" && twilioFromNumber != "" {
+		twilioClient = notify.NewTwilioClient(
+			twilioAccountSID,
+			twilioAuthToken,
+			twilioFromNumber,
+		)
+		log.Println("Twilio client initialized")
+	} else {
+		log.Println("Twilio credentials not found. SMS notifications will not be sent.")
 	}
+
+	// Initialize and start the forecast scheduler
+	var forecastScheduler scheduler.ForecastSchedulerService
+
+	if twilioClient != nil {
+		forecastScheduler = scheduler.NewForecastScheduler(
+			h.Store(),
+			weatherClient,
+			twilioClient,
+			12*time.Hour, // Check forecasts every 12 hours
+		)
+
+		// Start the scheduler
+		forecastScheduler.Start()
+		log.Println("Forecast scheduler started")
+	} else {
+		log.Println("Skipping forecast scheduler initialization due to missing Twilio credentials")
+	}
+
+	// Set up graceful shutdown
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	// Start the server in a goroutine
+	go func() {
+		log.Printf("Server starting on %s", server.Addr)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server failed to start: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal
+	<-stop
+	log.Println("Shutting down server...")
+
+	// Create a deadline for shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Stop the scheduler if it's running
+	if forecastScheduler != nil {
+		forecastScheduler.Stop()
+		log.Println("Forecast scheduler stopped")
+	}
+
+	// Gracefully shut down the server
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server exited gracefully")
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
