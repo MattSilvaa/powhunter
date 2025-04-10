@@ -12,7 +12,7 @@ import (
 )
 
 const getResortByUUID = `-- name: GetResortByUUID :one
-SELECT id, uuid, name, url_host, url_pathname, latitude, longitude, noaa_station FROM resorts
+SELECT id, uuid, name, url_host, url_pathname, latitude, longitude FROM resorts
 WHERE uuid = $1 LIMIT 1
 `
 
@@ -27,13 +27,12 @@ func (q *Queries) GetResortByUUID(ctx context.Context, argUuid uuid.UUID) (Resor
 		&i.UrlPathname,
 		&i.Latitude,
 		&i.Longitude,
-		&i.NoaaStation,
 	)
 	return i, err
 }
 
 const listResorts = `-- name: ListResorts :many
-SELECT id, uuid, name, url_host, url_pathname, latitude, longitude, noaa_station FROM resorts
+SELECT id, uuid, name, url_host, url_pathname, latitude, longitude FROM resorts
 ORDER BY name
 `
 
@@ -54,7 +53,6 @@ func (q *Queries) ListResorts(ctx context.Context) ([]Resort, error) {
 			&i.UrlPathname,
 			&i.Latitude,
 			&i.Longitude,
-			&i.NoaaStation,
 		); err != nil {
 			return nil, err
 		}

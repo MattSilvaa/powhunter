@@ -18,8 +18,7 @@ CREATE TABLE resorts (
     url_host VARCHAR(255),
     url_pathname VARCHAR(255),
     latitude DOUBLE PRECISION,
-    longitude DOUBLE PRECISION,
-    noaa_station VARCHAR(10)
+    longitude DOUBLE PRECISION
 );
 
 CREATE TABLE user_alerts (

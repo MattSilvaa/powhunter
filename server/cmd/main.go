@@ -18,21 +18,17 @@ import (
 )
 
 func main() {
-	// Create our API handlers
 	h, err := handlers.NewHandlers()
 	if err != nil {
 		log.Fatalf("Failed to initialize handlers: %v", err)
 	}
 
-	// Set up the router
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/resorts", h.Resort.ListAllResorts)
 	mux.HandleFunc("/api/alerts", h.Alert.CreateAlert)
 
-	// Apply CORS middleware
 	handler := corsMiddleware(mux)
 
-	// Set up the server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -46,10 +42,8 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Initialize the weather client
-	weatherClient := weather.NewWeatherGovClient()
+	weatherClient := weather.NewOpenMeteoClient()
 
-	// Initialize Twilio client (if credentials are available)
 	var twilioClient notify.NotificationService
 	twilioAccountSID := os.Getenv("TWILIO_ACCOUNT_SID")
 	twilioAuthToken := os.Getenv("TWILIO_AUTH_TOKEN")
@@ -74,7 +68,7 @@ func main() {
 			h.Store(),
 			weatherClient,
 			twilioClient,
-			12*time.Hour, // Check forecasts every 12 hours
+			12*time.Hour,
 		)
 
 		// Start the scheduler

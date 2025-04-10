@@ -18,10 +18,10 @@ import (
 type ForecastSchedulerService interface {
 	// Start begins the scheduler
 	Start()
-	
+
 	// Stop shuts down the scheduler
 	Stop()
-	
+
 	// CheckForecasts checks for new snow forecasts and sends alerts
 	CheckForecasts() error
 }
@@ -29,12 +29,12 @@ type ForecastSchedulerService interface {
 // ForecastScheduler handles regular checking of weather forecasts
 // and sending notifications for new snow
 type ForecastScheduler struct {
-	store          db.StoreService
-	weatherClient  weather.WeatherService
-	twilioClient   notify.NotificationService
-	interval       time.Duration
-	quit           chan struct{}
-	wg             sync.WaitGroup
+	store         db.StoreService
+	weatherClient weather.WeatherService
+	twilioClient  notify.NotificationService
+	interval      time.Duration
+	quit          chan struct{}
+	wg            sync.WaitGroup
 }
 
 // NewForecastScheduler creates a new forecast scheduler
@@ -61,7 +61,6 @@ func (s *ForecastScheduler) Start() {
 		ticker := time.NewTicker(s.interval)
 		defer ticker.Stop()
 
-		// Run once at startup
 		if err := s.CheckForecasts(); err != nil {
 			log.Printf("Error checking forecasts: %v", err)
 		}
@@ -79,13 +78,11 @@ func (s *ForecastScheduler) Start() {
 	}()
 }
 
-// Stop shuts down the scheduler
 func (s *ForecastScheduler) Stop() {
 	close(s.quit)
 	s.wg.Wait()
 }
 
-// CheckForecasts checks for new snow forecasts and sends alerts
 func (s *ForecastScheduler) CheckForecasts() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -96,42 +93,41 @@ func (s *ForecastScheduler) CheckForecasts() error {
 		return fmt.Errorf("error listing resorts: %w", err)
 	}
 
-	// Process each resort
 	for _, resort := range resorts {
-		// Skip if missing lat/lon
 		if !resort.Latitude.Valid || !resort.Longitude.Valid {
 			log.Printf("Skipping resort %s: missing coordinates", resort.Name)
 			continue
 		}
 
-		// Get snow forecast
 		predictions, err := s.weatherClient.GetSnowForecast(ctx, resort.Latitude.Float64, resort.Longitude.Float64)
 		if err != nil {
 			log.Printf("Error getting forecast for %s: %v", resort.Name, err)
 			continue
 		}
 
-		// Skip if no snow predicted
 		if len(predictions) == 0 {
 			continue
 		}
 
-		// Process each prediction
 		for _, pred := range predictions {
-			// Convert to int32 (round up for most favorable prediction)
 			snowAmount := int32(pred.SnowAmount + 0.5)
 			if snowAmount <= 0 {
 				continue
 			}
 
-			// Find matching alerts
+			/*
+				 	We need to do the following:
+						1. Check all users that have an alert for this resort
+						2. Check whether we've already sent them an alert that it's going to snow on that day?
+						3. If we have not sent them an alert, send an alert and add it to alert history for that date
+			*/
+
 			alerts, err := s.findMatchingAlerts(ctx, resort.Uuid.String(), pred.Date, snowAmount)
 			if err != nil {
 				log.Printf("Error finding matching alerts for %s: %v", resort.Name, err)
 				continue
 			}
 
-			// Send notifications for each alert
 			for _, alert := range alerts {
 				if err := s.sendAlertNotification(ctx, alert, pred.SnowAmount); err != nil {
 					log.Printf("Error sending notification: %v", err)
@@ -151,13 +147,15 @@ func (s *ForecastScheduler) findMatchingAlerts(
 	forecastDate time.Time,
 	snowAmount int32,
 ) ([]db.AlertToSend, error) {
-	// Calculate days ahead
-	daysAhead := int32(forecastDate.Sub(time.Now().Truncate(24*time.Hour)).Hours() / 24)
+	// Get dates in UTC and round down to midnight of the current day
+	nowDate := time.Now().UTC().Truncate(24 * time.Hour)
+	forecastDateUTC := forecastDate.UTC().Truncate(24 * time.Hour)
+
+	daysAhead := int32(forecastDateUTC.Sub(nowDate).Hours() / 24)
 	if daysAhead < 0 {
 		daysAhead = 0
 	}
 
-	// Find matching alerts
 	return s.store.GetAlertMatches(ctx, resortUUID, forecastDate, snowAmount, daysAhead)
 }
 
@@ -167,7 +165,6 @@ func (s *ForecastScheduler) sendAlertNotification(
 	alert db.AlertToSend,
 	snowAmount float64,
 ) error {
-	// Skip if no contact method
 	if alert.UserPhone == "" && alert.UserEmail == "" {
 		return fmt.Errorf("no contact method for user ID %d", alert.UserID)
 	}

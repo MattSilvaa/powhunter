@@ -23,11 +23,11 @@ func (q *Queries) ClearResorts(ctx context.Context) error {
 
 const insertResort = `-- name: InsertResort :one
 INSERT INTO resorts (
-  uuid, name, url_host, url_pathname, latitude, longitude, noaa_station
+  uuid, name, url_host, url_pathname, latitude, longitude
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7
+  $1, $2, $3, $4, $5, $6
 )
-RETURNING id, uuid, name, url_host, url_pathname, latitude, longitude, noaa_station
+RETURNING id, uuid, name, url_host, url_pathname, latitude, longitude
 `
 
 type InsertResortParams struct {
@@ -37,7 +37,6 @@ type InsertResortParams struct {
 	UrlPathname sql.NullString  `json:"url_pathname"`
 	Latitude    sql.NullFloat64 `json:"latitude"`
 	Longitude   sql.NullFloat64 `json:"longitude"`
-	NoaaStation sql.NullString  `json:"noaa_station"`
 }
 
 func (q *Queries) InsertResort(ctx context.Context, arg InsertResortParams) (Resort, error) {
@@ -48,7 +47,6 @@ func (q *Queries) InsertResort(ctx context.Context, arg InsertResortParams) (Res
 		arg.UrlPathname,
 		arg.Latitude,
 		arg.Longitude,
-		arg.NoaaStation,
 	)
 	var i Resort
 	err := row.Scan(
@@ -59,7 +57,6 @@ func (q *Queries) InsertResort(ctx context.Context, arg InsertResortParams) (Res
 		&i.UrlPathname,
 		&i.Latitude,
 		&i.Longitude,
-		&i.NoaaStation,
 	)
 	return i, err
 }

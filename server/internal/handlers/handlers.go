@@ -19,9 +19,8 @@ type Resort struct {
 		Host     string `json:"host"`
 		PathName string `json:"pathname"`
 	} `json:"url"`
-	Lat  float64 `json:"lat"`
-	Lon  float64 `json:"lon"`
-	Noaa string  `json:"noaa"`
+	Lat float64 `json:"lat"`
+	Lon float64 `json:"lon"`
 }
 
 type ResortHandler struct {

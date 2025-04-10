@@ -28,7 +28,6 @@ type Resort struct {
 	UrlPathname sql.NullString  `json:"url_pathname"`
 	Latitude    sql.NullFloat64 `json:"latitude"`
 	Longitude   sql.NullFloat64 `json:"longitude"`
-	NoaaStation sql.NullString  `json:"noaa_station"`
 }
 
 type SnowForecast struct {

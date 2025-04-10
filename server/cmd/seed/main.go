@@ -21,9 +21,8 @@ type Resort struct {
 		Host     string `json:"host"`
 		PathName string `json:"pathname"`
 	} `json:"url"`
-	Lat  float64 `json:"lat"`
-	Lon  float64 `json:"lon"`
-	Noaa string  `json:"noaa"`
+	Lat float64 `json:"lat"`
+	Lon float64 `json:"lon"`
 }
 
 func main() {
@@ -72,10 +71,6 @@ func main() {
 			Longitude: sql.NullFloat64{
 				Float64: r.Lon,
 				Valid:   true,
-			},
-			NoaaStation: sql.NullString{
-				String: r.Noaa,
-				Valid:  r.Noaa != "",
 			},
 		})
 		if err != nil {

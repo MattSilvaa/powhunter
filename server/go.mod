@@ -7,4 +7,4 @@ require (
 	github.com/lib/pq v1.10.9
 )
 
-require go.uber.org/mock v0.5.1 // indirect
+require go.uber.org/mock v0.5.1
