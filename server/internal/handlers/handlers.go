@@ -134,7 +134,7 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Email == "" || len(req.ResortsUuids) == 0 {
+	if (req.Phone == "" && req.Email == "") || len(req.ResortsUuids) == 0 {
 		http.Error(w, "Email and at least one resort are required", http.StatusBadRequest)
 		return
 	}
@@ -153,11 +153,6 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Printf("Failed to create alert: %v", err)
-
-		if err.Error() == "error creating user: ERROR: duplicate key value violates unique constraint \"users_email_key\"" {
-			http.Error(w, "User with this email already exists", http.StatusConflict)
-			return
-		}
 
 		http.Error(w, "Failed to create alert", http.StatusInternalServerError)
 		return

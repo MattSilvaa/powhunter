@@ -17,7 +17,7 @@ import (
 type StoreService interface {
 	// ListAllResorts returns all resorts
 	ListAllResorts(ctx context.Context) ([]dbgen.Resort, error)
-	
+
 	// GetAlertMatches returns alerts matching forecast criteria
 	GetAlertMatches(
 		ctx context.Context,
@@ -26,15 +26,15 @@ type StoreService interface {
 		predictedSnowAmount int32,
 		daysAhead int32,
 	) ([]AlertToSend, error)
-	
+
 	// RecordAlertSent records that an alert was sent
 	RecordAlertSent(ctx context.Context, alert AlertToSend) error
-	
+
 	// CreateUserWithAlerts creates a new user with alert preferences
 	CreateUserWithAlerts(
-		ctx context.Context, 
+		ctx context.Context,
 		email, phone string,
-		minSnowAmount, notificationDays int32, 
+		minSnowAmount, notificationDays int32,
 		resortUUIDs []string,
 	) error
 }
@@ -143,61 +143,57 @@ func (s *Store) GetAlertMatches(
 		return nil, fmt.Errorf("error parsing resort UUID %s: %w", resortUUID, err)
 	}
 
-	query := `
-	SELECT 
-		u.id as user_id,
-		u.email, 
-		u.phone, 
-		r.name as resort_name,
-		r.uuid as resort_uuid,
-		$3 as snow_amount,
-		$2 as forecast_date
-	FROM user_alerts ua
-	JOIN users u ON ua.user_id = u.id
-	JOIN resorts r ON ua.resort_uuid = r.uuid
-	LEFT JOIN alert_history ah ON 
-		ah.user_id = u.id AND 
-		ah.resort_uuid = r.uuid AND 
-		ah.forecast_date = $2
-	WHERE ua.active = TRUE
-	AND r.uuid = $1
-	AND $3 >= ua.min_snow_amount
-	AND $4 <= ua.notification_days
-	AND ah.id IS NULL
-	`
-
-	rows, err := s.db.QueryContext(ctx, query, parsedUUID, forecastDate, predictedSnowAmount, daysAhead)
+	// Get all active alerts
+	activeAlerts, err := s.queries.ListActiveAlerts(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error querying alert matches: %w", err)
+		return nil, fmt.Errorf("error listing active alerts: %w", err)
 	}
-	defer rows.Close()
 
 	var alerts []AlertToSend
-	for rows.Next() {
-		var alert AlertToSend
-		var phone sql.NullString
-		
-		if err := rows.Scan(
-			&alert.UserID,
-			&alert.UserEmail,
-			&phone,
-			&alert.ResortName,
-			&alert.ResortUUID,
-			&alert.SnowAmount,
-			&alert.ForecastDate,
-		); err != nil {
-			return nil, fmt.Errorf("error scanning alert row: %w", err)
+	for _, alert := range activeAlerts {
+		// Filter for matching resort
+		if alert.ResortUuid.UUID != parsedUUID {
+			continue
 		}
 
-		if phone.Valid {
-			alert.UserPhone = phone.String
+		// Check if snow amount is sufficient
+		if predictedSnowAmount < alert.MinSnowAmount {
+			continue
 		}
 
-		alerts = append(alerts, alert)
-	}
+		// Check if days ahead is within notification preferences
+		if daysAhead > alert.NotificationDays {
+			continue
+		}
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating alert rows: %w", err)
+		// Check if we've already sent an alert for this user/resort/date
+		alreadySent, err := s.queries.CheckAlertSent(ctx, dbgen.CheckAlertSentParams{
+			UserID: alert.UserID,
+			ResortUuid: alert.ResortUuid,
+			ForecastDate: forecastDate,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error checking if alert was sent: %w", err)
+		}
+		if alreadySent {
+			continue
+		}
+
+		// Create AlertToSend object
+		alertToSend := AlertToSend{
+			UserID:       alert.UserID.Int32,
+			UserEmail:    alert.Email,
+			ResortName:   alert.ResortName,
+			ResortUUID:   alert.ResortUuid.UUID.String(),
+			SnowAmount:   predictedSnowAmount,
+			ForecastDate: forecastDate,
+		}
+
+		if alert.Phone.Valid {
+			alertToSend.UserPhone = alert.Phone.String
+		}
+
+		alerts = append(alerts, alertToSend)
 	}
 
 	return alerts, nil
@@ -217,8 +213,8 @@ func (s *Store) RecordAlertSent(ctx context.Context, alert AlertToSend) error {
 	VALUES ($1, $2, $3, $4)
 	`
 
-	_, err := s.db.ExecContext(ctx, query, 
-		alert.UserID, 
+	_, err := s.db.ExecContext(ctx, query,
+		alert.UserID,
 		alert.ResortUUID,
 		alert.ForecastDate,
 		alert.SnowAmount,

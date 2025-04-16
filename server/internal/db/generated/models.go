@@ -30,14 +30,6 @@ type Resort struct {
 	Longitude   sql.NullFloat64 `json:"longitude"`
 }
 
-type SnowForecast struct {
-	ID                  int32         `json:"id"`
-	ResortUuid          uuid.NullUUID `json:"resort_uuid"`
-	ForecastDate        time.Time     `json:"forecast_date"`
-	PredictedSnowAmount int32         `json:"predicted_snow_amount"`
-	LastUpdated         sql.NullTime  `json:"last_updated"`
-}
-
 type User struct {
 	ID        int32          `json:"id"`
 	Uuid      uuid.UUID      `json:"uuid"`

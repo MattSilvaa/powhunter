@@ -15,21 +15,17 @@ import (
 )
 
 func main() {
-	// Parse command-line flags
 	sendSMS := flag.Bool("send-sms", false, "Actually send SMS notifications")
 	flag.Parse()
 
-	// Connect to the database
 	dbConn, err := db.New()
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
+
 	store := db.NewStore(dbConn)
+	weatherClient := weather.NewOpenMeteoClient()
 
-	// Create the weather client
-	weatherClient := weather.NewWeatherGovClient()
-
-	// Create the Twilio client if credentials are available and SMS sending is enabled
 	var twilioClient notify.NotificationService
 	if *sendSMS {
 		twilioAccountSID := os.Getenv("TWILIO_ACCOUNT_SID")
@@ -47,12 +43,10 @@ func main() {
 		)
 		log.Println("Twilio client initialized")
 	} else {
-		// Create a dummy notification service that just logs messages
 		twilioClient = &DummyNotificationService{}
 		log.Println("Using dummy notification service (SMS will not be sent)")
 	}
 
-	// Get all resorts
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
@@ -61,9 +55,6 @@ func main() {
 		log.Fatalf("Failed to list resorts: %v", err)
 	}
 
-	log.Printf("Found %d resorts", len(resorts))
-
-	// Process each resort
 	for _, resort := range resorts {
 		// Skip if missing lat/lon
 		if !resort.Latitude.Valid || !resort.Longitude.Valid {
@@ -73,14 +64,12 @@ func main() {
 
 		log.Printf("Checking forecast for %s (%.4f, %.4f)", resort.Name, resort.Latitude.Float64, resort.Longitude.Float64)
 
-		// Get snow forecast
 		predictions, err := weatherClient.GetSnowForecast(ctx, resort.Latitude.Float64, resort.Longitude.Float64)
 		if err != nil {
 			log.Printf("Error getting forecast for %s: %v", resort.Name, err)
 			continue
 		}
 
-		// Report predictions
 		if len(predictions) == 0 {
 			log.Printf("No snow predicted for %s", resort.Name)
 			continue
@@ -90,13 +79,11 @@ func main() {
 		for _, pred := range predictions {
 			log.Printf("  %s: %.1f inches", pred.Date.Format("2006-01-02"), pred.SnowAmount)
 
-			// Compute days ahead for this prediction
 			daysAhead := int32(pred.Date.Sub(time.Now().Truncate(24*time.Hour)).Hours() / 24)
 			if daysAhead < 0 {
 				daysAhead = 0
 			}
 
-			// Find matching alerts
 			snowAmount := int32(pred.SnowAmount + 0.5) // Round up for best prediction
 			alerts, err := store.GetAlertMatches(ctx, resort.Uuid.String(), pred.Date, snowAmount, daysAhead)
 			if err != nil {
@@ -104,10 +91,9 @@ func main() {
 				continue
 			}
 
-			// Report matching alerts
-			log.Printf("  Found %d matching alerts", len(alerts))
+			log.Printf("Found %d matching alerts", len(alerts))
 			for _, alert := range alerts {
-				log.Printf("  Alert for %s (Email: %s, Phone: %s)", alert.ResortName, alert.UserEmail, alert.UserPhone)
+				log.Printf("Alert for %s (Email: %s, Phone: %s)", alert.ResortName, alert.UserEmail, alert.UserPhone)
 
 				// Send notification
 				if alert.UserPhone != "" {

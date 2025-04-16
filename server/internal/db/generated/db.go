@@ -30,23 +30,17 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.clearResortsStmt, err = db.PrepareContext(ctx, clearResorts); err != nil {
 		return nil, fmt.Errorf("error preparing query ClearResorts: %w", err)
 	}
-	if q.createAlertHistoryStmt, err = db.PrepareContext(ctx, createAlertHistory); err != nil {
-		return nil, fmt.Errorf("error preparing query CreateAlertHistory: %w", err)
-	}
-	if q.createSnowForecastStmt, err = db.PrepareContext(ctx, createSnowForecast); err != nil {
-		return nil, fmt.Errorf("error preparing query CreateSnowForecast: %w", err)
-	}
 	if q.createUserStmt, err = db.PrepareContext(ctx, createUser); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateUser: %w", err)
 	}
 	if q.createUserAlertStmt, err = db.PrepareContext(ctx, createUserAlert); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateUserAlert: %w", err)
 	}
+	if q.getLastAlertSnowAmountStmt, err = db.PrepareContext(ctx, getLastAlertSnowAmount); err != nil {
+		return nil, fmt.Errorf("error preparing query GetLastAlertSnowAmount: %w", err)
+	}
 	if q.getResortByUUIDStmt, err = db.PrepareContext(ctx, getResortByUUID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetResortByUUID: %w", err)
-	}
-	if q.getSnowForecastsStmt, err = db.PrepareContext(ctx, getSnowForecasts); err != nil {
-		return nil, fmt.Errorf("error preparing query GetSnowForecasts: %w", err)
 	}
 	if q.getUserAlertStmt, err = db.PrepareContext(ctx, getUserAlert); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserAlert: %w", err)
@@ -56,6 +50,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getUserByUUIDStmt, err = db.PrepareContext(ctx, getUserByUUID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserByUUID: %w", err)
+	}
+	if q.insertAlertHistoryStmt, err = db.PrepareContext(ctx, insertAlertHistory); err != nil {
+		return nil, fmt.Errorf("error preparing query InsertAlertHistory: %w", err)
 	}
 	if q.insertResortStmt, err = db.PrepareContext(ctx, insertResort); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertResort: %w", err)
@@ -84,16 +81,6 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing clearResortsStmt: %w", cerr)
 		}
 	}
-	if q.createAlertHistoryStmt != nil {
-		if cerr := q.createAlertHistoryStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing createAlertHistoryStmt: %w", cerr)
-		}
-	}
-	if q.createSnowForecastStmt != nil {
-		if cerr := q.createSnowForecastStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing createSnowForecastStmt: %w", cerr)
-		}
-	}
 	if q.createUserStmt != nil {
 		if cerr := q.createUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createUserStmt: %w", cerr)
@@ -104,14 +91,14 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing createUserAlertStmt: %w", cerr)
 		}
 	}
+	if q.getLastAlertSnowAmountStmt != nil {
+		if cerr := q.getLastAlertSnowAmountStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getLastAlertSnowAmountStmt: %w", cerr)
+		}
+	}
 	if q.getResortByUUIDStmt != nil {
 		if cerr := q.getResortByUUIDStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getResortByUUIDStmt: %w", cerr)
-		}
-	}
-	if q.getSnowForecastsStmt != nil {
-		if cerr := q.getSnowForecastsStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getSnowForecastsStmt: %w", cerr)
 		}
 	}
 	if q.getUserAlertStmt != nil {
@@ -127,6 +114,11 @@ func (q *Queries) Close() error {
 	if q.getUserByUUIDStmt != nil {
 		if cerr := q.getUserByUUIDStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getUserByUUIDStmt: %w", cerr)
+		}
+	}
+	if q.insertAlertHistoryStmt != nil {
+		if cerr := q.insertAlertHistoryStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing insertAlertHistoryStmt: %w", cerr)
 		}
 	}
 	if q.insertResortStmt != nil {
@@ -186,43 +178,41 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                     DBTX
-	tx                     *sql.Tx
-	checkAlertSentStmt     *sql.Stmt
-	clearResortsStmt       *sql.Stmt
-	createAlertHistoryStmt *sql.Stmt
-	createSnowForecastStmt *sql.Stmt
-	createUserStmt         *sql.Stmt
-	createUserAlertStmt    *sql.Stmt
-	getResortByUUIDStmt    *sql.Stmt
-	getSnowForecastsStmt   *sql.Stmt
-	getUserAlertStmt       *sql.Stmt
-	getUserByEmailStmt     *sql.Stmt
-	getUserByUUIDStmt      *sql.Stmt
-	insertResortStmt       *sql.Stmt
-	listActiveAlertsStmt   *sql.Stmt
-	listResortsStmt        *sql.Stmt
-	updateUserAlertStmt    *sql.Stmt
+	db                         DBTX
+	tx                         *sql.Tx
+	checkAlertSentStmt         *sql.Stmt
+	clearResortsStmt           *sql.Stmt
+	createUserStmt             *sql.Stmt
+	createUserAlertStmt        *sql.Stmt
+	getLastAlertSnowAmountStmt *sql.Stmt
+	getResortByUUIDStmt        *sql.Stmt
+	getUserAlertStmt           *sql.Stmt
+	getUserByEmailStmt         *sql.Stmt
+	getUserByUUIDStmt          *sql.Stmt
+	insertAlertHistoryStmt     *sql.Stmt
+	insertResortStmt           *sql.Stmt
+	listActiveAlertsStmt       *sql.Stmt
+	listResortsStmt            *sql.Stmt
+	updateUserAlertStmt        *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                     tx,
-		tx:                     tx,
-		checkAlertSentStmt:     q.checkAlertSentStmt,
-		clearResortsStmt:       q.clearResortsStmt,
-		createAlertHistoryStmt: q.createAlertHistoryStmt,
-		createSnowForecastStmt: q.createSnowForecastStmt,
-		createUserStmt:         q.createUserStmt,
-		createUserAlertStmt:    q.createUserAlertStmt,
-		getResortByUUIDStmt:    q.getResortByUUIDStmt,
-		getSnowForecastsStmt:   q.getSnowForecastsStmt,
-		getUserAlertStmt:       q.getUserAlertStmt,
-		getUserByEmailStmt:     q.getUserByEmailStmt,
-		getUserByUUIDStmt:      q.getUserByUUIDStmt,
-		insertResortStmt:       q.insertResortStmt,
-		listActiveAlertsStmt:   q.listActiveAlertsStmt,
-		listResortsStmt:        q.listResortsStmt,
-		updateUserAlertStmt:    q.updateUserAlertStmt,
+		db:                         tx,
+		tx:                         tx,
+		checkAlertSentStmt:         q.checkAlertSentStmt,
+		clearResortsStmt:           q.clearResortsStmt,
+		createUserStmt:             q.createUserStmt,
+		createUserAlertStmt:        q.createUserAlertStmt,
+		getLastAlertSnowAmountStmt: q.getLastAlertSnowAmountStmt,
+		getResortByUUIDStmt:        q.getResortByUUIDStmt,
+		getUserAlertStmt:           q.getUserAlertStmt,
+		getUserByEmailStmt:         q.getUserByEmailStmt,
+		getUserByUUIDStmt:          q.getUserByUUIDStmt,
+		insertAlertHistoryStmt:     q.insertAlertHistoryStmt,
+		insertResortStmt:           q.insertResortStmt,
+		listActiveAlertsStmt:       q.listActiveAlertsStmt,
+		listResortsStmt:            q.listResortsStmt,
+		updateUserAlertStmt:        q.updateUserAlertStmt,
 	}
 }

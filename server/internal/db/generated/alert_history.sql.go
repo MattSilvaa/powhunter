@@ -18,7 +18,7 @@ SELECT EXISTS(
   SELECT 1 FROM alert_history
   WHERE user_id = $1
     AND resort_uuid = $2
-        AND forecast_date = $3
+    AND forecast_date = $3
 ) as alert_sent
 `
 
@@ -35,37 +35,50 @@ func (q *Queries) CheckAlertSent(ctx context.Context, arg CheckAlertSentParams) 
 	return alert_sent, err
 }
 
-const createAlertHistory = `-- name: CreateAlertHistory :one
-INSERT INTO alert_history (
-  user_id, resort_uuid, forecast_date, snow_amount
-) VALUES (
-  $1, $2, $3, $4
-)
-RETURNING id, user_id, resort_uuid, sent_at, forecast_date, snow_amount
+const getLastAlertSnowAmount = `-- name: GetLastAlertSnowAmount :one
+SELECT snow_amount
+FROM alert_history
+WHERE user_id = $1
+  AND resort_uuid = $2
+  AND forecast_date = $3
+ORDER BY sent_at DESC
+LIMIT 1
 `
 
-type CreateAlertHistoryParams struct {
+type GetLastAlertSnowAmountParams struct {
+	UserID       sql.NullInt32 `json:"user_id"`
+	ResortUuid   uuid.NullUUID `json:"resort_uuid"`
+	ForecastDate time.Time     `json:"forecast_date"`
+}
+
+func (q *Queries) GetLastAlertSnowAmount(ctx context.Context, arg GetLastAlertSnowAmountParams) (int32, error) {
+	row := q.queryRow(ctx, q.getLastAlertSnowAmountStmt, getLastAlertSnowAmount, arg.UserID, arg.ResortUuid, arg.ForecastDate)
+	var snow_amount int32
+	err := row.Scan(&snow_amount)
+	return snow_amount, err
+}
+
+const insertAlertHistory = `-- name: InsertAlertHistory :exec
+INSERT INTO alert_history (
+  user_id, resort_uuid, forecast_date, snow_amount, sent_at
+) VALUES (
+  $1, $2, $3, $4, NOW()
+)
+`
+
+type InsertAlertHistoryParams struct {
 	UserID       sql.NullInt32 `json:"user_id"`
 	ResortUuid   uuid.NullUUID `json:"resort_uuid"`
 	ForecastDate time.Time     `json:"forecast_date"`
 	SnowAmount   int32         `json:"snow_amount"`
 }
 
-func (q *Queries) CreateAlertHistory(ctx context.Context, arg CreateAlertHistoryParams) (AlertHistory, error) {
-	row := q.queryRow(ctx, q.createAlertHistoryStmt, createAlertHistory,
+func (q *Queries) InsertAlertHistory(ctx context.Context, arg InsertAlertHistoryParams) error {
+	_, err := q.exec(ctx, q.insertAlertHistoryStmt, insertAlertHistory,
 		arg.UserID,
 		arg.ResortUuid,
 		arg.ForecastDate,
 		arg.SnowAmount,
 	)
-	var i AlertHistory
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.ResortUuid,
-		&i.SentAt,
-		&i.ForecastDate,
-		&i.SnowAmount,
-	)
-	return i, err
+	return err
 }

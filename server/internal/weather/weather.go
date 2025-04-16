@@ -104,7 +104,6 @@ func ParseWeatherData(forecast *OpenMeteoResponse) []WeatherPrediction {
 	tempMaxByDate := make(map[string]float64)
 	countByDate := make(map[string]int)
 
-	// Process hourly data
 	for i, timestamp := range forecast.Hourly.Time {
 		if i >= len(forecast.Hourly.Snowfall) || i >= len(forecast.Hourly.Temperature) {
 			fmt.Printf("mismatch between items in time and snowfall/temperature")
@@ -119,7 +118,6 @@ func ParseWeatherData(forecast *OpenMeteoResponse) []WeatherPrediction {
 			tempMinByDate[dateStr] = temp
 			tempMaxByDate[dateStr] = temp
 		} else {
-			// Update min/max as needed
 			if temp < tempMinByDate[dateStr] {
 				tempMinByDate[dateStr] = temp
 			}
