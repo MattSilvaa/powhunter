@@ -7,29 +7,27 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
 )
 
 const checkAlertSent = `-- name: CheckAlertSent :one
-SELECT EXISTS(
-  SELECT 1 FROM alert_history
-  WHERE user_id = $1
-    AND resort_uuid = $2
-    AND forecast_date = $3
-) as alert_sent
+SELECT EXISTS(SELECT 1
+              FROM alert_history
+              WHERE user_uuid = $1
+                AND resort_uuid = $2
+                AND forecast_date = $3) as alert_sent
 `
 
 type CheckAlertSentParams struct {
-	UserID       sql.NullInt32 `json:"user_id"`
+	UserUuid     uuid.NullUUID `json:"user_uuid"`
 	ResortUuid   uuid.NullUUID `json:"resort_uuid"`
 	ForecastDate time.Time     `json:"forecast_date"`
 }
 
 func (q *Queries) CheckAlertSent(ctx context.Context, arg CheckAlertSentParams) (bool, error) {
-	row := q.queryRow(ctx, q.checkAlertSentStmt, checkAlertSent, arg.UserID, arg.ResortUuid, arg.ForecastDate)
+	row := q.queryRow(ctx, q.checkAlertSentStmt, checkAlertSent, arg.UserUuid, arg.ResortUuid, arg.ForecastDate)
 	var alert_sent bool
 	err := row.Scan(&alert_sent)
 	return alert_sent, err
@@ -38,36 +36,32 @@ func (q *Queries) CheckAlertSent(ctx context.Context, arg CheckAlertSentParams) 
 const getLastAlertSnowAmount = `-- name: GetLastAlertSnowAmount :one
 SELECT snow_amount
 FROM alert_history
-WHERE user_id = $1
+WHERE user_uuid = $1
   AND resort_uuid = $2
   AND forecast_date = $3
-ORDER BY sent_at DESC
-LIMIT 1
+ORDER BY sent_at DESC LIMIT 1
 `
 
 type GetLastAlertSnowAmountParams struct {
-	UserID       sql.NullInt32 `json:"user_id"`
+	UserUuid     uuid.NullUUID `json:"user_uuid"`
 	ResortUuid   uuid.NullUUID `json:"resort_uuid"`
 	ForecastDate time.Time     `json:"forecast_date"`
 }
 
 func (q *Queries) GetLastAlertSnowAmount(ctx context.Context, arg GetLastAlertSnowAmountParams) (int32, error) {
-	row := q.queryRow(ctx, q.getLastAlertSnowAmountStmt, getLastAlertSnowAmount, arg.UserID, arg.ResortUuid, arg.ForecastDate)
+	row := q.queryRow(ctx, q.getLastAlertSnowAmountStmt, getLastAlertSnowAmount, arg.UserUuid, arg.ResortUuid, arg.ForecastDate)
 	var snow_amount int32
 	err := row.Scan(&snow_amount)
 	return snow_amount, err
 }
 
 const insertAlertHistory = `-- name: InsertAlertHistory :exec
-INSERT INTO alert_history (
-  user_id, resort_uuid, forecast_date, snow_amount, sent_at
-) VALUES (
-  $1, $2, $3, $4, NOW()
-)
+INSERT INTO alert_history (user_uuid, resort_uuid, forecast_date, snow_amount, sent_at)
+VALUES ($1, $2, $3, $4, NOW())
 `
 
 type InsertAlertHistoryParams struct {
-	UserID       sql.NullInt32 `json:"user_id"`
+	UserUuid     uuid.NullUUID `json:"user_uuid"`
 	ResortUuid   uuid.NullUUID `json:"resort_uuid"`
 	ForecastDate time.Time     `json:"forecast_date"`
 	SnowAmount   int32         `json:"snow_amount"`
@@ -75,7 +69,7 @@ type InsertAlertHistoryParams struct {
 
 func (q *Queries) InsertAlertHistory(ctx context.Context, arg InsertAlertHistoryParams) error {
 	_, err := q.exec(ctx, q.insertAlertHistoryStmt, insertAlertHistory,
-		arg.UserID,
+		arg.UserUuid,
 		arg.ResortUuid,
 		arg.ForecastDate,
 		arg.SnowAmount,

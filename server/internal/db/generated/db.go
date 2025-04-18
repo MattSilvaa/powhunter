@@ -39,6 +39,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getLastAlertSnowAmountStmt, err = db.PrepareContext(ctx, getLastAlertSnowAmount); err != nil {
 		return nil, fmt.Errorf("error preparing query GetLastAlertSnowAmount: %w", err)
 	}
+	if q.getResortAlertsStmt, err = db.PrepareContext(ctx, getResortAlerts); err != nil {
+		return nil, fmt.Errorf("error preparing query GetResortAlerts: %w", err)
+	}
 	if q.getResortByUUIDStmt, err = db.PrepareContext(ctx, getResortByUUID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetResortByUUID: %w", err)
 	}
@@ -94,6 +97,11 @@ func (q *Queries) Close() error {
 	if q.getLastAlertSnowAmountStmt != nil {
 		if cerr := q.getLastAlertSnowAmountStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getLastAlertSnowAmountStmt: %w", cerr)
+		}
+	}
+	if q.getResortAlertsStmt != nil {
+		if cerr := q.getResortAlertsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getResortAlertsStmt: %w", cerr)
 		}
 	}
 	if q.getResortByUUIDStmt != nil {
@@ -185,6 +193,7 @@ type Queries struct {
 	createUserStmt             *sql.Stmt
 	createUserAlertStmt        *sql.Stmt
 	getLastAlertSnowAmountStmt *sql.Stmt
+	getResortAlertsStmt        *sql.Stmt
 	getResortByUUIDStmt        *sql.Stmt
 	getUserAlertStmt           *sql.Stmt
 	getUserByEmailStmt         *sql.Stmt
@@ -205,6 +214,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		createUserStmt:             q.createUserStmt,
 		createUserAlertStmt:        q.createUserAlertStmt,
 		getLastAlertSnowAmountStmt: q.getLastAlertSnowAmountStmt,
+		getResortAlertsStmt:        q.getResortAlertsStmt,
 		getResortByUUIDStmt:        q.getResortByUUIDStmt,
 		getUserAlertStmt:           q.getUserAlertStmt,
 		getUserByEmailStmt:         q.getUserByEmailStmt,

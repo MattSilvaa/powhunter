@@ -13,16 +13,12 @@ import (
 )
 
 const createUserAlert = `-- name: CreateUserAlert :one
-INSERT INTO user_alerts (
-  user_id, resort_uuid, min_snow_amount, notification_days
-) VALUES (
-  $1, $2, $3, $4
-)
-RETURNING id, user_id, resort_uuid, min_snow_amount, notification_days, active, created_at
+INSERT INTO user_alerts (user_uuid, resort_uuid, min_snow_amount, notification_days)
+VALUES ($1, $2, $3, $4) RETURNING id, user_uuid, resort_uuid, min_snow_amount, notification_days, active, created_at
 `
 
 type CreateUserAlertParams struct {
-	UserID           sql.NullInt32 `json:"user_id"`
+	UserUuid         uuid.NullUUID `json:"user_uuid"`
 	ResortUuid       uuid.NullUUID `json:"resort_uuid"`
 	MinSnowAmount    int32         `json:"min_snow_amount"`
 	NotificationDays int32         `json:"notification_days"`
@@ -30,7 +26,7 @@ type CreateUserAlertParams struct {
 
 func (q *Queries) CreateUserAlert(ctx context.Context, arg CreateUserAlertParams) (UserAlert, error) {
 	row := q.queryRow(ctx, q.createUserAlertStmt, createUserAlert,
-		arg.UserID,
+		arg.UserUuid,
 		arg.ResortUuid,
 		arg.MinSnowAmount,
 		arg.NotificationDays,
@@ -38,7 +34,7 @@ func (q *Queries) CreateUserAlert(ctx context.Context, arg CreateUserAlertParams
 	var i UserAlert
 	err := row.Scan(
 		&i.ID,
-		&i.UserID,
+		&i.UserUuid,
 		&i.ResortUuid,
 		&i.MinSnowAmount,
 		&i.NotificationDays,
@@ -48,23 +44,62 @@ func (q *Queries) CreateUserAlert(ctx context.Context, arg CreateUserAlertParams
 	return i, err
 }
 
+const getResortAlerts = `-- name: GetResortAlerts :many
+SELECT id, user_uuid, resort_uuid, min_snow_amount, notification_days, active, created_at
+FROM user_alerts
+WHERE resort_uuid = $1
+  and active = true
+`
+
+func (q *Queries) GetResortAlerts(ctx context.Context, resortUuid uuid.NullUUID) ([]UserAlert, error) {
+	rows, err := q.query(ctx, q.getResortAlertsStmt, getResortAlerts, resortUuid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserAlert{}
+	for rows.Next() {
+		var i UserAlert
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserUuid,
+			&i.ResortUuid,
+			&i.MinSnowAmount,
+			&i.NotificationDays,
+			&i.Active,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUserAlert = `-- name: GetUserAlert :one
-SELECT id, user_id, resort_uuid, min_snow_amount, notification_days, active, created_at FROM user_alerts
-WHERE user_id = $1 AND resort_uuid = $2
-LIMIT 1
+SELECT id, user_uuid, resort_uuid, min_snow_amount, notification_days, active, created_at
+FROM user_alerts
+WHERE user_uuid = $1
+  AND resort_uuid = $2 LIMIT 1
 `
 
 type GetUserAlertParams struct {
-	UserID     sql.NullInt32 `json:"user_id"`
+	UserUuid   uuid.NullUUID `json:"user_uuid"`
 	ResortUuid uuid.NullUUID `json:"resort_uuid"`
 }
 
 func (q *Queries) GetUserAlert(ctx context.Context, arg GetUserAlertParams) (UserAlert, error) {
-	row := q.queryRow(ctx, q.getUserAlertStmt, getUserAlert, arg.UserID, arg.ResortUuid)
+	row := q.queryRow(ctx, q.getUserAlertStmt, getUserAlert, arg.UserUuid, arg.ResortUuid)
 	var i UserAlert
 	err := row.Scan(
 		&i.ID,
-		&i.UserID,
+		&i.UserUuid,
 		&i.ResortUuid,
 		&i.MinSnowAmount,
 		&i.NotificationDays,
@@ -75,19 +110,23 @@ func (q *Queries) GetUserAlert(ctx context.Context, arg GetUserAlertParams) (Use
 }
 
 const listActiveAlerts = `-- name: ListActiveAlerts :many
-SELECT
-  ua.id, ua.user_id, u.email, u.phone,
-  ua.resort_uuid, r.name as resort_name,
-  ua.min_snow_amount, ua.notification_days
+SELECT ua.id,
+       ua.user_uuid,
+       u.email,
+       u.phone,
+       ua.resort_uuid,
+       r.name as resort_name,
+       ua.min_snow_amount,
+       ua.notification_days
 FROM user_alerts ua
-JOIN users u ON ua.user_id = u.id
-JOIN resorts r ON ua.resort_uuid = r.uuid
+         JOIN users u ON ua.user_uuid = u.id
+         JOIN resorts r ON ua.resort_uuid = r.uuid
 WHERE ua.active = true
 `
 
 type ListActiveAlertsRow struct {
 	ID               int32          `json:"id"`
-	UserID           sql.NullInt32  `json:"user_id"`
+	UserUuid         uuid.NullUUID  `json:"user_uuid"`
 	Email            string         `json:"email"`
 	Phone            sql.NullString `json:"phone"`
 	ResortUuid       uuid.NullUUID  `json:"resort_uuid"`
@@ -107,7 +146,7 @@ func (q *Queries) ListActiveAlerts(ctx context.Context) ([]ListActiveAlertsRow, 
 		var i ListActiveAlertsRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.UserID,
+			&i.UserUuid,
 			&i.Email,
 			&i.Phone,
 			&i.ResortUuid,
@@ -130,15 +169,15 @@ func (q *Queries) ListActiveAlerts(ctx context.Context) ([]ListActiveAlertsRow, 
 
 const updateUserAlert = `-- name: UpdateUserAlert :one
 UPDATE user_alerts
-SET min_snow_amount = $3,
+SET min_snow_amount   = $3,
     notification_days = $4,
-    active = $5
-WHERE user_id = $1 AND resort_uuid = $2
-RETURNING id, user_id, resort_uuid, min_snow_amount, notification_days, active, created_at
+    active            = $5
+WHERE user_uuid = $1
+  AND resort_uuid = $2 RETURNING id, user_uuid, resort_uuid, min_snow_amount, notification_days, active, created_at
 `
 
 type UpdateUserAlertParams struct {
-	UserID           sql.NullInt32 `json:"user_id"`
+	UserUuid         uuid.NullUUID `json:"user_uuid"`
 	ResortUuid       uuid.NullUUID `json:"resort_uuid"`
 	MinSnowAmount    int32         `json:"min_snow_amount"`
 	NotificationDays int32         `json:"notification_days"`
@@ -147,7 +186,7 @@ type UpdateUserAlertParams struct {
 
 func (q *Queries) UpdateUserAlert(ctx context.Context, arg UpdateUserAlertParams) (UserAlert, error) {
 	row := q.queryRow(ctx, q.updateUserAlertStmt, updateUserAlert,
-		arg.UserID,
+		arg.UserUuid,
 		arg.ResortUuid,
 		arg.MinSnowAmount,
 		arg.NotificationDays,
@@ -156,7 +195,7 @@ func (q *Queries) UpdateUserAlert(ctx context.Context, arg UpdateUserAlertParams
 	var i UserAlert
 	err := row.Scan(
 		&i.ID,
-		&i.UserID,
+		&i.UserUuid,
 		&i.ResortUuid,
 		&i.MinSnowAmount,
 		&i.NotificationDays,

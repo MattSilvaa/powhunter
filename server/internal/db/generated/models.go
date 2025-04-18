@@ -13,7 +13,7 @@ import (
 
 type AlertHistory struct {
 	ID           int32         `json:"id"`
-	UserID       sql.NullInt32 `json:"user_id"`
+	UserUuid     uuid.NullUUID `json:"user_uuid"`
 	ResortUuid   uuid.NullUUID `json:"resort_uuid"`
 	SentAt       sql.NullTime  `json:"sent_at"`
 	ForecastDate time.Time     `json:"forecast_date"`
@@ -40,7 +40,7 @@ type User struct {
 
 type UserAlert struct {
 	ID               int32         `json:"id"`
-	UserID           sql.NullInt32 `json:"user_id"`
+	UserUuid         uuid.NullUUID `json:"user_uuid"`
 	ResortUuid       uuid.NullUUID `json:"resort_uuid"`
 	MinSnowAmount    int32         `json:"min_snow_amount"`
 	NotificationDays int32         `json:"notification_days"`
