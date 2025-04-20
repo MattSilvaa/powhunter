@@ -131,7 +131,7 @@ type AlertToSend struct {
 	UserEmail    string
 	UserPhone    string
 	ResortName   string
-	ResortUUID   string
+	ResortUUID   uuid.UUID
 	SnowAmount   int32
 	ForecastDate time.Time
 	IsUpdate     bool
@@ -188,7 +188,7 @@ func (s *Store) GetAlertMatches(
 						UserEmail:    userToAlert.Email,
 						UserPhone:    userToAlert.Phone.String,
 						ResortName:   resortToAlertUserOn.Name,
-						ResortUUID:   resortToAlertUserOn.Uuid.String(),
+						ResortUUID:   resortToAlertUserOn.Uuid,
 						SnowAmount:   predictedSnowAmount,
 						ForecastDate: forecastDate,
 						IsUpdate:     false,
@@ -197,7 +197,7 @@ func (s *Store) GetAlertMatches(
 					return fmt.Errorf("error getting latest alert for resort %s: %w", resortUUID, err)
 				}
 			}
-			// Alert when new snow ampunt is greater than or equal to 3 inches.
+			// Alert when new snow amount is greater than or equal to 3 inches
 			if predictedSnowAmount-lastAlertSnowAmount >= 3 {
 				userToAlert, err := q.GetUserByUUID(ctx, alert.UserUuid.UUID)
 				if err != nil {
@@ -214,7 +214,7 @@ func (s *Store) GetAlertMatches(
 					UserEmail:    userToAlert.Email,
 					UserPhone:    userToAlert.Phone.String,
 					ResortName:   resortToAlertUserOn.Name,
-					ResortUUID:   resortToAlertUserOn.Uuid.String(),
+					ResortUUID:   resortToAlertUserOn.Uuid,
 					SnowAmount:   predictedSnowAmount,
 					ForecastDate: forecastDate,
 					IsUpdate:     true,
@@ -232,31 +232,16 @@ func (s *Store) GetAlertMatches(
 	return alertsToSend, nil
 }
 
-//
-//// RecordAlertSent records that an alert was sent to avoid sending duplicates
-//func (s *Store) RecordAlertSent(ctx context.Context, alert AlertToSend) error {
-//	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
-//		var ruuid uuid.NullUUID
-//		if alert.ResortUUID != "" {
-//			parsedUUID, err := uuid.Parse(alert.ResortUUID)
-//			if err != nil {
-//				return fmt.Errorf("error parsing resort UUID %s: %w", alert.ResortUUID, err)
-//			}
-//			ruuid = uuid.NullUUID{UUID: parsedUUID, Valid: true}
-//		} else {
-//			ruuid = uuid.NullUUID{Valid: false}
-//		}
-//
-//		err := q.InsertAlertHistory(ctx, dbgen.InsertAlertHistoryParams{
-//			UserID: sql.NullInt32{
-//				Valid: true,
-//				Int32: alert.UserID,
-//			},
-//			ResortUuid:   ruuid,
-//			ForecastDate: alert.ForecastDate,
-//			SnowAmount:   alert.SnowAmount,
-//		})
-//
-//		return err
-//	})
-//}
+// RecordAlertSent records that an alert was sent to avoid sending duplicates
+func (s *Store) RecordAlertSent(ctx context.Context, alert AlertToSend) error {
+	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
+		err := q.InsertAlertHistory(ctx, dbgen.InsertAlertHistoryParams{
+			UserUuid:     uuid.NullUUID{UUID: alert.UserUuid, Valid: true},
+			ResortUuid:   uuid.NullUUID{UUID: alert.ResortUUID, Valid: true},
+			ForecastDate: alert.ForecastDate,
+			SnowAmount:   alert.SnowAmount,
+		})
+
+		return err
+	})
+}
