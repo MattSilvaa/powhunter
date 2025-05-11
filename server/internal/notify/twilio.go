@@ -1,12 +1,8 @@
 package notify
 
 import (
-	"crypto/dsa"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/url"
-	"strings"
 	"time"
 
 	"github.com/twilio/twilio-go"
@@ -23,21 +19,13 @@ type NotificationService interface {
 
 // TwilioClient handles SMS notifications via Twilio
 type TwilioClient struct {
-	accountSID string
-	authToken  string
 	fromNumber string
-	client     *http.Client
 }
 
 // NewTwilioClient creates a new Twilio client
-func NewTwilioClient(accountSID, authToken, fromNumber string) *TwilioClient {
+func NewTwilioClient(fromNumber string) *TwilioClient {
 	return &TwilioClient{
-		accountSID: accountSID,
-		authToken:  authToken,
 		fromNumber: fromNumber,
-		client: &http.Client{
-			Timeout: 10 * time.Second,
-		},
 	}
 }
 
@@ -47,56 +35,20 @@ func (t *TwilioClient) SendSMS(to, message string) error {
 		return fmt.Errorf("phone number and message are required")
 	}
 
+	// This will look for `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` variables inside the current environment to initialize the constructor
 	client := twilio.NewRestClient()
 	params := &twilioAPI.CreateMessageParams{}
+	params.SetTo("6195733405")
+	params.SetFrom(t.fromNumber)
+	params.SetBody("Test")
 
-	v2 := client.MessagingV2
-
-	params.SetTo(to)
-	params.SetA
-	params.SetFrom(t.serviceSID)
-
-	data := url.Values{}
-	data.Set("To", to)
-	data.Set("MessagingServiceSid", t.serviceSID)
-	data.Set("Body", message)
-
-	// Set up the HTTP request
-	req, err := http.NewRequest(
-		"POST",
-		fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Messages.json", t.accountSID),
-		strings.NewReader(data.Encode()),
-	)
-	if err != nil {
-		return fmt.Errorf("error creating Twilio request: %w", err)
-	}
-
-	// Set headers and auth
-	req.SetBasicAuth(t.accountSID, t.authToken)
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-	// Make the request
-	resp, err := t.client.Do(req)
+	resp, err := client.Api.CreateMessage(params)
 	if err != nil {
 		return fmt.Errorf("error sending SMS: %w", err)
 	}
-	defer resp.Body.Close()
 
-	// Check response
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var errResp struct {
-			Code     int    `json:"code"`
-			Message  string `json:"message"`
-			MoreInfo string `json:"more_info"`
-			Status   int    `json:"status"`
-		}
-
-		if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
-			return fmt.Errorf("error parsing Twilio error: %w (status: %d)", err, resp.StatusCode)
-		}
-
-		return fmt.Errorf("Twilio error: %s (code: %d)", errResp.Message, errResp.Code)
-	}
+	response, _ := json.Marshal(*resp)
+	fmt.Println("Response: " + string(response))
 
 	return nil
 }

@@ -87,7 +87,6 @@ func (s *ForecastScheduler) CheckForecasts() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	// Get all resorts
 	resorts, err := s.store.ListAllResorts(ctx)
 	if err != nil {
 		return fmt.Errorf("error listing resorts: %w", err)
@@ -147,7 +146,6 @@ func (s *ForecastScheduler) findMatchingAlerts(
 	forecastDate time.Time,
 	snowAmount int32,
 ) ([]db.AlertToSend, error) {
-	// Get dates in UTC and round down to midnight of the current day
 	nowDate := time.Now().UTC().Truncate(24 * time.Hour)
 	forecastDateUTC := forecastDate.UTC().Truncate(24 * time.Hour)
 
@@ -165,21 +163,19 @@ func (s *ForecastScheduler) sendAlertNotification(
 	alert db.AlertToSend,
 	snowAmount float64,
 ) error {
-	if alert.UserPhone == "" && alert.UserEmail == "" {
-		return fmt.Errorf("no contact method for user ID %d", alert.UserUuid)
+	if alert.UserPhone == "" {
+		return fmt.Errorf("no phone number for user ID %d", alert.UserUuid)
 	}
 
-	// Send SMS if phone available
-	if alert.UserPhone != "" {
-		message := notify.FormatSnowAlertMessage(alert.ResortName, snowAmount, alert.ForecastDate)
-		if err := s.twilioClient.SendSMS(alert.UserPhone, message); err != nil {
-			log.Printf("Error sending SMS to %s: %v", alert.UserPhone, err)
-		} else {
-			log.Printf("Sent SMS alert to %s for %s", alert.UserPhone, alert.ResortName)
-		}
+	message := notify.FormatSnowAlertMessage(alert.ResortName, snowAmount, alert.ForecastDate)
+	if err := s.twilioClient.SendSMS(alert.UserPhone, message); err != nil {
+		log.Printf("Error sending SMS to %s: %v", alert.UserPhone, err)
+		return fmt.Errorf("error sending SMS: %w", err)
+	} else {
+		log.Printf("Sent SMS alert to %s for %s", alert.UserPhone, alert.ResortName)
 	}
 
-	// Record that we sent the alert
+	// We want to keep track of each alert we've sent so we need to persist it
 	if err := s.store.RecordAlertSent(ctx, alert); err != nil {
 		return fmt.Errorf("error recording alert history: %w", err)
 	}

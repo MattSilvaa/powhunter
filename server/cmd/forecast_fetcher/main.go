@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"github.com/MattSilvaa/powhunter/internal/scheduler"
 	"log"
 	"os"
 	"time"
@@ -30,17 +31,30 @@ func main() {
 	if *sendSMS {
 		twilioAccountSID := os.Getenv("TWILIO_ACCOUNT_SID")
 		twilioAuthToken := os.Getenv("TWILIO_AUTH_TOKEN")
-		twilioServiceSID := os.Getenv("TWILIO_SERVICE_SID")
+		twilioFromNumber := os.Getenv("TWILIO_FROM_NUMBER")
 
-		if twilioAccountSID == "" || twilioAuthToken == "" || twilioServiceSID == "" {
-			log.Fatalf("Twilio credentials not found. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_SERVICE_SID environment variables.")
+		if twilioAccountSID == "" || twilioAuthToken == "" || twilioFromNumber == "" {
+			log.Fatalf("Twilio credentials not found. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER environment variables.")
 		}
-
 		twilioClient = notify.NewTwilioClient(
-			twilioAccountSID,
-			twilioAuthToken,
-			twilioServiceSID,
+			twilioFromNumber,
 		)
+
+		var forecastScheduler scheduler.ForecastSchedulerService
+
+		if twilioClient != nil {
+			forecastScheduler = scheduler.NewForecastScheduler(
+				h.Store(),
+				weatherClient,
+				twilioClient,
+				12*time.Hour,
+			)
+
+			forecastScheduler.Start()
+			log.Println("Forecast scheduler started")
+		} else {
+			log.Println("Skipping forecast scheduler initialization due to missing Twilio credentials")
+		}
 		log.Println("Twilio client initialized")
 	} else {
 		twilioClient = &DummyNotificationService{}

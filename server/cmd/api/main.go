@@ -49,12 +49,10 @@ func main() {
 
 	twilioAccountSID := os.Getenv("TWILIO_ACCOUNT_SID")
 	twilioAuthToken := os.Getenv("TWILIO_AUTH_TOKEN")
-	twilioFromNumber := os.Getenv("TWILIO_FROM_NUMBER", )
+	twilioFromNumber := os.Getenv("TWILIO_FROM_NUMBER")
 
 	if twilioAccountSID != "" && twilioAuthToken != "" && twilioFromNumber != "" {
 		twilioClient = notify.NewTwilioClient(
-			twilioAccountSID,
-			twilioAuthToken,
 			twilioFromNumber,
 		)
 		log.Println("Twilio client initialized")
