@@ -26,7 +26,7 @@ type Resort struct {
 }
 
 func main() {
-	data, err := os.ReadFile("internal/handlers/data/resorts.json")
+	data, err := os.ReadFile("cmd/seed/data/resorts.json")
 	if err != nil {
 		log.Fatalf("Failed to read resorts data: %v", err)
 	}

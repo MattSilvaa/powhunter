@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -45,9 +46,10 @@ func main() {
 	weatherClient := weather.NewOpenMeteoClient()
 
 	var twilioClient notify.NotificationService
+
 	twilioAccountSID := os.Getenv("TWILIO_ACCOUNT_SID")
 	twilioAuthToken := os.Getenv("TWILIO_AUTH_TOKEN")
-	twilioFromNumber := os.Getenv("TWILIO_FROM_NUMBER")
+	twilioFromNumber := os.Getenv("TWILIO_FROM_NUMBER", )
 
 	if twilioAccountSID != "" && twilioAuthToken != "" && twilioFromNumber != "" {
 		twilioClient = notify.NewTwilioClient(
@@ -60,7 +62,6 @@ func main() {
 		log.Println("Twilio credentials not found. SMS notifications will not be sent.")
 	}
 
-	// Initialize and start the forecast scheduler
 	var forecastScheduler scheduler.ForecastSchedulerService
 
 	if twilioClient != nil {
@@ -71,40 +72,35 @@ func main() {
 			12*time.Hour,
 		)
 
-		// Start the scheduler
 		forecastScheduler.Start()
 		log.Println("Forecast scheduler started")
 	} else {
 		log.Println("Skipping forecast scheduler initialization due to missing Twilio credentials")
 	}
 
-	// Set up graceful shutdown
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
-	// Start the server in a goroutine
 	go func() {
 		log.Printf("Server starting on %s", server.Addr)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server failed to start: %v", err)
+
+		serverErr := server.ListenAndServe()
+		if serverErr != nil && !errors.Is(serverErr, http.ErrServerClosed) {
+			log.Fatalf("Server failed to start: %v", serverErr)
 		}
 	}()
 
-	// Wait for interrupt signal
 	<-stop
 	log.Println("Shutting down server...")
 
-	// Create a deadline for shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Stop the scheduler if it's running
 	if forecastScheduler != nil {
 		forecastScheduler.Stop()
 		log.Println("Forecast scheduler stopped")
 	}
 
-	// Gracefully shut down the server
 	if err := server.Shutdown(ctx); err != nil {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}

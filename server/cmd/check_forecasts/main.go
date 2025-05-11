@@ -15,7 +15,7 @@ import (
 )
 
 func main() {
-	sendSMS := flag.Bool("send-sms", false, "Actually send SMS notifications")
+	sendSMS := flag.Bool("send-sms", true, "Actually send SMS notifications")
 	flag.Parse()
 
 	dbConn, err := db.New()
@@ -30,16 +30,16 @@ func main() {
 	if *sendSMS {
 		twilioAccountSID := os.Getenv("TWILIO_ACCOUNT_SID")
 		twilioAuthToken := os.Getenv("TWILIO_AUTH_TOKEN")
-		twilioFromNumber := os.Getenv("TWILIO_FROM_NUMBER")
+		twilioServiceSID := os.Getenv("TWILIO_SERVICE_SID")
 
-		if twilioAccountSID == "" || twilioAuthToken == "" || twilioFromNumber == "" {
-			log.Fatalf("Twilio credentials not found. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER environment variables.")
+		if twilioAccountSID == "" || twilioAuthToken == "" || twilioServiceSID == "" {
+			log.Fatalf("Twilio credentials not found. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_SERVICE_SID environment variables.")
 		}
 
 		twilioClient = notify.NewTwilioClient(
 			twilioAccountSID,
 			twilioAuthToken,
-			twilioFromNumber,
+			twilioServiceSID,
 		)
 		log.Println("Twilio client initialized")
 	} else {
@@ -56,7 +56,6 @@ func main() {
 	}
 
 	for _, resort := range resorts {
-		// Skip if missing lat/lon
 		if !resort.Latitude.Valid || !resort.Longitude.Valid {
 			log.Printf("Skipping resort %s: missing coordinates", resort.Name)
 			continue
@@ -93,7 +92,7 @@ func main() {
 
 			log.Printf("Found %d matching alerts", len(alerts))
 			for _, alert := range alerts {
-				log.Printf("Alert for %s (Email: %s, Phone: %s)", alert.ResortName, alert.UserEmail, alert.UserPhone)
+				log.Printf("Alert for %s (Phone: %s)", alert.ResortName, alert.UserPhone)
 
 				// Send notification
 				if alert.UserPhone != "" {

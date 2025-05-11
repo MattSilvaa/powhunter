@@ -29,7 +29,7 @@ CREATE TABLE user_alerts (
     notification_days INTEGER NOT NULL,
     active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(user_id, resort_uuid)
+    UNIQUE(user_uuid, resort_uuid)
 );
 
 CREATE TABLE alert_history (

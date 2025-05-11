@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"embed"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -29,7 +28,7 @@ type ResortHandler struct {
 }
 
 type AlertHandler struct {
-	store *db.Store
+	store db.StoreService
 }
 
 type Handlers struct {
@@ -42,9 +41,6 @@ type Handlers struct {
 func (h *Handlers) Store() *db.Store {
 	return h.store
 }
-
-//go:embed "data/resorts.json"
-var resortsFS embed.FS
 
 func setSecurityHeaders(w http.ResponseWriter) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -134,8 +130,8 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if (req.Phone == "" && req.Email == "") || len(req.ResortsUuids) == 0 {
-		http.Error(w, "Email and at least one resort are required", http.StatusBadRequest)
+	if req.Phone == "" || len(req.ResortsUuids) == 0 {
+		http.Error(w, "Phone and at least one resort are required", http.StatusBadRequest)
 		return
 	}
 
@@ -150,18 +146,21 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		int32(req.NotificationDays),
 		req.ResortsUuids,
 	)
-
 	if err != nil {
 		log.Printf("Failed to create alert: %v", err)
-
 		http.Error(w, "Failed to create alert", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	err = json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "Alert created successfully",
 	})
+
+	if err != nil {
+		log.Printf("Failed to write resposne: %v", err)
+		return
+	}
 }

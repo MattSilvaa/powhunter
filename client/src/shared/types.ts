@@ -16,7 +16,6 @@ export type ResortApiResponse = {
 	url_pathname: NullableString
 	latitude: NullableFloat
 	longitude: NullableFloat
-	noaa_station: NullableString
 }
 
 export type Resort = {
@@ -27,5 +26,4 @@ export type Resort = {
 	urlPathname: string | null
 	latitude: number | null
 	longitude: number | null
-	noaaStation: string | null
 }

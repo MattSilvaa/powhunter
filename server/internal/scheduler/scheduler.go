@@ -166,7 +166,7 @@ func (s *ForecastScheduler) sendAlertNotification(
 	snowAmount float64,
 ) error {
 	if alert.UserPhone == "" && alert.UserEmail == "" {
-		return fmt.Errorf("no contact method for user ID %d", alert.UserID)
+		return fmt.Errorf("no contact method for user ID %d", alert.UserUuid)
 	}
 
 	// Send SMS if phone available
