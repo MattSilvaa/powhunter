@@ -2,22 +2,19 @@ package main
 
 import (
 	"context"
-	"flag"
-	"github.com/MattSilvaa/powhunter/internal/scheduler"
 	"log"
 	"os"
 	"time"
 
 	"github.com/MattSilvaa/powhunter/internal/db"
 	"github.com/MattSilvaa/powhunter/internal/notify"
+	"github.com/MattSilvaa/powhunter/internal/scheduler"
 	"github.com/MattSilvaa/powhunter/internal/weather"
 
 	_ "github.com/lib/pq"
 )
 
 func main() {
-	sendSMS := flag.Bool("send-sms", true, "Actually send SMS notifications")
-	flag.Parse()
 
 	dbConn, err := db.New()
 	if err != nil {
@@ -28,38 +25,25 @@ func main() {
 	weatherClient := weather.NewOpenMeteoClient()
 
 	var twilioClient notify.NotificationService
-	if *sendSMS {
-		twilioAccountSID := os.Getenv("TWILIO_ACCOUNT_SID")
-		twilioAuthToken := os.Getenv("TWILIO_AUTH_TOKEN")
-		twilioFromNumber := os.Getenv("TWILIO_FROM_NUMBER")
+	twilioAccountSID := os.Getenv("TWILIO_ACCOUNT_SID")
+	twilioAuthToken := os.Getenv("TWILIO_AUTH_TOKEN")
+	twilioFromNumber := os.Getenv("TWILIO_FROM_NUMBER")
 
-		if twilioAccountSID == "" || twilioAuthToken == "" || twilioFromNumber == "" {
-			log.Fatalf("Twilio credentials not found. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER environment variables.")
-		}
-		twilioClient = notify.NewTwilioClient(
-			twilioFromNumber,
-		)
-
-		var forecastScheduler scheduler.ForecastSchedulerService
-
-		if twilioClient != nil {
-			forecastScheduler = scheduler.NewForecastScheduler(
-				h.Store(),
-				weatherClient,
-				twilioClient,
-				12*time.Hour,
-			)
-
-			forecastScheduler.Start()
-			log.Println("Forecast scheduler started")
-		} else {
-			log.Println("Skipping forecast scheduler initialization due to missing Twilio credentials")
-		}
-		log.Println("Twilio client initialized")
-	} else {
-		twilioClient = &DummyNotificationService{}
-		log.Println("Using dummy notification service (SMS will not be sent)")
+	if twilioAccountSID == "" || twilioAuthToken == "" || twilioFromNumber == "" {
+		log.Fatalf("Twilio credentials not found. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER environment variables.")
 	}
+	twilioClient = notify.NewTwilioClient(
+		twilioFromNumber,
+	)
+
+	forecastScheduler := scheduler.NewForecastScheduler(
+		store,
+		weatherClient,
+		twilioClient,
+		12*time.Hour,
+	)
+	forecastScheduler.Start()
+	log.Println("Forecast scheduler started")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -127,12 +111,4 @@ func main() {
 	}
 
 	log.Println("Forecast check complete")
-}
-
-// DummyNotificationService just logs messages instead of sending them
-type DummyNotificationService struct{}
-
-func (d *DummyNotificationService) SendSMS(to, message string) error {
-	log.Printf("[DUMMY SMS] To: %s, Message: %s", to, message)
-	return nil
 }

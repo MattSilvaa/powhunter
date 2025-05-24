@@ -102,18 +102,18 @@ func (h *ResortHandler) ListAllResorts(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func NewAlertHandler(store *db.Store) (*AlertHandler, error) {
+	return &AlertHandler{
+		store: store,
+	}, nil
+}
+
 type CreateAlertRequest struct {
 	Email            string   `json:"email"`
 	Phone            string   `json:"phone"`
 	NotificationDays int      `json:"notificationDays"`
 	MinSnowAmount    int      `json:"minSnowAmount"`
 	ResortsUuids     []string `json:"resortsUuids"`
-}
-
-func NewAlertHandler(store *db.Store) (*AlertHandler, error) {
-	return &AlertHandler{
-		store: store,
-	}, nil
 }
 
 func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {

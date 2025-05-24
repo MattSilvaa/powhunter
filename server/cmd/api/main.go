@@ -11,11 +11,6 @@ import (
 	"time"
 
 	"github.com/MattSilvaa/powhunter/internal/handlers"
-	"github.com/MattSilvaa/powhunter/internal/notify"
-	"github.com/MattSilvaa/powhunter/internal/scheduler"
-	"github.com/MattSilvaa/powhunter/internal/weather"
-
-	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -30,50 +25,12 @@ func main() {
 
 	handler := corsMiddleware(mux)
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
 	server := &http.Server{
-		Addr:         ":" + port,
+		Addr:         ":8080",
 		Handler:      handler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
-	}
-
-	weatherClient := weather.NewOpenMeteoClient()
-
-	var twilioClient notify.NotificationService
-
-	twilioAccountSID := os.Getenv("TWILIO_ACCOUNT_SID")
-	twilioAuthToken := os.Getenv("TWILIO_AUTH_TOKEN")
-	twilioFromNumber := os.Getenv("TWILIO_FROM_NUMBER")
-
-	if twilioAccountSID != "" && twilioAuthToken != "" && twilioFromNumber != "" {
-		twilioClient = notify.NewTwilioClient(
-			twilioFromNumber,
-		)
-		log.Println("Twilio client initialized")
-	} else {
-		log.Println("Twilio credentials not found. SMS notifications will not be sent.")
-	}
-
-	var forecastScheduler scheduler.ForecastSchedulerService
-
-	if twilioClient != nil {
-		forecastScheduler = scheduler.NewForecastScheduler(
-			h.Store(),
-			weatherClient,
-			twilioClient,
-			12*time.Hour,
-		)
-
-		forecastScheduler.Start()
-		log.Println("Forecast scheduler started")
-	} else {
-		log.Println("Skipping forecast scheduler initialization due to missing Twilio credentials")
 	}
 
 	stop := make(chan os.Signal, 1)
@@ -89,15 +46,10 @@ func main() {
 	}()
 
 	<-stop
-	log.Println("Shutting down server...")
+	log.Println("Shutting down API server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	if forecastScheduler != nil {
-		forecastScheduler.Stop()
-		log.Println("Forecast scheduler stopped")
-	}
 
 	if err := server.Shutdown(ctx); err != nil {
 		log.Fatalf("Server forced to shutdown: %v", err)
@@ -106,7 +58,7 @@ func main() {
 	log.Println("Server exited gracefully")
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
+func corsMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		allowedOrigin := "*"
 		if os.Getenv("ENVIRONMENT") == "production" {
@@ -125,6 +77,6 @@ func corsMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		next.ServeHTTP(w, r)
+		h.ServeHTTP(w, r)
 	})
 }
