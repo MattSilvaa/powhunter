@@ -91,7 +91,7 @@ type WeatherPrediction struct {
 }
 
 func (c *OpenMeteoClient) GetForecast(ctx context.Context, lat, lon float64) (*OpenMeteoResponse, error) {
-	url := fmt.Sprintf("%s/forecast?latitude=%.6f&longitude=%.6f&current=temperature_2m,snowfall&hourly=snowfall,temperature_2m&temperature_unit=fahrenheit&precipitation_unit=inch&temporal_resolution=hourly_6", c.baseURL, lat, lon)
+	url := fmt.Sprintf("%s/forecast?latitude=%.6f&longitude=%.6f&current=temperature_2m,snowfall&hourly=snowfall,temperature_2m&temperature_unit=fahrenheit&precipitation_unit=inch&temporal_resolution=hourly_6&timezone=Etc/UTC", c.baseURL, lat, lon)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {

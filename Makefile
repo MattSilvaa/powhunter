@@ -16,7 +16,7 @@ clean:
 
 server:
 	@echo "Starting server..."
-	@cd server && go run cmd/main.go
+	@cd server && go run cmd/api/main.go
 
 client:
 	@echo "Starting client..."

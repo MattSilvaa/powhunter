@@ -197,7 +197,7 @@ func (s *Store) GetAlertMatches(
 					return fmt.Errorf("error getting latest alert for resort %s: %w", resortUUID, err)
 				}
 			}
-			// Alert when new snow amount is greater than or equal to 3 inches
+			// Alert when the new snow amount is greater than or equal to 3 inches
 			if predictedSnowAmount-lastAlertSnowAmount >= 3 {
 				userToAlert, err := q.GetUserByUUID(ctx, alert.UserUuid.UUID)
 				if err != nil {
