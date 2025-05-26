@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -26,10 +27,41 @@ type OpenMeteoClient struct {
 func NewOpenMeteoClient() *OpenMeteoClient {
 	return &OpenMeteoClient{
 		client: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: 30 * time.Second,
 		},
 		baseURL: "https://api.open-meteo.com/v1",
 	}
+}
+
+// CustomTime handles Open-Meteo's time format "2006-01-02T15:04"
+type OpenMeteoTime struct {
+	time.Time
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for Open-Meteo's time format
+func (ct *OpenMeteoTime) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), `"`)
+	if s == "null" || s == "" {
+		return nil
+	}
+
+	// Try parsing with seconds first (in case format changes)
+	t, err := time.Parse("2006-01-02T15:04:05", s)
+	if err != nil {
+		// Fall back to format without seconds
+		t, err = time.Parse("2006-01-02T15:04", s)
+		if err != nil {
+			return fmt.Errorf("parsing time %q: %w", s, err)
+		}
+	}
+
+	ct.Time = t
+	return nil
+}
+
+// MarshalJSON implements JSON marshaling
+func (ct OpenMeteoTime) MarshalJSON() ([]byte, error) {
+	return json.Marshal(ct.Time.Format("2006-01-02T15:04:05"))
 }
 
 // OpenMeteoResponse represents the response from the Open-Meteo API
@@ -38,14 +70,14 @@ type OpenMeteoResponse struct {
 	Longitude float64 `json:"longitude"`
 	Elevation float64 `json:"elevation"`
 	Current   struct {
-		Time        time.Time `json:"time"`
-		Temperature float64   `json:"temperature_2m"`
-		Snowfall    float64   `json:"snowfall"`
+		Time        OpenMeteoTime `json:"time"`
+		Temperature float64       `json:"temperature_2m"`
+		Snowfall    float64       `json:"snowfall"`
 	} `json:"current"`
 	Hourly struct {
-		Time        []time.Time `json:"time"`
-		Temperature []float64   `json:"temperature_2m"`
-		Snowfall    []float64   `json:"snowfall"`
+		Time        []OpenMeteoTime `json:"time"`
+		Temperature []float64       `json:"temperature_2m"`
+		Snowfall    []float64       `json:"snowfall"`
 	} `json:"hourly"`
 }
 

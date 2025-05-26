@@ -11,6 +11,7 @@ import (
 
 	"github.com/MattSilvaa/powhunter/internal/db"
 	dbgen "github.com/MattSilvaa/powhunter/internal/db/generated"
+
 	"github.com/google/uuid"
 )
 
