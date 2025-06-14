@@ -24,7 +24,7 @@ type Resort struct {
 
 type ResortHandler struct {
 	resorts []Resort
-	store   *db.Store
+	store   db.StoreService
 }
 
 type AlertHandler struct {
@@ -74,7 +74,7 @@ func NewHandlers() (*Handlers, error) {
 	}, nil
 }
 
-func NewResortHandler(store *db.Store) (*ResortHandler, error) {
+func NewResortHandler(store db.StoreService) (*ResortHandler, error) {
 	return &ResortHandler{
 		store: store,
 	}, nil
@@ -94,15 +94,17 @@ func (h *ResortHandler) ListAllResorts(w http.ResponseWriter, r *http.Request) {
 	resorts, err := h.store.ListAllResorts(ctx)
 	if err != nil {
 		http.Error(w, "Failed to retrieve resorts", http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resorts); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
 	}
 }
 
-func NewAlertHandler(store *db.Store) (*AlertHandler, error) {
+func NewAlertHandler(store db.StoreService) (*AlertHandler, error) {
 	return &AlertHandler{
 		store: store,
 	}, nil

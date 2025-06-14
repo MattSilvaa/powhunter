@@ -8,20 +8,30 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	dbgen "github.com/MattSilvaa/powhunter/internal/db/generated"
 	"github.com/MattSilvaa/powhunter/internal/db/mocks"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
-// testAlertHandler creates an AlertHandler with a mock store for testing
 func testAlertHandler(t *testing.T) (*AlertHandler, *mocks.MockStoreService) {
 	ctrl := gomock.NewController(t)
 	mockStore := mocks.NewMockStoreService(ctrl)
 
-	// You'll need to modify your AlertHandler to accept StoreService interface
-	// or create a wrapper for testing purposes
 	handler := &AlertHandler{
+		store: mockStore,
+	}
+
+	return handler, mockStore
+}
+
+func testResortHandler(t *testing.T) (*ResortHandler, *mocks.MockStoreService) {
+	ctrl := gomock.NewController(t)
+	mockStore := mocks.NewMockStoreService(ctrl)
+
+	handler := &ResortHandler{
 		store: mockStore,
 	}
 
@@ -155,13 +165,10 @@ func TestCreateAlert(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create handler with mock store
 			handler, mockStore := testAlertHandler(t)
 
-			// Set up mock expectations
 			tt.setupMock(mockStore)
 
-			// Create request
 			var body bytes.Buffer
 			switch v := tt.requestBody.(type) {
 			case string:
@@ -175,23 +182,18 @@ func TestCreateAlert(t *testing.T) {
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 
-			// Create response recorder
 			rr := httptest.NewRecorder()
 
-			// Call handler
 			handler.CreateAlert(rr, req)
 
-			// Check status code
 			assert.Equal(t, tt.expectedStatus, rr.Code, "Status code mismatch")
 
-			// Check headers (only if specified in test case)
 			if tt.expectedHeaders != nil {
 				for key, value := range tt.expectedHeaders {
 					assert.Equal(t, value, rr.Header().Get(key), "Header mismatch: %s", key)
 				}
 			}
 
-			// Check response body (only for success cases)
 			if tt.expectedStatus == http.StatusCreated {
 				var response map[string]string
 				err = json.NewDecoder(rr.Body).Decode(&response)
@@ -202,7 +204,105 @@ func TestCreateAlert(t *testing.T) {
 	}
 }
 
-// TestSetSecurityHeaders tests that security headers are correctly set
+func TestListAllResorts(t *testing.T) {
+	tests := []struct {
+		name            string
+		method          string
+		setupMock       func(*mocks.MockStoreService)
+		expectedStatus  int
+		expectedHeaders map[string]string
+		expectedResorts []dbgen.Resort
+	}{
+		{
+			name:   "Success",
+			method: http.MethodGet,
+			setupMock: func(m *mocks.MockStoreService) {
+				mockResorts := []dbgen.Resort{
+					{
+						ID:   1,
+						Uuid: uuid.MustParse("550e8400-e29b-41d4-a716-446655440001"),
+						Name: "Whistler Blackcomb",
+					},
+					{
+						ID:   2,
+						Uuid: uuid.MustParse("550e8400-e29b-41d4-a716-446655440002"),
+						Name: "Vail",
+					},
+				}
+				m.EXPECT().
+					ListAllResorts(gomock.Any()).
+					Return(mockResorts, nil)
+			},
+			expectedStatus: http.StatusOK,
+			expectedHeaders: map[string]string{
+				"Content-Type":           "application/json",
+				"X-Content-Type-Options": "nosniff",
+				"X-Frame-Options":        "DENY",
+				"X-XSS-Protection":       "1; mode=block",
+				"Referrer-Policy":        "strict-origin-when-cross-origin",
+			},
+			expectedResorts: []dbgen.Resort{
+				{
+					ID:   1,
+					Uuid: uuid.MustParse("550e8400-e29b-41d4-a716-446655440001"),
+					Name: "Whistler Blackcomb",
+				},
+				{
+					ID:   2,
+					Uuid: uuid.MustParse("550e8400-e29b-41d4-a716-446655440002"),
+					Name: "Vail",
+				},
+			},
+		},
+		{
+			name:           "Wrong HTTP Method",
+			method:         http.MethodPost,
+			setupMock:      func(m *mocks.MockStoreService) {},
+			expectedStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:   "Database Error",
+			method: http.MethodGet,
+			setupMock: func(m *mocks.MockStoreService) {
+				m.EXPECT().
+					ListAllResorts(gomock.Any()).
+					Return(nil, errors.New("database connection failed"))
+			},
+			expectedStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler, mockStore := testResortHandler(t)
+
+			tt.setupMock(mockStore)
+
+			req, err := http.NewRequest(tt.method, "/api/resorts", nil)
+			require.NoError(t, err)
+
+			rr := httptest.NewRecorder()
+
+			handler.ListAllResorts(rr, req)
+
+			assert.Equal(t, tt.expectedStatus, rr.Code, "Status code mismatch")
+
+			if tt.expectedHeaders != nil {
+				for key, value := range tt.expectedHeaders {
+					assert.Equal(t, value, rr.Header().Get(key), "Header mismatch: %s", key)
+				}
+			}
+
+			if tt.expectedStatus == http.StatusOK && tt.expectedResorts != nil {
+				var response []dbgen.Resort
+				err = json.NewDecoder(rr.Body).Decode(&response)
+				require.NoError(t, err, "Failed to decode response body")
+				assert.Equal(t, tt.expectedResorts, response)
+			}
+		})
+	}
+}
+
 func TestSetSecurityHeaders(t *testing.T) {
 	w := httptest.NewRecorder()
 	setSecurityHeaders(w)

@@ -15,7 +15,6 @@ import (
 )
 
 func main() {
-
 	dbConn, err := db.New()
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -81,8 +80,7 @@ func main() {
 				daysAhead = 0
 			}
 
-			snowAmount := int32(pred.SnowAmount + 0.5) // Round up for best prediction
-			alerts, err := store.GetAlertMatches(ctx, resort.Uuid.String(), pred.Date, snowAmount, daysAhead)
+			alerts, err := store.GetAlertMatches(ctx, resort.Uuid.String(), pred.Date, int32(pred.SnowAmount), daysAhead)
 			if err != nil {
 				log.Printf("Error finding matching alerts: %v", err)
 				continue
@@ -92,7 +90,6 @@ func main() {
 			for _, alert := range alerts {
 				log.Printf("Alert for %s (Phone: %s)", alert.ResortName, alert.UserPhone)
 
-				// Send notification
 				if alert.UserPhone != "" {
 					message := notify.FormatSnowAlertMessage(alert.ResortName, pred.SnowAmount, alert.ForecastDate)
 					if err := twilioClient.SendSMS(alert.UserPhone, message); err != nil {
@@ -102,7 +99,6 @@ func main() {
 					}
 				}
 
-				// Record that we sent the alert
 				if err := store.RecordAlertSent(ctx, alert); err != nil {
 					log.Printf("Error recording alert history: %v", err)
 				}
