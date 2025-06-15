@@ -20,7 +20,7 @@ VALUES ($1, $2, $3, $4) RETURNING id, user_uuid, resort_uuid, min_snow_amount, n
 type CreateUserAlertParams struct {
 	UserUuid         uuid.NullUUID `json:"user_uuid"`
 	ResortUuid       uuid.NullUUID `json:"resort_uuid"`
-	MinSnowAmount    int32         `json:"min_snow_amount"`
+	MinSnowAmount    float64       `json:"min_snow_amount"`
 	NotificationDays int32         `json:"notification_days"`
 }
 
@@ -131,7 +131,7 @@ type ListActiveAlertsRow struct {
 	Phone            sql.NullString `json:"phone"`
 	ResortUuid       uuid.NullUUID  `json:"resort_uuid"`
 	ResortName       string         `json:"resort_name"`
-	MinSnowAmount    int32          `json:"min_snow_amount"`
+	MinSnowAmount    float64        `json:"min_snow_amount"`
 	NotificationDays int32          `json:"notification_days"`
 }
 
@@ -179,7 +179,7 @@ WHERE user_uuid = $1
 type UpdateUserAlertParams struct {
 	UserUuid         uuid.NullUUID `json:"user_uuid"`
 	ResortUuid       uuid.NullUUID `json:"resort_uuid"`
-	MinSnowAmount    int32         `json:"min_snow_amount"`
+	MinSnowAmount    float64       `json:"min_snow_amount"`
 	NotificationDays int32         `json:"notification_days"`
 	Active           sql.NullBool  `json:"active"`
 }

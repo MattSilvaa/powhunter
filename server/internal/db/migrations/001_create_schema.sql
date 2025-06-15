@@ -25,7 +25,7 @@ CREATE TABLE user_alerts (
     id SERIAL PRIMARY KEY,
     user_uuid UUID REFERENCES users(uuid) ON DELETE CASCADE,
     resort_uuid UUID REFERENCES resorts(uuid) ON DELETE CASCADE,
-    min_snow_amount INTEGER NOT NULL,
+    min_snow_amount DOUBLE PRECISION NOT NULL,
     notification_days INTEGER NOT NULL,
     active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -38,7 +38,7 @@ CREATE TABLE alert_history (
     resort_uuid UUID REFERENCES resorts(uuid) ON DELETE CASCADE,
     sent_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     forecast_date DATE NOT NULL,
-    snow_amount INTEGER NOT NULL
+    snow_amount DOUBLE PRECISION NOT NULL
 );
 
 CREATE INDEX idx_users_email ON users(email);

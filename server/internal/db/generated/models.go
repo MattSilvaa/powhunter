@@ -17,7 +17,7 @@ type AlertHistory struct {
 	ResortUuid   uuid.NullUUID `json:"resort_uuid"`
 	SentAt       sql.NullTime  `json:"sent_at"`
 	ForecastDate time.Time     `json:"forecast_date"`
-	SnowAmount   int32         `json:"snow_amount"`
+	SnowAmount   float64       `json:"snow_amount"`
 }
 
 type Resort struct {
@@ -42,7 +42,7 @@ type UserAlert struct {
 	ID               int32         `json:"id"`
 	UserUuid         uuid.NullUUID `json:"user_uuid"`
 	ResortUuid       uuid.NullUUID `json:"resort_uuid"`
-	MinSnowAmount    int32         `json:"min_snow_amount"`
+	MinSnowAmount    float64       `json:"min_snow_amount"`
 	NotificationDays int32         `json:"notification_days"`
 	Active           sql.NullBool  `json:"active"`
 	CreatedAt        sql.NullTime  `json:"created_at"`

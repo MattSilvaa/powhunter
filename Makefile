@@ -42,12 +42,11 @@ db-setup:
 
 db-migrate:
 	@echo "Running database migrations..."
-	@cd server && goose -dir internal/db/migrations postgres "host=localhost port=5432 user=postgres password=postgres dbname=powhunter sslmode=disable" up
+	@cd server && goose -dir internal/db/migrations postgres "host=localhost port=5432 dbname=powhunter sslmode=disable" up
 
 db-reset:
 	@echo "Resetting database..."
-	@dropdb -U postgres powhunter || echo "Database may not exist"
-	@make db-setup
+	@dropdb -U postgres_rw powhunter || echo "Database may not exist"
 
 generate-db-code:
 	@echo "Generating database code..."
@@ -56,11 +55,3 @@ generate-db-code:
 db-seed:
 	@echo "Seeding database with initial data..."
 	@cd server && go run cmd/seed/main.go
-
-check-forecasts:
-	@echo "Checking snow forecasts..."
-	@cd server && go run cmd/check_forecasts/main.go
-
-check-forecasts-send-sms:
-	@echo "Checking snow forecasts and sending SMS..."
-	@cd server && go run cmd/check_forecasts/main.go -send-sms

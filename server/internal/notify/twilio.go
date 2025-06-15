@@ -40,7 +40,7 @@ func (t *TwilioClient) SendSMS(to, message string) error {
 	params := &twilioAPI.CreateMessageParams{}
 	params.SetTo("6195733405")
 	params.SetFrom(t.fromNumber)
-	params.SetBody("Test")
+	params.SetBody(message)
 
 	resp, err := client.Api.CreateMessage(params)
 	if err != nil {

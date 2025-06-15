@@ -114,7 +114,7 @@ type CreateAlertRequest struct {
 	Email            string   `json:"email"`
 	Phone            string   `json:"phone"`
 	NotificationDays int      `json:"notificationDays"`
-	MinSnowAmount    int      `json:"minSnowAmount"`
+	MinSnowAmount    float64  `json:"minSnowAmount"`
 	ResortsUuids     []string `json:"resortsUuids"`
 }
 
@@ -144,7 +144,7 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		ctx,
 		req.Email,
 		req.Phone,
-		int32(req.MinSnowAmount),
+		req.MinSnowAmount,
 		int32(req.NotificationDays),
 		req.ResortsUuids,
 	)

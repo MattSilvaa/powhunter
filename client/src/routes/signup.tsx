@@ -68,7 +68,6 @@ export default function SignUpPage() {
             return
         }
 
-        // Map resort names to UUIDs more safely
         const resortsUuids = formData.resorts
             .map((resortName) => {
                 const resort = resorts.find((r) => r.name === resortName)
@@ -164,7 +163,7 @@ export default function SignUpPage() {
                                             notificationDays: value as number,
                                         }))}
                                     min={1}
-                                    max={5}
+                                    max={10}
                                     marks
                                     valueLabelDisplay='auto'
                                 />
@@ -188,7 +187,7 @@ export default function SignUpPage() {
                                             ...prev,
                                             minSnowAmount: value as number,
                                         }))}
-                                    min={1}
+                                    min={0}
                                     max={24}
                                     marks
                                     valueLabelDisplay='auto'

@@ -8,7 +8,6 @@ import (
 
 	"github.com/MattSilvaa/powhunter/internal/db"
 	"github.com/MattSilvaa/powhunter/internal/notify"
-	"github.com/MattSilvaa/powhunter/internal/scheduler"
 	"github.com/MattSilvaa/powhunter/internal/weather"
 
 	_ "github.com/lib/pq"
@@ -34,15 +33,6 @@ func main() {
 	twilioClient = notify.NewTwilioClient(
 		twilioFromNumber,
 	)
-
-	forecastScheduler := scheduler.NewForecastScheduler(
-		store,
-		weatherClient,
-		twilioClient,
-		12*time.Hour,
-	)
-	forecastScheduler.Start()
-	log.Println("Forecast scheduler started")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -80,7 +70,7 @@ func main() {
 				daysAhead = 0
 			}
 
-			alerts, err := store.GetAlertMatches(ctx, resort.Uuid.String(), pred.Date, int32(pred.SnowAmount), daysAhead)
+			alerts, err := store.GetAlertMatches(ctx, resort.Uuid.String(), pred.Date, pred.SnowAmount, daysAhead)
 			if err != nil {
 				log.Printf("Error finding matching alerts: %v", err)
 				continue

@@ -55,7 +55,7 @@ func TestCreateAlert(t *testing.T) {
 				Email:            "test@example.com",
 				Phone:            "1234567890",
 				NotificationDays: 3,
-				MinSnowAmount:    5,
+				MinSnowAmount:    5.0,
 				ResortsUuids:     []string{"resort1", "resort2"},
 			},
 			setupMock: func(m *mocks.MockStoreService) {
@@ -64,7 +64,7 @@ func TestCreateAlert(t *testing.T) {
 						gomock.Any(),
 						"test@example.com",
 						"1234567890",
-						int32(5),
+						5.0,
 						int32(3),
 						[]string{"resort1", "resort2"},
 					).
@@ -90,7 +90,7 @@ func TestCreateAlert(t *testing.T) {
 				Email:            "test@example.com",
 				Phone:            "1234567890",
 				NotificationDays: 3,
-				MinSnowAmount:    5,
+				MinSnowAmount:    5.0,
 				ResortsUuids:     []string{"resort1"},
 			},
 			setupMock: func(m *mocks.MockStoreService) {
@@ -114,7 +114,7 @@ func TestCreateAlert(t *testing.T) {
 				Email:            "test@example.com",
 				Phone:            "", // Empty phone
 				NotificationDays: 3,
-				MinSnowAmount:    5,
+				MinSnowAmount:    5.0,
 				ResortsUuids:     []string{"resort1"},
 			},
 			setupMock: func(m *mocks.MockStoreService) {
@@ -129,7 +129,7 @@ func TestCreateAlert(t *testing.T) {
 				Email:            "test@example.com",
 				Phone:            "1234567890",
 				NotificationDays: 3,
-				MinSnowAmount:    5,
+				MinSnowAmount:    5.0,
 				ResortsUuids:     []string{}, // Empty resorts
 			},
 			setupMock: func(m *mocks.MockStoreService) {
@@ -144,7 +144,7 @@ func TestCreateAlert(t *testing.T) {
 				Email:            "test@example.com",
 				Phone:            "1234567890",
 				NotificationDays: 3,
-				MinSnowAmount:    5,
+				MinSnowAmount:    5.0,
 				ResortsUuids:     []string{"resort1"},
 			},
 			setupMock: func(m *mocks.MockStoreService) {
@@ -153,7 +153,7 @@ func TestCreateAlert(t *testing.T) {
 						gomock.Any(),
 						"test@example.com",
 						"1234567890",
-						int32(5),
+						5.0,
 						int32(3),
 						[]string{"resort1"},
 					).

@@ -15,7 +15,7 @@ type Querier interface {
 	ClearResorts(ctx context.Context) error
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserAlert(ctx context.Context, arg CreateUserAlertParams) (UserAlert, error)
-	GetLastAlertSnowAmount(ctx context.Context, arg GetLastAlertSnowAmountParams) (int32, error)
+	GetLastAlertSnowAmount(ctx context.Context, arg GetLastAlertSnowAmountParams) (float64, error)
 	GetResortAlerts(ctx context.Context, resortUuid uuid.NullUUID) ([]UserAlert, error)
 	GetResortByUUID(ctx context.Context, argUuid uuid.UUID) (Resort, error)
 	GetUserAlert(ctx context.Context, arg GetUserAlertParams) (UserAlert, error)

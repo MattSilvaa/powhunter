@@ -48,9 +48,9 @@ type GetLastAlertSnowAmountParams struct {
 	ForecastDate time.Time     `json:"forecast_date"`
 }
 
-func (q *Queries) GetLastAlertSnowAmount(ctx context.Context, arg GetLastAlertSnowAmountParams) (int32, error) {
+func (q *Queries) GetLastAlertSnowAmount(ctx context.Context, arg GetLastAlertSnowAmountParams) (float64, error) {
 	row := q.queryRow(ctx, q.getLastAlertSnowAmountStmt, getLastAlertSnowAmount, arg.UserUuid, arg.ResortUuid, arg.ForecastDate)
-	var snow_amount int32
+	var snow_amount float64
 	err := row.Scan(&snow_amount)
 	return snow_amount, err
 }
@@ -64,7 +64,7 @@ type InsertAlertHistoryParams struct {
 	UserUuid     uuid.NullUUID `json:"user_uuid"`
 	ResortUuid   uuid.NullUUID `json:"resort_uuid"`
 	ForecastDate time.Time     `json:"forecast_date"`
-	SnowAmount   int32         `json:"snow_amount"`
+	SnowAmount   float64       `json:"snow_amount"`
 }
 
 func (q *Queries) InsertAlertHistory(ctx context.Context, arg InsertAlertHistoryParams) error {

@@ -12,7 +12,7 @@ DB_NAME=${DB_NAME:-powhunter}
 
 # Application user configuration
 APP_DB_USER=${APP_DB_USER:-powerhunter_rw}
-APP_DB_PASSWORD=${APP_DB_PASSWORD:-$(openssl rand -base64 32)}
+APP_DB_PASSWORD=${APP_DB_PASSWORD:-root}
 
 echo "Setting up database '$DB_NAME' with application user '$APP_DB_USER'..."
 

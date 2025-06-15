@@ -24,7 +24,7 @@ type StoreService interface {
 		ctx context.Context,
 		resortUUID string,
 		forecastDate time.Time,
-		predictedSnowAmount int32,
+		predictedSnowAmount float64,
 		daysAhead int32,
 	) ([]AlertToSend, error)
 
@@ -35,7 +35,8 @@ type StoreService interface {
 	CreateUserWithAlerts(
 		ctx context.Context,
 		email, phone string,
-		minSnowAmount, notificationDays int32,
+		minSnowAmount float64,
+		notificationDays int32,
 		resortUUIDs []string,
 	) error
 }
@@ -84,7 +85,7 @@ func (s *Store) ListAllResorts(ctx context.Context) ([]dbgen.Resort, error) {
 }
 
 func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
-	minSnowAmount, notificationDays int32, resortUUIDs []string) error {
+	minSnowAmount float64, notificationDays int32, resortUUIDs []string) error {
 	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
 		phoneParam := sql.NullString{
 			String: phone,
@@ -132,7 +133,7 @@ type AlertToSend struct {
 	UserPhone    string
 	ResortName   string
 	ResortUUID   uuid.UUID
-	SnowAmount   int32
+	SnowAmount   float64
 	ForecastDate time.Time
 	IsUpdate     bool
 }
@@ -142,7 +143,7 @@ func (s *Store) GetAlertMatches(
 	ctx context.Context,
 	resortUUID string,
 	forecastDate time.Time,
-	predictedSnowAmount int32,
+	predictedSnowAmount float64,
 	daysAhead int32,
 ) ([]AlertToSend, error) {
 	var alertsToSend []AlertToSend
