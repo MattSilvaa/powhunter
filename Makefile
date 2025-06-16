@@ -21,6 +21,21 @@ client:
 	@echo "Starting client..."
 	@cd client && deno task dev
 
+start-prod:
+	@echo "Starting production environment..."
+	@make -j2 prod-server prod-client
+
+prod-server:
+	@cd server && ./bin/powhunter
+
+prod-client:
+	@cd client && deno task start
+
+start-forecaster:
+	@echo "Starting forecaster..."
+	@cd server && go run cmd/check_forecasts/main.go
+
+
 install:
 	@echo "Installing dependencies..."
 	@cd server && go mod tidy
