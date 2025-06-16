@@ -28,7 +28,5 @@ go.work.sum
 .react-router/
 node_modules/
 client/build
-
 .idea/
-
-/server/bin
+server/bin
