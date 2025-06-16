@@ -9,7 +9,13 @@ import (
 	"time"
 
 	"github.com/MattSilvaa/powhunter/internal/db"
+	"github.com/lib/pq"
 )
+
+type ErrorResponse struct {
+	Error   string `json:"error"`
+	Message string `json:"message"`
+}
 
 type Resort struct {
 	Name string `json:"name"`
@@ -47,6 +53,20 @@ func setSecurityHeaders(w http.ResponseWriter) {
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("X-XSS-Protection", "1; mode=block")
 	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+}
+
+func sendErrorResponse(w http.ResponseWriter, errorCode string, message string, statusCode int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	
+	errorResp := ErrorResponse{
+		Error:   errorCode,
+		Message: message,
+	}
+	
+	if err := json.NewEncoder(w).Encode(errorResp); err != nil {
+		log.Printf("Failed to encode error response: %v", err)
+	}
 }
 
 func NewHandlers() (*Handlers, error) {
@@ -120,7 +140,7 @@ type CreateAlertRequest struct {
 
 func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		sendErrorResponse(w, "METHOD_NOT_ALLOWED", "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -128,12 +148,22 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 
 	var req CreateAlertRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		sendErrorResponse(w, "INVALID_REQUEST", "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if req.Phone == "" || len(req.ResortsUuids) == 0 {
-		http.Error(w, "Phone and at least one resort are required", http.StatusBadRequest)
+	if req.Email == "" {
+		sendErrorResponse(w, "MISSING_EMAIL", "Email is required", http.StatusBadRequest)
+		return
+	}
+
+	if req.Phone == "" {
+		sendErrorResponse(w, "MISSING_PHONE", "Phone number is required", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.ResortsUuids) == 0 {
+		sendErrorResponse(w, "MISSING_RESORTS", "At least one resort is required", http.StatusBadRequest)
 		return
 	}
 
@@ -150,7 +180,26 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		log.Printf("Failed to create alert: %v", err)
-		http.Error(w, "Failed to create alert", http.StatusInternalServerError)
+		
+		if pqErr, ok := err.(*pq.Error); ok {
+			switch pqErr.Code {
+			case "23505": // unique_violation
+				if pqErr.Constraint == "users_email_key" {
+					sendErrorResponse(w, "DUPLICATE_EMAIL", "An account with this email address already exists", http.StatusConflict)
+					return
+				}
+				sendErrorResponse(w, "DUPLICATE_ENTRY", "This entry already exists", http.StatusConflict)
+				return
+			case "23502": // not_null_violation
+				sendErrorResponse(w, "MISSING_REQUIRED_FIELD", "Required field is missing", http.StatusBadRequest)
+				return
+			case "23514": // check_violation
+				sendErrorResponse(w, "VALIDATION_ERROR", "Data validation failed", http.StatusBadRequest)
+				return
+			}
+		}
+		
+		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to create alert", http.StatusInternalServerError)
 		return
 	}
 

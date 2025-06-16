@@ -17,17 +17,24 @@ import {
     TextField,
     Typography,
 } from '@mui/material'
-import {useResorts} from '../shared/useResorts.ts'
-import {Resort} from '../shared/types.ts'
-import {useCreateAlert} from '../shared/useCreateAlert.ts'
+import {useNavigate} from 'react-router'
+import {useResorts} from '../shared/useResorts'
+import {Resort} from '../shared/types'
+import {useCreateAlert} from '../shared/useCreateAlert'
 
 export default function SignUpPage() {
+    const navigate = useNavigate()
     const [formData, setFormData] = useState({
         email: '',
         phone: '',
         notificationDays: 3,
         minSnowAmount: 6,
         resorts: [] as string[],
+    })
+    const [fieldErrors, setFieldErrors] = useState({
+        email: '',
+        phone: '',
+        resorts: '',
     })
     const {
         createAlert,
@@ -43,6 +50,14 @@ export default function SignUpPage() {
             ...prev,
             [name]: value,
         }))
+        
+        // Clear field-specific error when user starts typing
+        if (fieldErrors[name as keyof typeof fieldErrors]) {
+            setFieldErrors(prev => ({
+                ...prev,
+                [name]: '',
+            }))
+        }
     }
 
     const handleSelectChange = (e: SelectChangeEvent<string[]>) => {
@@ -51,20 +66,50 @@ export default function SignUpPage() {
             ...prev,
             [name]: value,
         }))
+        
+        // Clear resorts error when user selects resorts
+        if (name === 'resorts' && fieldErrors.resorts) {
+            setFieldErrors(prev => ({
+                ...prev,
+                resorts: '',
+            }))
+        }
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
+        // Clear previous field errors
+        setFieldErrors({
+            email: '',
+            phone: '',
+            resorts: '',
+        })
+
+        // Validate form fields
+        const errors = {
+            email: '',
+            phone: '',
+            resorts: '',
+        }
+
         if (!formData.email.trim()) {
-            return
+            errors.email = 'Email is required'
+        } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+            errors.email = 'Please enter a valid email address'
         }
 
         if (!formData.phone.trim()) {
-            return
+            errors.phone = 'Phone number is required'
         }
 
         if (formData.resorts.length === 0) {
+            errors.resorts = 'Please select at least one resort'
+        }
+
+        // If there are validation errors, show them and don't submit
+        if (errors.email || errors.phone || errors.resorts) {
+            setFieldErrors(errors)
             return
         }
 
@@ -85,26 +130,20 @@ export default function SignUpPage() {
             return
         }
 
-        try {
-            await createAlert({
-                email: formData.email.trim(),
-                phone: formData.phone.trim(),
-                minSnowAmount: formData.minSnowAmount,
-                notificationDays: formData.notificationDays,
-                resortsUuids,
-            })
-            // TODO: Create a success page
-            // TODO: Add check to remove duplicate
-            setFormData({
-                email: '',
-                phone: '',
-                notificationDays: 3,
-                minSnowAmount: 6,
-                resorts: [],
-            })
-        } catch (error) {
-            console.error('Failed to create alert:', error)
-        }
+        createAlert({
+            email: formData.email.trim(),
+            phone: formData.phone.trim(),
+            minSnowAmount: formData.minSnowAmount,
+            notificationDays: formData.notificationDays,
+            resortsUuids,
+        }, {
+            onSuccess: () => {
+                navigate('/success')
+            },
+            onError: (error) => {
+                console.error('Failed to create alert:', error)
+            }
+        })
     }
 
     return (
@@ -124,6 +163,18 @@ export default function SignUpPage() {
                             Sign up to start receiving powder alerts for your favorite resorts
                         </Typography>
 
+                        {createAlertError && (
+                            <Alert 
+                                severity='error' 
+                                sx={{mb: 3}}
+                                onClose={() => {
+                                    // Reset error when user dismisses
+                                }}
+                            >
+                                <strong>Oops!</strong> {createAlertError}
+                            </Alert>
+                        )}
+
                         <Grid container spacing={3}>
                             <Grid container spacing={3} size={12}>
                                 <Grid size={6}>
@@ -135,6 +186,8 @@ export default function SignUpPage() {
                                         type='email'
                                         value={formData.email}
                                         onChange={handleChange}
+                                        error={!!fieldErrors.email}
+                                        helperText={fieldErrors.email || 'We\'ll use this to send you powder alerts'}
                                     />
                                 </Grid>
                                 <Grid size={6}>
@@ -146,7 +199,8 @@ export default function SignUpPage() {
                                         type='tel'
                                         value={formData.phone}
                                         onChange={handleChange}
-                                        helperText="We'll send SMS alerts to this number"
+                                        error={!!fieldErrors.phone}
+                                        helperText={fieldErrors.phone || "We'll send SMS alerts to this number"}
                                     />
                                 </Grid>
                             </Grid>
@@ -202,7 +256,7 @@ export default function SignUpPage() {
                             </Grid>
 
                             <Grid size={{xs: 12}}>
-                                <FormControl fullWidth>
+                                <FormControl fullWidth error={!!fieldErrors.resorts}>
                                     <InputLabel>Select Resorts</InputLabel>
                                     {loading && (
                                         <Box display='flex' justifyContent='center' p={2}>
@@ -225,6 +279,11 @@ export default function SignUpPage() {
                                             </MenuItem>
                                         ))}
                                     </Select>
+                                    {fieldErrors.resorts && (
+                                        <Typography variant='caption' color='error' sx={{mt: 0.5, ml: 1.5}}>
+                                            {fieldErrors.resorts}
+                                        </Typography>
+                                    )}
                                 </FormControl>
                             </Grid>
 
@@ -235,11 +294,10 @@ export default function SignUpPage() {
                                     size='large'
                                     fullWidth
                                     sx={{mt: 2}}
-                                    disabled={!formData.email || !formData.phone ||
-                                        !formData.resorts}
+                                    disabled={isCreateAlertLoading}
                                     onClick={handleSubmit}
                                 >
-                                    Create Alert
+                                    {isCreateAlertLoading ? 'Creating Alert...' : 'Create Alert'}
                                 </Button>
                             </Grid>
                         </Grid>

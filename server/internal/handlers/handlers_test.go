@@ -11,6 +11,7 @@ import (
 	dbgen "github.com/MattSilvaa/powhunter/internal/db/generated"
 	"github.com/MattSilvaa/powhunter/internal/db/mocks"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -47,6 +48,7 @@ func TestCreateAlert(t *testing.T) {
 		expectedStatus  int
 		expectedHeaders map[string]string
 		expectedBody    map[string]string
+		expectedError   *ErrorResponse
 	}{
 		{
 			name:   "Success",
@@ -97,6 +99,10 @@ func TestCreateAlert(t *testing.T) {
 				// No calls expected
 			},
 			expectedStatus: http.StatusMethodNotAllowed,
+			expectedError: &ErrorResponse{
+				Error:   "METHOD_NOT_ALLOWED",
+				Message: "Method not allowed",
+			},
 		},
 		{
 			name:        "Invalid JSON Body",
@@ -106,6 +112,29 @@ func TestCreateAlert(t *testing.T) {
 				// No calls expected
 			},
 			expectedStatus: http.StatusBadRequest,
+			expectedError: &ErrorResponse{
+				Error:   "INVALID_REQUEST",
+				Message: "Invalid request body",
+			},
+		},
+		{
+			name:   "Missing Required Fields - Empty Email",
+			method: http.MethodPut,
+			requestBody: CreateAlertRequest{
+				Email:            "", // Empty email
+				Phone:            "1234567890",
+				NotificationDays: 3,
+				MinSnowAmount:    5.0,
+				ResortsUuids:     []string{"resort1"},
+			},
+			setupMock: func(m *mocks.MockStoreService) {
+				// No calls expected
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedError: &ErrorResponse{
+				Error:   "MISSING_EMAIL",
+				Message: "Email is required",
+			},
 		},
 		{
 			name:   "Missing Required Fields - Empty Phone",
@@ -121,6 +150,10 @@ func TestCreateAlert(t *testing.T) {
 				// No calls expected
 			},
 			expectedStatus: http.StatusBadRequest,
+			expectedError: &ErrorResponse{
+				Error:   "MISSING_PHONE",
+				Message: "Phone number is required",
+			},
 		},
 		{
 			name:   "Missing Required Fields - Empty Resorts",
@@ -136,6 +169,42 @@ func TestCreateAlert(t *testing.T) {
 				// No calls expected
 			},
 			expectedStatus: http.StatusBadRequest,
+			expectedError: &ErrorResponse{
+				Error:   "MISSING_RESORTS",
+				Message: "At least one resort is required",
+			},
+		},
+		{
+			name:   "Duplicate Email Error",
+			method: http.MethodPut,
+			requestBody: CreateAlertRequest{
+				Email:            "existing@example.com",
+				Phone:            "1234567890",
+				NotificationDays: 3,
+				MinSnowAmount:    5.0,
+				ResortsUuids:     []string{"resort1"},
+			},
+			setupMock: func(m *mocks.MockStoreService) {
+				pqErr := &pq.Error{
+					Code:       "23505", // unique_violation
+					Constraint: "users_email_key",
+				}
+				m.EXPECT().
+					CreateUserWithAlerts(
+						gomock.Any(),
+						"existing@example.com",
+						"1234567890",
+						5.0,
+						int32(3),
+						[]string{"resort1"},
+					).
+					Return(pqErr)
+			},
+			expectedStatus: http.StatusConflict,
+			expectedError: &ErrorResponse{
+				Error:   "DUPLICATE_EMAIL",
+				Message: "An account with this email address already exists",
+			},
 		},
 		{
 			name:   "Database Error",
@@ -160,6 +229,10 @@ func TestCreateAlert(t *testing.T) {
 					Return(errors.New("database error"))
 			},
 			expectedStatus: http.StatusInternalServerError,
+			expectedError: &ErrorResponse{
+				Error:   "INTERNAL_ERROR",
+				Message: "Failed to create alert",
+			},
 		},
 	}
 
@@ -199,6 +272,11 @@ func TestCreateAlert(t *testing.T) {
 				err = json.NewDecoder(rr.Body).Decode(&response)
 				require.NoError(t, err, "Failed to decode response body")
 				assert.Equal(t, tt.expectedBody, response)
+			} else if tt.expectedError != nil {
+				var errorResponse ErrorResponse
+				err = json.NewDecoder(rr.Body).Decode(&errorResponse)
+				require.NoError(t, err, "Failed to decode error response body")
+				assert.Equal(t, *tt.expectedError, errorResponse)
 			}
 		})
 	}
