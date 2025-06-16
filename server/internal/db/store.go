@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,6 +11,35 @@ import (
 
 	dbgen "github.com/MattSilvaa/powhunter/internal/db/generated"
 )
+
+//go:generate mockgen -destination=mocks/mock_store.go -package=mocks github.com/MattSilvaa/powhunter/internal/db StoreService
+
+// StoreService defines the interface for database operations
+type StoreService interface {
+	// ListAllResorts returns all resorts
+	ListAllResorts(ctx context.Context) ([]dbgen.Resort, error)
+
+	// GetAlertMatches returns alerts matching forecast criteria
+	GetAlertMatches(
+		ctx context.Context,
+		resortUUID string,
+		forecastDate time.Time,
+		predictedSnowAmount float64,
+		daysAhead int32,
+	) ([]AlertToSend, error)
+
+	// RecordAlertSent records that an alert was sent
+	RecordAlertSent(ctx context.Context, alert AlertToSend) error
+
+	// CreateUserWithAlerts creates a new user with alert preferences
+	CreateUserWithAlerts(
+		ctx context.Context,
+		email, phone string,
+		minSnowAmount float64,
+		notificationDays int32,
+		resortUUIDs []string,
+	) error
+}
 
 type Store struct {
 	db      *sql.DB
@@ -55,8 +85,7 @@ func (s *Store) ListAllResorts(ctx context.Context) ([]dbgen.Resort, error) {
 }
 
 func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
-	minSnowAmount, notificationDays int32, resortUUIDs []string) error {
-
+	minSnowAmount float64, notificationDays int32, resortUUIDs []string) error {
 	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
 		phoneParam := sql.NullString{
 			String: phone,
@@ -67,7 +96,6 @@ func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
 			Email: email,
 			Phone: phoneParam,
 		})
-
 		if err != nil {
 			return fmt.Errorf("error creating user: %w", err)
 		}
@@ -85,10 +113,7 @@ func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
 			}
 
 			_, err = q.CreateUserAlert(ctx, dbgen.CreateUserAlertParams{
-				UserID: sql.NullInt32{
-					Int32: user.ID,
-					Valid: true,
-				},
+				UserUuid:         uuid.NullUUID{UUID: user.Uuid, Valid: true},
 				ResortUuid:       ruuid,
 				MinSnowAmount:    minSnowAmount,
 				NotificationDays: notificationDays,
@@ -102,45 +127,122 @@ func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
 	})
 }
 
-func (s *Store) UpdateSnowForecasts(ctx context.Context, resortUUID string,
-	forecasts map[time.Time]int32) error {
-	var ruuid uuid.NullUUID
-	if resortUUID != "" {
-		parsedUUID, err := uuid.Parse(resortUUID)
-		if err != nil {
-			return fmt.Errorf("error parsing resort UUID %s: %w", resortUUID, err)
-		}
-		ruuid = uuid.NullUUID{UUID: parsedUUID, Valid: true}
-	} else {
-		ruuid = uuid.NullUUID{Valid: false}
-	}
+type AlertToSend struct {
+	UserUuid     uuid.UUID
+	UserEmail    string
+	UserPhone    string
+	ResortName   string
+	ResortUUID   uuid.UUID
+	SnowAmount   float64
+	ForecastDate time.Time
+	IsUpdate     bool
+}
 
-	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
-		for date, amount := range forecasts {
-			_, err := q.CreateSnowForecast(ctx, dbgen.CreateSnowForecastParams{
-				ResortUuid:          ruuid,
-				ForecastDate:        date,
-				PredictedSnowAmount: amount,
+// GetAlertMatches finds alerts that match a specific resort, date, and snow amount
+func (s *Store) GetAlertMatches(
+	ctx context.Context,
+	resortUUID string,
+	forecastDate time.Time,
+	predictedSnowAmount float64,
+	daysAhead int32,
+) ([]AlertToSend, error) {
+	var alertsToSend []AlertToSend
+
+	err := s.ExecTx(ctx, func(q *dbgen.Queries) error {
+		var ruuid uuid.NullUUID
+		if resortUUID != "" {
+			parsedUUID, err := uuid.Parse(resortUUID)
+			if err != nil {
+				return fmt.Errorf("error parsing resort UUID %s: %w", resortUUID, err)
+			}
+			ruuid = uuid.NullUUID{UUID: parsedUUID, Valid: true}
+		} else {
+			ruuid = uuid.NullUUID{Valid: false}
+		}
+
+		alerts, err := q.GetResortAlerts(ctx, ruuid)
+		if err != nil {
+			return fmt.Errorf("error getting alert for resort %s: %w", resortUUID, err)
+		}
+
+		for _, alert := range alerts {
+			lastAlertSnowAmount, err := q.GetLastAlertSnowAmount(ctx, dbgen.GetLastAlertSnowAmountParams{
+				UserUuid:     alert.UserUuid,
+				ResortUuid:   ruuid,
+				ForecastDate: forecastDate,
 			})
 			if err != nil {
-				return fmt.Errorf("error updating forecast for %s on %s: %w",
-					resortUUID, date.Format("2006-01-02"), err)
+				// Alert if no alert has ever been sent to this user
+				if errors.Is(err, sql.ErrNoRows) {
+					userToAlert, err := q.GetUserByUUID(ctx, alert.UserUuid.UUID)
+					if err != nil {
+						return fmt.Errorf("error getting user %s: %w", alert.UserUuid.UUID.String(), err)
+					}
+
+					resortToAlertUserOn, err := q.GetResortByUUID(ctx, alert.ResortUuid.UUID)
+					if err != nil {
+						return fmt.Errorf("error getting resort %s: %w", alert.ResortUuid.UUID.String(), err)
+					}
+
+					alertsToSend = append(alertsToSend, AlertToSend{
+						UserUuid:     userToAlert.Uuid,
+						UserEmail:    userToAlert.Email,
+						UserPhone:    userToAlert.Phone.String,
+						ResortName:   resortToAlertUserOn.Name,
+						ResortUUID:   resortToAlertUserOn.Uuid,
+						SnowAmount:   predictedSnowAmount,
+						ForecastDate: forecastDate,
+						IsUpdate:     false,
+					})
+				} else {
+					return fmt.Errorf("error getting latest alert for resort %s: %w", resortUUID, err)
+				}
+			}
+			// Alert when the new snow amount is greater than or equal to 3 inches
+			if predictedSnowAmount-lastAlertSnowAmount >= 3 {
+				userToAlert, err := q.GetUserByUUID(ctx, alert.UserUuid.UUID)
+				if err != nil {
+					return fmt.Errorf("error getting user %s: %w", alert.UserUuid.UUID.String(), err)
+				}
+
+				resortToAlertUserOn, err := q.GetResortByUUID(ctx, alert.ResortUuid.UUID)
+				if err != nil {
+					return fmt.Errorf("error getting resort %s: %w", alert.ResortUuid.UUID.String(), err)
+				}
+
+				alertsToSend = append(alertsToSend, AlertToSend{
+					UserUuid:     userToAlert.Uuid,
+					UserEmail:    userToAlert.Email,
+					UserPhone:    userToAlert.Phone.String,
+					ResortName:   resortToAlertUserOn.Name,
+					ResortUUID:   resortToAlertUserOn.Uuid,
+					SnowAmount:   predictedSnowAmount,
+					ForecastDate: forecastDate,
+					IsUpdate:     true,
+				})
+
 			}
 		}
 		return nil
 	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return alertsToSend, nil
 }
 
-// FindAlertsToSend finds alerts that should be sent based on forecast data
-func (s *Store) FindAlertsToSend(ctx context.Context, daysAhead int) ([]AlertToSend, error) {
-	alerts := []AlertToSend{}
-	return alerts, nil
-}
+// RecordAlertSent records that an alert was sent to avoid sending duplicates
+func (s *Store) RecordAlertSent(ctx context.Context, alert AlertToSend) error {
+	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
+		err := q.InsertAlertHistory(ctx, dbgen.InsertAlertHistoryParams{
+			UserUuid:     uuid.NullUUID{UUID: alert.UserUuid, Valid: true},
+			ResortUuid:   uuid.NullUUID{UUID: alert.ResortUUID, Valid: true},
+			ForecastDate: alert.ForecastDate,
+			SnowAmount:   alert.SnowAmount,
+		})
 
-type AlertToSend struct {
-	UserEmail    string
-	UserPhone    string
-	ResortName   string
-	SnowAmount   int32
-	ForecastDate time.Time
+		return err
+	})
 }

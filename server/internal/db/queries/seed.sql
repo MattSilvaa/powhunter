@@ -3,8 +3,8 @@ DELETE FROM resorts;
 
 -- name: InsertResort :one
 INSERT INTO resorts (
-  uuid, name, url_host, url_pathname, latitude, longitude, noaa_station
+  uuid, name, url_host, url_pathname, latitude, longitude
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7
+  $1, $2, $3, $4, $5, $6
 )
 RETURNING *;

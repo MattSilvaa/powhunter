@@ -1,4 +1,4 @@
-.PHONY: dev build clean server client db-setup db-migrate db-reset generate-db-code db-seed
+.PHONY: dev build clean server client db-setup db-migrate db-reset generate-db-code db-seed check-forecasts
 
 dev:
 	@echo "Starting development environment..."
@@ -7,6 +7,7 @@ build:
 	@echo "Building client and server..."
 	@cd client && deno task build
 	@cd server && go build -o bin/powhunter cmd/main.go
+	@cd server && go build -o bin/check_forecasts cmd/check_forecasts/main.go
 
 clean:
 	@echo "Cleaning build artifacts..."
@@ -15,7 +16,7 @@ clean:
 
 server:
 	@echo "Starting server..."
-	@cd server && go run cmd/main.go
+	@cd server && go run cmd/api/main.go
 
 client:
 	@echo "Starting client..."
@@ -56,12 +57,11 @@ db-setup:
 
 db-migrate:
 	@echo "Running database migrations..."
-	@cd server && goose -dir internal/db/migrations postgres "host=localhost port=5432 user=postgres password=postgres dbname=powhunter sslmode=disable" up
+	@cd server && goose -dir internal/db/migrations postgres "host=localhost port=5432 dbname=powhunter sslmode=disable" up
 
 db-reset:
 	@echo "Resetting database..."
-	@dropdb -U postgres powhunter || echo "Database may not exist"
-	@make db-setup
+	@dropdb -U postgres_rw powhunter || echo "Database may not exist"
 
 generate-db-code:
 	@echo "Generating database code..."

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Resort, ResortApiResponse } from './types'
+import { Resort, ResortApiResponse } from './types.ts'
 
 const API_BASE_URL = 'http://localhost:8080/api'
 
@@ -28,7 +28,6 @@ const transformResortData = (data?: ResortApiResponse[]): Resort[] => {
 		urlPathname: resort.url_pathname.Valid ? resort.url_pathname.String : null,
 		latitude: resort.latitude.Valid ? resort.latitude.Float64 : null,
 		longitude: resort.longitude.Valid ? resort.longitude.Float64 : null,
-		noaaStation: resort.noaa_station.Valid ? resort.noaa_station.String : null,
 	})) || [] // Default to empty array if data is undefined
 }
 
