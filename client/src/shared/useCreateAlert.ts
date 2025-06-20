@@ -40,7 +40,7 @@ const getErrorMessage = (errorResponse: ErrorResponse): string => {
 }
 
 const createAlert = async (data: AlertData): Promise<void> => {
-	const response = await fetch(`${API_BASE_URL}/alerts`, {
+	const response = await fetch(`/api/alerts`, {
 		method: 'PUT',
 		headers: {
 			'Content-Type': 'application/json',
