@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
+import {BASE_SERVER_URL} from "./types";
 
 const CREATE_ALERT_RETRIES = 2
 
@@ -39,7 +40,7 @@ const getErrorMessage = (errorResponse: ErrorResponse): string => {
 }
 
 const createAlert = async (data: AlertData): Promise<void> => {
-	const response = await fetch(`/api/alerts`, {
+	const response = await fetch(`${BASE_SERVER_URL}/api/alerts`, {
 		method: 'PUT',
 		headers: {
 			'Content-Type': 'application/json',

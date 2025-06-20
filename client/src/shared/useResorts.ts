@@ -1,20 +1,25 @@
 import { useQuery } from '@tanstack/react-query'
-import { Resort, ResortApiResponse } from './types.ts'
+import { BASE_SERVER_URL, Resort, ResortApiResponse} from './types.ts'
 
 const fetchResorts = async (): Promise<ResortApiResponse[]> => {
-	const response = await fetch(`/api/resorts`, {
-		method: 'GET',
-		headers: {
-			'Content-Type': 'application/json',
-		},
-		credentials: 'include', // For auth cookies if needed
-	})
+	try {
+		const response = await fetch(`${BASE_SERVER_URL}/api/resorts`, {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			credentials: 'include', // For auth cookies if needed
+		})
 
-	if (!response.ok) {
-		throw new Error(`Request failed: ${response.status}`)
+		if (!response.ok) {
+			throw new Error(`Request failed: ${response.status}`)
+		}
+
+		return response.json()
+	} catch(err){
+		console.log(err)
+		throw err
 	}
-
-	return response.json()
 }
 
 const transformResortData = (data?: ResortApiResponse[]): Resort[] => {
