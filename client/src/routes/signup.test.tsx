@@ -1,5 +1,4 @@
-import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts'
-import { createMockContext } from 'https://deno.land/x/deno_dom@v0.1.43/deno-dom-wasm.ts'
+import { test, expect } from 'bun:test'
 
 // Mock React and related dependencies for testing
 const mockReact = {
@@ -41,7 +40,7 @@ const mockUseCreateAlert = () => ({
 	error: null,
 })
 
-Deno.test('SignUp component validation', () => {
+test('SignUp component validation', () => {
 	// Test form validation logic
 	const formData = {
 		email: '',
@@ -52,16 +51,16 @@ Deno.test('SignUp component validation', () => {
 	}
 
 	// Test email validation
-	assertEquals(formData.email.trim() === '', true, 'Empty email should be invalid')
+	expect(formData.email.trim() === '').toBe(true)
 	
 	// Test phone validation
-	assertEquals(formData.phone.trim() === '', true, 'Empty phone should be invalid')
+	expect(formData.phone.trim() === '').toBe(true)
 	
 	// Test resorts validation
-	assertEquals(formData.resorts.length === 0, true, 'Empty resorts array should be invalid')
+	expect(formData.resorts.length === 0).toBe(true)
 })
 
-Deno.test('Alert creation request structure', () => {
+test('Alert creation request structure', () => {
 	const mockFormData = {
 		email: 'test@example.com',
 		phone: '1234567890',
@@ -83,24 +82,24 @@ Deno.test('Alert creation request structure', () => {
 		})
 		.filter((uuid) => !!uuid) as string[]
 
-	assertEquals(resortsUuids.length, 2, 'Should map all resort names to UUIDs')
-	assertEquals(resortsUuids, ['uuid1', 'uuid2'], 'Should have correct UUIDs')
+	expect(resortsUuids.length).toBe(2)
+	expect(resortsUuids).toEqual(['uuid1', 'uuid2'])
 })
 
-Deno.test('Error handling structure', () => {
+test('Error handling structure', () => {
 	// Test error response structure
 	const mockErrorResponse = {
 		error: 'DUPLICATE_EMAIL',
 		message: 'An account with this email address already exists',
 	}
 
-	assertEquals(typeof mockErrorResponse.error, 'string', 'Error code should be string')
-	assertEquals(typeof mockErrorResponse.message, 'string', 'Error message should be string')
-	assertEquals(mockErrorResponse.error.length > 0, true, 'Error code should not be empty')
-	assertEquals(mockErrorResponse.message.length > 0, true, 'Error message should not be empty')
+	expect(typeof mockErrorResponse.error).toBe('string')
+	expect(typeof mockErrorResponse.message).toBe('string')
+	expect(mockErrorResponse.error.length > 0).toBe(true)
+	expect(mockErrorResponse.message.length > 0).toBe(true)
 })
 
-Deno.test('Form data structure validation', () => {
+test('Form data structure validation', () => {
 	const validFormData = {
 		email: 'user@example.com',
 		phone: '+1234567890',
@@ -110,14 +109,14 @@ Deno.test('Form data structure validation', () => {
 	}
 
 	// Test all required fields are present
-	assertEquals(typeof validFormData.email, 'string', 'Email should be string')
-	assertEquals(typeof validFormData.phone, 'string', 'Phone should be string')
-	assertEquals(typeof validFormData.notificationDays, 'number', 'NotificationDays should be number')
-	assertEquals(typeof validFormData.minSnowAmount, 'number', 'MinSnowAmount should be number')
-	assertEquals(Array.isArray(validFormData.resortsUuids), true, 'ResortsUuids should be array')
+	expect(typeof validFormData.email).toBe('string')
+	expect(typeof validFormData.phone).toBe('string')
+	expect(typeof validFormData.notificationDays).toBe('number')
+	expect(typeof validFormData.minSnowAmount).toBe('number')
+	expect(Array.isArray(validFormData.resortsUuids)).toBe(true)
 	
 	// Test field constraints
-	assertEquals(validFormData.notificationDays >= 1 && validFormData.notificationDays <= 10, true, 'NotificationDays should be 1-10')
-	assertEquals(validFormData.minSnowAmount >= 0 && validFormData.minSnowAmount <= 24, true, 'MinSnowAmount should be 0-24')
-	assertEquals(validFormData.resortsUuids.length > 0, true, 'Should have at least one resort')
+	expect(validFormData.notificationDays >= 1 && validFormData.notificationDays <= 10).toBe(true)
+	expect(validFormData.minSnowAmount >= 0 && validFormData.minSnowAmount <= 24).toBe(true)
+	expect(validFormData.resortsUuids.length > 0).toBe(true)
 })

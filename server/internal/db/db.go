@@ -17,12 +17,12 @@ const (
 func New() (*sql.DB, error) {
 	dbUser := os.Getenv("DB_USER")
 	if dbUser == "" {
-		dbUser = "powerhunter_rw"
+		dbUser = "powhunter_rw"
 	}
 
 	dbPassword := os.Getenv("DB_PASSWORD")
 	if dbPassword == "" {
-		dbPassword = "powerhunter_rw"
+		dbPassword = "powhunter_rw"
 	}
 
 	dbHost := os.Getenv("DB_HOST")

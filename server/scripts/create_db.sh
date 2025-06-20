@@ -1,34 +1,71 @@
 #!/bin/bash
 set -e
 
-# Database configuration from environment variables
-# Try to detect the correct admin user (common on macOS)
-DEFAULT_ADMIN_USER=$(whoami)
-DB_ADMIN_USER=${DB_ADMIN_USER:-$DEFAULT_ADMIN_USER}
-DB_ADMIN_PASSWORD=${DB_ADMIN_PASSWORD:-""}
+DB_ADMIN_USER=${DB_ADMIN_USER:-postgres}
+DB_ADMIN_PASSWORD=${DB_ADMIN_PASSWORD:-}
 DB_HOST=${DB_HOST:-localhost}
 DB_PORT=${DB_PORT:-5432}
 DB_NAME=${DB_NAME:-powhunter}
 
 # Application user configuration
-APP_DB_USER=${APP_DB_USER:-powerhunter_rw}
+APP_DB_USER=${APP_DB_USER:-powhunter_rw}
 APP_DB_PASSWORD=${APP_DB_PASSWORD:-root}
 
 echo "Setting up database '$DB_NAME' with application user '$APP_DB_USER'..."
+echo ""
+
+# Check if we can connect to PostgreSQL
+echo "Checking PostgreSQL connection..."
+if [ -n "$DB_ADMIN_PASSWORD" ]; then
+    echo "Using password authentication for admin user '$DB_ADMIN_USER'"
+else
+    echo "Attempting peer authentication for admin user '$DB_ADMIN_USER' (no password set)"
+    echo "If this fails, you may need to:"
+    echo "  1. Run as postgres system user: sudo -u postgres $0"
+    echo "  2. Or set DB_ADMIN_PASSWORD environment variable"
+    echo "  3. Or configure PostgreSQL to allow password authentication"
+fi
+echo ""
 
 # Function to run SQL commands as admin
 run_sql_as_admin() {
-    PGPASSWORD=$DB_ADMIN_PASSWORD psql -U $DB_ADMIN_USER -h $DB_HOST -p $DB_PORT -d postgres -c "$1"
+    if [ -n "$DB_ADMIN_PASSWORD" ]; then
+        PGPASSWORD=$DB_ADMIN_PASSWORD psql -U $DB_ADMIN_USER -h $DB_HOST -p $DB_PORT -d postgres -c "$1"
+    else
+        # Try without password first (for peer authentication)
+        psql -U $DB_ADMIN_USER -h $DB_HOST -p $DB_PORT -d postgres -c "$1" 2>/dev/null || \
+        # If that fails, try with empty password
+        PGPASSWORD="" psql -U $DB_ADMIN_USER -h $DB_HOST -p $DB_PORT -d postgres -c "$1"
+    fi
 }
 
 # Function to run SQL commands on target database as admin
 run_sql_on_db_as_admin() {
-    PGPASSWORD=$DB_ADMIN_PASSWORD psql -U $DB_ADMIN_USER -h $DB_HOST -p $DB_PORT -d $DB_NAME -c "$1"
+    if [ -n "$DB_ADMIN_PASSWORD" ]; then
+        PGPASSWORD=$DB_ADMIN_PASSWORD psql -U $DB_ADMIN_USER -h $DB_HOST -p $DB_PORT -d $DB_NAME -c "$1"
+    else
+        # Try without password first (for peer authentication)
+        psql -U $DB_ADMIN_USER -h $DB_HOST -p $DB_PORT -d $DB_NAME -c "$1" 2>/dev/null || \
+        # If that fails, try with empty password
+        PGPASSWORD="" psql -U $DB_ADMIN_USER -h $DB_HOST -p $DB_PORT -d $DB_NAME -c "$1"
+    fi
+}
+
+# Function to run createdb command
+run_createdb() {
+    if [ -n "$DB_ADMIN_PASSWORD" ]; then
+        PGPASSWORD=$DB_ADMIN_PASSWORD createdb -U $DB_ADMIN_USER -h $DB_HOST -p $DB_PORT $DB_NAME
+    else
+        # Try without password first (for peer authentication)
+        createdb -U $DB_ADMIN_USER -h $DB_HOST -p $DB_PORT $DB_NAME 2>/dev/null || \
+        # If that fails, try with empty password
+        PGPASSWORD="" createdb -U $DB_ADMIN_USER -h $DB_HOST -p $DB_PORT $DB_NAME
+    fi
 }
 
 # Create database if it doesn't exist
 echo "Creating database '$DB_NAME'..."
-PGPASSWORD=$DB_ADMIN_PASSWORD createdb -U $DB_ADMIN_USER -h $DB_HOST -p $DB_PORT $DB_NAME 2>/dev/null || echo "Database '$DB_NAME' already exists"
+run_createdb 2>/dev/null || echo "Database '$DB_NAME' already exists"
 
 # Create application user if it doesn't exist
 echo "Creating application user '$APP_DB_USER'..."

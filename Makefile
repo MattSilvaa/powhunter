@@ -5,9 +5,9 @@ dev:
 	@make -j2 server client
 build:
 	@echo "Building client and server..."
-	@cd client && deno task build
-	@cd server && go build -o bin/powhunter cmd/main.go
-	@cd server && go build -o bin/check_forecasts cmd/check_forecasts/main.go
+	@cd client && bun run build
+	@cd server && go build -o bin/powhunter cmd/api/main.go
+	@cd server && go build -o bin/check_forecasts cmd/forecaster/main.go
 
 clean:
 	@echo "Cleaning build artifacts..."
@@ -20,7 +20,7 @@ server:
 
 client:
 	@echo "Starting client..."
-	@cd client && deno task dev
+	@cd client && bun run dev
 
 start-prod:
 	@echo "Starting production environment..."
@@ -30,24 +30,24 @@ prod-server:
 	@cd server && ./bin/powhunter
 
 prod-client:
-	@cd client && deno task start
+	@cd client && bun run start
 
 start-forecaster:
 	@echo "Starting forecaster..."
-	@cd server && go run cmd/check_forecasts/main.go
+	@cd server && go run cmd/forecaster/main.go
 
 
 install:
 	@echo "Installing dependencies..."
 	@cd server && go mod tidy
-	@cd client && deno install
+	@cd client && bun install
 	@go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 	@go install github.com/pressly/goose/v3/cmd/goose@latest
 
 test:
 	@echo "Running tests..."
 	@cd server && go test ./...
-	@cd client && deno test
+	@cd client && bun test
 
 # Database commands
 db-setup:
@@ -61,7 +61,7 @@ db-migrate:
 
 db-reset:
 	@echo "Resetting database..."
-	@dropdb -U postgres_rw powhunter || echo "Database may not exist"
+	@dropdb -U postgres powhunter || echo "Database may not exist"
 
 generate-db-code:
 	@echo "Generating database code..."
