@@ -1,4 +1,4 @@
-export const BASE_SERVER_URL = Bun.env.BASE_SERVER_URL || 'http://localhost:8080'
+export const BASE_SERVER_URL = process.env.BASE_SERVER_URL || 'http://localhost:8080'
 
 export type NullableString = {
 	String: string
