@@ -10,8 +10,6 @@ This is a web app that allows users to select mountain resorts which they would 
 - Run dev environment: `make dev`
 - Install dependencies: `make install`
 - Server tests: `cd server && go test ./...`
-- Client linting: `cd client && deno lint`
-- Client formatting: `cd client && deno fmt`
 
 ## Code Style Guidelines
 - **Frontend (TypeScript/React)**:
@@ -20,6 +18,7 @@ This is a web app that allows users to select mountain resorts which they would 
   - Explicit type annotations for function parameters/returns
   - Use React hooks for state management
   - Material UI for components
+  - Use bun as a package manager
 
 - **Backend (Go)**:
   - Standard Go code formatting (gofmt)
