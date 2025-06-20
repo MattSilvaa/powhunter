@@ -1,4 +1,4 @@
-export const BASE_SERVER_URL = import.meta.env.BASE_SERVER_URL || 'http://localhost:8080'
+export const BASE_SERVER_URL = import.meta.env.VITE_BASE_SERVER_URL || 'http://localhost:8080'
 
 export type NullableString = {
 	String: string
