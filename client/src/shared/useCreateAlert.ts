@@ -1,5 +1,4 @@
 import { useMutation } from '@tanstack/react-query'
-import { API_BASE_URL } from './types'
 
 const CREATE_ALERT_RETRIES = 2
 

@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import { Resort, ResortApiResponse } from './types.ts'
-import { API_BASE_URL } from './types'
 
 const fetchResorts = async (): Promise<ResortApiResponse[]> => {
 	const response = await fetch(`/api/resorts`, {
