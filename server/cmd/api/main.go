@@ -62,13 +62,19 @@ func corsMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		allowedOrigin := "*"
 		if os.Getenv("ENVIRONMENT") == "production" {
-			allowedOrigin = "https://www.powhunter.app"
+			allowedOrigin = "powhunter-web.onrender.com"
 		}
 		origin := r.Header.Get("Origin")
+
+		log.Printf("Request from origin: %s", origin)
+		log.Printf("Allowed origin: %s", allowedOrigin)
+		log.Printf("Match check: origin == allowedOrigin: %v", origin == allowedOrigin)
+
 		if origin == allowedOrigin || allowedOrigin == "*" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
+
 		w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, Authorization")
 

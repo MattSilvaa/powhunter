@@ -58,12 +58,12 @@ func setSecurityHeaders(w http.ResponseWriter) {
 func sendErrorResponse(w http.ResponseWriter, errorCode string, message string, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	
+
 	errorResp := ErrorResponse{
 		Error:   errorCode,
 		Message: message,
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(errorResp); err != nil {
 		log.Printf("Failed to encode error response: %v", err)
 	}
@@ -180,7 +180,7 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		log.Printf("Failed to create alert: %v", err)
-		
+
 		if pqErr, ok := err.(*pq.Error); ok {
 			switch pqErr.Code {
 			case "23505": // unique_violation
@@ -198,7 +198,7 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		
+
 		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to create alert", http.StatusInternalServerError)
 		return
 	}
