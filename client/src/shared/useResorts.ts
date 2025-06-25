@@ -5,10 +5,11 @@ const fetchResorts = async (): Promise<ResortApiResponse[]> => {
 	try {
 		const response = await fetch(`${BASE_SERVER_URL}/api/resorts`, {
 			method: 'GET',
+			mode: 'cors',
 			headers: {
 				'Content-Type': 'application/json',
 			},
-			credentials: 'include', // For auth cookies if needed
+			credentials: 'include',
 		})
 
 		if (!response.ok) {
