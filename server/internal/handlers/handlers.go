@@ -139,7 +139,7 @@ type CreateAlertRequest struct {
 }
 
 func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPut {
+	if r.Method != http.MethodPost {
 		sendErrorResponse(w, "METHOD_NOT_ALLOWED", "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
