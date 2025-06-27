@@ -64,11 +64,17 @@ func main() {
 
 func corsMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Request from origin: %s", r.Header)
+		log.Printf("Request %s from origin: %s", r.Method, r.Header.Get("Origin"))
 
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "*")
+
+		if r.Method == "OPTIONS" {
+			log.Printf("Handling OPTIONS preflight request")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 
 		h.ServeHTTP(w, r)
 	})
