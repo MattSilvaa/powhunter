@@ -101,7 +101,10 @@ func NewResortHandler(store db.StoreService) (*ResortHandler, error) {
 }
 
 func (h *ResortHandler) ListAllResorts(w http.ResponseWriter, r *http.Request) {
+	log.Printf("ListAllResorts called from %s", r.RemoteAddr)
+	
 	if r.Method != http.MethodGet {
+		log.Printf("Invalid method %s for ListAllResorts", r.Method)
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -111,17 +114,23 @@ func (h *ResortHandler) ListAllResorts(w http.ResponseWriter, r *http.Request) {
 
 	setSecurityHeaders(w)
 
+	log.Printf("Calling store.ListAllResorts")
 	resorts, err := h.store.ListAllResorts(ctx)
 	if err != nil {
+		log.Printf("Error retrieving resorts: %v", err)
 		http.Error(w, "Failed to retrieve resorts", http.StatusInternalServerError)
 		return
 	}
 
+	log.Printf("Successfully retrieved %d resorts", len(resorts))
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resorts); err != nil {
+		log.Printf("Error encoding response: %v", err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
+	
+	log.Printf("ListAllResorts completed successfully")
 }
 
 func NewAlertHandler(store db.StoreService) (*AlertHandler, error) {
