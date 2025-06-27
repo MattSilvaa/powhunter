@@ -42,10 +42,10 @@ const getErrorMessage = (errorResponse: ErrorResponse): string => {
 const createAlert = async (data: AlertData): Promise<void> => {
 	const response = await fetch(`${BASE_SERVER_URL}/api/alerts`, {
 		method: 'POST',
+		mode: 'cors',
 		headers: {
 			'Content-Type': 'application/json',
 		},
-		credentials: 'include',
 		body: JSON.stringify(data),
 	})
 
