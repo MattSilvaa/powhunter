@@ -57,11 +57,11 @@ db-setup:
 
 db-migrate:
 	@echo "Running database migrations..."
-	@cd server && goose -dir internal/db/migrations postgres "host=localhost port=5432 dbname=powhunter sslmode=disable" up
+	@cd server && ./scripts/migrate_db.sh
 
-db-reset:
-	@echo "Resetting database..."
-	@dropdb -U postgres powhunter || echo "Database may not exist"
+db-drop:
+	@echo "Dropping database..."
+	@cd server && ./scripts/drop_db.sh
 
 generate-db-code:
 	@echo "Generating database code..."
