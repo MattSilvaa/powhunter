@@ -1,31 +1,46 @@
-export const BASE_SERVER_URL = import.meta.env.VITE_BASE_SERVER_URL || 'http://localhost:8080'
+export const BASE_SERVER_URL =
+  import.meta.env.VITE_BASE_SERVER_URL || 'http://localhost:8080'
 
 export type NullableString = {
-	String: string
-	Valid: boolean
+  String: string
+  Valid: boolean
 }
 
 export type NullableFloat = {
-	Float64: number
-	Valid: boolean
+  Float64: number
+  Valid: boolean
 }
 
 export type ResortApiResponse = {
-	id: number
-	uuid: string
-	name: string
-	url_host: NullableString
-	url_pathname: NullableString
-	latitude: NullableFloat
-	longitude: NullableFloat
+  id: number
+  uuid: string
+  name: string
+  url_host: NullableString
+  url_pathname: NullableString
+  latitude: NullableFloat
+  longitude: NullableFloat
 }
 
 export type Resort = {
-	id: number
-	uuid: string
-	name: string
-	urlHost: string | null
-	urlPathname: string | null
-	latitude: number | null
-	longitude: number | null
+  id: number
+  uuid: string
+  name: string
+  urlHost: string | null
+  urlPathname: string | null
+  latitude: number | null
+  longitude: number | null
+}
+
+export type UserAlert = {
+  id: number
+  user_uuid: string
+  resort_uuid: string
+  resort_name: string
+  min_snow_amount: number
+  notification_days: number
+  active: boolean
+  created_at: {
+    Time: string
+    Valid: boolean
+  }
 }

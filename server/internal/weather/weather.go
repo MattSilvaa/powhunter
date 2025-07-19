@@ -11,19 +11,19 @@ import (
 
 //go:generate mockgen -destination=mocks/mock_weather.go -package=mocks github.com/MattSilvaa/powhunter/internal/weather WeatherService
 
-// WeatherService defines the interface for weather service operations
+// WeatherService defines the interface for weather service operations.
 type WeatherService interface {
 	// GetSnowForecast gets the snow forecast for a location
 	GetSnowForecast(ctx context.Context, lat, lon float64) ([]WeatherPrediction, error)
 }
 
-// OpenMeteoClient provides access to the Open-Meteo API
+// OpenMeteoClient provides access to the Open-Meteo API.
 type OpenMeteoClient struct {
 	client  *http.Client
 	baseURL string
 }
 
-// NewOpenMeteoClient creates a new Open-Meteo API client
+// NewOpenMeteoClient creates a new Open-Meteo API client.
 func NewOpenMeteoClient() *OpenMeteoClient {
 	return &OpenMeteoClient{
 		client: &http.Client{
@@ -33,12 +33,12 @@ func NewOpenMeteoClient() *OpenMeteoClient {
 	}
 }
 
-// CustomTime handles Open-Meteo's time format "2006-01-02T15:04"
+// CustomTime handles Open-Meteo's time format "2006-01-02T15:04".
 type OpenMeteoTime struct {
 	time.Time
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for Open-Meteo's time format
+// UnmarshalJSON implements custom JSON unmarshaling for Open-Meteo's time format.
 func (ct *OpenMeteoTime) UnmarshalJSON(b []byte) error {
 	s := strings.Trim(string(b), `"`)
 	if s == "null" || s == "" {
@@ -59,12 +59,12 @@ func (ct *OpenMeteoTime) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// MarshalJSON implements JSON marshaling
+// MarshalJSON implements JSON marshaling.
 func (ct OpenMeteoTime) MarshalJSON() ([]byte, error) {
 	return json.Marshal(ct.Time.Format("2006-01-02T15:04:05"))
 }
 
-// OpenMeteoResponse represents the response from the Open-Meteo API
+// OpenMeteoResponse represents the response from the Open-Meteo API.
 type OpenMeteoResponse struct {
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
@@ -81,7 +81,7 @@ type OpenMeteoResponse struct {
 	} `json:"hourly"`
 }
 
-// WeatherPrediction represents a predicted snowfall and temperature for a specific date
+// WeatherPrediction represents a predicted snowfall and temperature for a specific date.
 type WeatherPrediction struct {
 	Date           time.Time
 	SnowAmount     float64 // in inches
@@ -91,9 +91,14 @@ type WeatherPrediction struct {
 }
 
 func (c *OpenMeteoClient) GetForecast(ctx context.Context, lat, lon float64) (*OpenMeteoResponse, error) {
-	url := fmt.Sprintf("%s/forecast?latitude=%.6f&longitude=%.6f&current=temperature_2m,snowfall&hourly=snowfall,temperature_2m&temperature_unit=fahrenheit&precipitation_unit=inch&temporal_resolution=hourly_6&timezone=Etc/UTC", c.baseURL, lat, lon)
+	url := fmt.Sprintf(
+		"%s/forecast?latitude=%.6f&longitude=%.6f&current=temperature_2m,snowfall&hourly=snowfall,temperature_2m&temperature_unit=fahrenheit&precipitation_unit=inch&temporal_resolution=hourly_6&timezone=Etc/UTC",
+		c.baseURL,
+		lat,
+		lon,
+	)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -128,7 +133,7 @@ func (c *OpenMeteoClient) GetSnowForecast(ctx context.Context, lat, lon float64)
 	return ParseWeatherData(forecast), nil
 }
 
-// ParseWeatherData parses the snowfall and temperature data from the response
+// ParseWeatherData parses the snowfall and temperature data from the response.
 func ParseWeatherData(forecast *OpenMeteoResponse) []WeatherPrediction {
 	snowByDate := make(map[string]float64)
 	tempSumByDate := make(map[string]float64)

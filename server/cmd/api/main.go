@@ -26,6 +26,9 @@ func main() {
 	})
 	mux.HandleFunc("/api/resorts", h.Resort.ListAllResorts)
 	mux.HandleFunc("/api/alerts", h.Alert.CreateAlert)
+	mux.HandleFunc("/api/user/alerts", h.Alert.GetUserAlerts)
+	mux.HandleFunc("/api/user/alerts/delete", h.Alert.DeleteUserAlert)
+	mux.HandleFunc("/api/user/alerts/delete-all", h.Alert.DeleteAllUserAlerts)
 
 	handler := corsMiddleware(mux)
 
@@ -79,11 +82,11 @@ func corsMiddleware(h http.Handler) http.Handler {
 				w.Header().Set("Access-Control-Allow-Credentials", "true")
 			}
 		}
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().
+			Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, Authorization")
 
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, Authorization")
-
-		if r.Method == "OPTIONS" {
+		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
 			return
 		}

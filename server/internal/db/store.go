@@ -14,7 +14,7 @@ import (
 
 //go:generate mockgen -destination=mocks/mock_store.go -package=mocks github.com/MattSilvaa/powhunter/internal/db StoreService
 
-// StoreService defines the interface for database operations
+// StoreService defines the interface for database operations.
 type StoreService interface {
 	// ListAllResorts returns all resorts
 	ListAllResorts(ctx context.Context) ([]dbgen.Resort, error)
@@ -39,6 +39,15 @@ type StoreService interface {
 		notificationDays int32,
 		resortUUIDs []string,
 	) error
+
+	// GetUserAlertsByEmail returns all alerts for a user by email
+	GetUserAlertsByEmail(ctx context.Context, email string) ([]dbgen.GetUserAlertsByEmailRow, error)
+
+	// DeleteUserAlert deletes a specific alert for a user
+	DeleteUserAlert(ctx context.Context, email, resortUuid string) error
+
+	// DeleteAllUserAlerts deletes all alerts for a user
+	DeleteAllUserAlerts(ctx context.Context, email string) error
 }
 
 type Store struct {
@@ -63,7 +72,7 @@ func (s *Store) ExecTx(ctx context.Context, fn func(*dbgen.Queries) error) error
 	err = fn(q)
 	if err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
-			return fmt.Errorf("error rolling back transaction: %v (original error: %w)", rbErr, err)
+			return fmt.Errorf("error rolling back transaction: %w (original error: %w)", rbErr, err)
 		}
 		return err
 	}
@@ -92,12 +101,21 @@ func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
 			Valid:  phone != "",
 		}
 
-		user, err := q.CreateUser(ctx, dbgen.CreateUserParams{
-			Email: email,
-			Phone: phoneParam,
-		})
+		// Try to get existing user first
+		user, err := q.GetUserByEmail(ctx, email)
 		if err != nil {
-			return fmt.Errorf("error creating user: %w", err)
+			// If user doesn't exist, create them
+			if errors.Is(err, sql.ErrNoRows) {
+				user, err = q.CreateUser(ctx, dbgen.CreateUserParams{
+					Email: email,
+					Phone: phoneParam,
+				})
+				if err != nil {
+					return fmt.Errorf("error creating user: %w", err)
+				}
+			} else {
+				return fmt.Errorf("error checking for existing user: %w", err)
+			}
 		}
 
 		for _, resortUUID := range resortUUIDs {
@@ -138,7 +156,7 @@ type AlertToSend struct {
 	IsUpdate     bool
 }
 
-// GetAlertMatches finds alerts that match a specific resort, date, and snow amount
+// GetAlertMatches finds alerts that match a specific resort, date, and snow amount.
 func (s *Store) GetAlertMatches(
 	ctx context.Context,
 	resortUUID string,
@@ -220,7 +238,6 @@ func (s *Store) GetAlertMatches(
 					ForecastDate: forecastDate,
 					IsUpdate:     true,
 				})
-
 			}
 		}
 		return nil
@@ -233,7 +250,7 @@ func (s *Store) GetAlertMatches(
 	return alertsToSend, nil
 }
 
-// RecordAlertSent records that an alert was sent to avoid sending duplicates
+// RecordAlertSent records that an alert was sent to avoid sending duplicates.
 func (s *Store) RecordAlertSent(ctx context.Context, alert AlertToSend) error {
 	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
 		err := q.InsertAlertHistory(ctx, dbgen.InsertAlertHistoryParams{
@@ -245,4 +262,39 @@ func (s *Store) RecordAlertSent(ctx context.Context, alert AlertToSend) error {
 
 		return err
 	})
+}
+
+// GetUserAlertsByEmail returns all alerts for a user by email.
+func (s *Store) GetUserAlertsByEmail(ctx context.Context, email string) ([]dbgen.GetUserAlertsByEmailRow, error) {
+	alerts, err := s.queries.GetUserAlertsByEmail(ctx, email)
+	if err != nil {
+		return nil, fmt.Errorf("error getting user alerts by email: %w", err)
+	}
+	return alerts, nil
+}
+
+// DeleteUserAlert deletes a specific alert for a user.
+func (s *Store) DeleteUserAlert(ctx context.Context, email, resortUuid string) error {
+	resortUUID, err := uuid.Parse(resortUuid)
+	if err != nil {
+		return fmt.Errorf("error parsing resort UUID: %w", err)
+	}
+
+	err = s.queries.DeleteUserAlert(ctx, dbgen.DeleteUserAlertParams{
+		Email:      email,
+		ResortUuid: uuid.NullUUID{UUID: resortUUID, Valid: true},
+	})
+	if err != nil {
+		return fmt.Errorf("error deleting user alert: %w", err)
+	}
+	return nil
+}
+
+// DeleteAllUserAlerts deletes all alerts for a user.
+func (s *Store) DeleteAllUserAlerts(ctx context.Context, email string) error {
+	err := s.queries.DeleteAllUserAlerts(ctx, email)
+	if err != nil {
+		return fmt.Errorf("error deleting all user alerts: %w", err)
+	}
+	return nil
 }

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -43,7 +44,9 @@ type Handlers struct {
 	store  *db.Store
 }
 
-// Store returns the store used by the handlers
+var METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
+
+// Store returns the store used by the handlers.
 func (h *Handlers) Store() *db.Store {
 	return h.store
 }
@@ -102,6 +105,7 @@ func NewResortHandler(store db.StoreService) (*ResortHandler, error) {
 
 func (h *ResortHandler) ListAllResorts(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
+		sendErrorResponse(w, METHOD_NOT_ALLOWED, "Method not allowed", http.StatusMethodNotAllowed)
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -136,6 +140,108 @@ type CreateAlertRequest struct {
 	NotificationDays int      `json:"notificationDays"`
 	MinSnowAmount    float64  `json:"minSnowAmount"`
 	ResortsUuids     []string `json:"resortsUuids"`
+}
+
+func (h *AlertHandler) GetUserAlerts(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		sendErrorResponse(w, "METHOD_NOT_ALLOWED", "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	setSecurityHeaders(w)
+
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		sendErrorResponse(w, "MISSING_EMAIL", "Email parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 1000*time.Second)
+	defer cancel()
+
+	alerts, err := h.store.GetUserAlertsByEmail(ctx, email)
+	if err != nil {
+		log.Printf("Failed to get user alerts: %v", err)
+		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to retrieve alerts", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(alerts); err != nil {
+		log.Printf("Failed to encode alerts response: %v", err)
+		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (h *AlertHandler) DeleteUserAlert(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		sendErrorResponse(w, "METHOD_NOT_ALLOWED", "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	setSecurityHeaders(w)
+
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		sendErrorResponse(w, "MISSING_EMAIL", "Email parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	resortUuid := r.URL.Query().Get("resort_uuid")
+	if resortUuid == "" {
+		sendErrorResponse(w, "MISSING_RESORT", "Resort UUID parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	err := h.store.DeleteUserAlert(ctx, email, resortUuid)
+	if err != nil {
+		log.Printf("Failed to delete user alert: %v", err)
+		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to delete alert", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "success",
+		"message": "Alert deleted successfully",
+	})
+}
+
+func (h *AlertHandler) DeleteAllUserAlerts(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		sendErrorResponse(w, "METHOD_NOT_ALLOWED", "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	setSecurityHeaders(w)
+
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		sendErrorResponse(w, "MISSING_EMAIL", "Email parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	err := h.store.DeleteAllUserAlerts(ctx, email)
+	if err != nil {
+		log.Printf("Failed to delete all user alerts: %v", err)
+		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to delete alerts", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "success",
+		"message": "All alerts deleted successfully",
+	})
 }
 
 func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
@@ -181,11 +287,17 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Failed to create alert: %v", err)
 
-		if pqErr, ok := err.(*pq.Error); ok {
+		pqErr := &pq.Error{}
+		if errors.As(err, &pqErr) {
 			switch pqErr.Code {
 			case "23505": // unique_violation
-				if pqErr.Constraint == "users_email_key" {
-					sendErrorResponse(w, "DUPLICATE_EMAIL", "An account with this email address already exists", http.StatusConflict)
+				if pqErr.Constraint == "user_alerts_user_uuid_resort_uuid_key" {
+					sendErrorResponse(
+						w,
+						"DUPLICATE_ALERT",
+						"You already have an alert for this resort",
+						http.StatusConflict,
+					)
 					return
 				}
 				sendErrorResponse(w, "DUPLICATE_ENTRY", "This entry already exists", http.StatusConflict)

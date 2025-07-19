@@ -36,6 +36,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.createUserAlertStmt, err = db.PrepareContext(ctx, createUserAlert); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateUserAlert: %w", err)
 	}
+	if q.deleteAllUserAlertsStmt, err = db.PrepareContext(ctx, deleteAllUserAlerts); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteAllUserAlerts: %w", err)
+	}
+	if q.deleteUserAlertStmt, err = db.PrepareContext(ctx, deleteUserAlert); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteUserAlert: %w", err)
+	}
 	if q.getLastAlertSnowAmountStmt, err = db.PrepareContext(ctx, getLastAlertSnowAmount); err != nil {
 		return nil, fmt.Errorf("error preparing query GetLastAlertSnowAmount: %w", err)
 	}
@@ -47,6 +53,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getUserAlertStmt, err = db.PrepareContext(ctx, getUserAlert); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserAlert: %w", err)
+	}
+	if q.getUserAlertsByEmailStmt, err = db.PrepareContext(ctx, getUserAlertsByEmail); err != nil {
+		return nil, fmt.Errorf("error preparing query GetUserAlertsByEmail: %w", err)
 	}
 	if q.getUserByEmailStmt, err = db.PrepareContext(ctx, getUserByEmail); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserByEmail: %w", err)
@@ -94,6 +103,16 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing createUserAlertStmt: %w", cerr)
 		}
 	}
+	if q.deleteAllUserAlertsStmt != nil {
+		if cerr := q.deleteAllUserAlertsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteAllUserAlertsStmt: %w", cerr)
+		}
+	}
+	if q.deleteUserAlertStmt != nil {
+		if cerr := q.deleteUserAlertStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteUserAlertStmt: %w", cerr)
+		}
+	}
 	if q.getLastAlertSnowAmountStmt != nil {
 		if cerr := q.getLastAlertSnowAmountStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getLastAlertSnowAmountStmt: %w", cerr)
@@ -112,6 +131,11 @@ func (q *Queries) Close() error {
 	if q.getUserAlertStmt != nil {
 		if cerr := q.getUserAlertStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getUserAlertStmt: %w", cerr)
+		}
+	}
+	if q.getUserAlertsByEmailStmt != nil {
+		if cerr := q.getUserAlertsByEmailStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getUserAlertsByEmailStmt: %w", cerr)
 		}
 	}
 	if q.getUserByEmailStmt != nil {
@@ -192,10 +216,13 @@ type Queries struct {
 	clearResortsStmt           *sql.Stmt
 	createUserStmt             *sql.Stmt
 	createUserAlertStmt        *sql.Stmt
+	deleteAllUserAlertsStmt    *sql.Stmt
+	deleteUserAlertStmt        *sql.Stmt
 	getLastAlertSnowAmountStmt *sql.Stmt
 	getResortAlertsStmt        *sql.Stmt
 	getResortByUUIDStmt        *sql.Stmt
 	getUserAlertStmt           *sql.Stmt
+	getUserAlertsByEmailStmt   *sql.Stmt
 	getUserByEmailStmt         *sql.Stmt
 	getUserByUUIDStmt          *sql.Stmt
 	insertAlertHistoryStmt     *sql.Stmt
@@ -213,10 +240,13 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		clearResortsStmt:           q.clearResortsStmt,
 		createUserStmt:             q.createUserStmt,
 		createUserAlertStmt:        q.createUserAlertStmt,
+		deleteAllUserAlertsStmt:    q.deleteAllUserAlertsStmt,
+		deleteUserAlertStmt:        q.deleteUserAlertStmt,
 		getLastAlertSnowAmountStmt: q.getLastAlertSnowAmountStmt,
 		getResortAlertsStmt:        q.getResortAlertsStmt,
 		getResortByUUIDStmt:        q.getResortByUUIDStmt,
 		getUserAlertStmt:           q.getUserAlertStmt,
+		getUserAlertsByEmailStmt:   q.getUserAlertsByEmailStmt,
 		getUserByEmailStmt:         q.getUserByEmailStmt,
 		getUserByUUIDStmt:          q.getUserByUUIDStmt,
 		insertAlertHistoryStmt:     q.insertAlertHistoryStmt,
