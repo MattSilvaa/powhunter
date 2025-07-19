@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Resort represents a ski resort from the JSON file
+// Resort represents a ski resort from the JSON file.
 type Resort struct {
 	Name string `json:"name"`
 	URL  struct {

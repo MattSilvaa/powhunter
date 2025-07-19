@@ -175,7 +175,7 @@ func TestCreateAlert(t *testing.T) {
 			},
 		},
 		{
-			name:   "Duplicate Email Error",
+			name:   "Duplicate Alert Error",
 			method: http.MethodPut,
 			requestBody: CreateAlertRequest{
 				Email:            "existing@example.com",
@@ -187,7 +187,7 @@ func TestCreateAlert(t *testing.T) {
 			setupMock: func(m *mocks.MockStoreService) {
 				pqErr := &pq.Error{
 					Code:       "23505", // unique_violation
-					Constraint: "users_email_key",
+					Constraint: "user_alerts_user_uuid_resort_uuid_key",
 				}
 				m.EXPECT().
 					CreateUserWithAlerts(
@@ -202,8 +202,8 @@ func TestCreateAlert(t *testing.T) {
 			},
 			expectedStatus: http.StatusConflict,
 			expectedError: &ErrorResponse{
-				Error:   "DUPLICATE_EMAIL",
-				Message: "An account with this email address already exists",
+				Error:   "DUPLICATE_ALERT",
+				Message: "You already have an alert for this resort",
 			},
 		},
 		{

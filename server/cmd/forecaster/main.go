@@ -28,7 +28,9 @@ func main() {
 	twilioFromNumber := os.Getenv("TWILIO_FROM_NUMBER")
 
 	if twilioAccountSID == "" || twilioAuthToken == "" || twilioFromNumber == "" {
-		log.Fatalf("Twilio credentials not found. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER environment variables.")
+		log.Fatalf(
+			"Twilio credentials not found. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER environment variables.",
+		)
 	}
 	twilioClient = notify.NewTwilioClient(
 		twilioFromNumber,
@@ -48,7 +50,12 @@ func main() {
 			continue
 		}
 
-		log.Printf("Checking forecast for %s (%.4f, %.4f)", resort.Name, resort.Latitude.Float64, resort.Longitude.Float64)
+		log.Printf(
+			"Checking forecast for %s (%.4f, %.4f)",
+			resort.Name,
+			resort.Latitude.Float64,
+			resort.Longitude.Float64,
+		)
 
 		predictions, err := weatherClient.GetSnowForecast(ctx, resort.Latitude.Float64, resort.Longitude.Float64)
 		if err != nil {
