@@ -2,14 +2,15 @@ import { useQuery } from '@tanstack/react-query'
 import { BASE_SERVER_URL, Resort, ResortApiResponse } from './types.ts'
 
 const fetchResorts = async (): Promise<ResortApiResponse[]> => {
-  try {
-    const response = await fetch(`${BASE_SERVER_URL}/api/resorts`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include', // For auth cookies if needed
-    })
+	try {
+		const response = await fetch(`${BASE_SERVER_URL}/api/resorts`, {
+			method: 'GET',
+			mode: 'cors',
+			cache: 'no-store',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+		})
 
     if (!response.ok) {
       throw new Error(`Request failed: ${response.status}`)

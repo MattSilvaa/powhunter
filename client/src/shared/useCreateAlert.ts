@@ -43,35 +43,25 @@ const getErrorMessage = (errorResponse: ErrorResponse): string => {
 }
 
 const createAlert = async (data: AlertData): Promise<void> => {
-  const response = await fetch(`${BASE_SERVER_URL}/api/alerts`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-    body: JSON.stringify(data),
-  })
+	const response = await fetch(`${BASE_SERVER_URL}/api/alerts`, {
+		method: 'POST',
+		mode: 'cors',
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		body: JSON.stringify(data),
+	})
 
   if (!response.ok) {
-    console.log('Error response status:', response.status)
-    console.log(
-      'Error response headers:',
-      Object.fromEntries(response.headers.entries()),
-    )
-
     const responseText = await response.text()
-    console.log('Raw error response:', responseText)
 
     let errorMessage = 'An unexpected error occurred. Please try again.'
 
     try {
       const errorData: ErrorResponse = JSON.parse(responseText)
-      console.log('Parsed error data:', errorData)
       errorMessage = getErrorMessage(errorData)
-      console.log('Final error message:', errorMessage)
     } catch (parseError) {
       console.warn('Failed to parse error response as JSON:', parseError)
-      console.log('Falling back to status-based error messages')
 
       switch (response.status) {
         case 409:

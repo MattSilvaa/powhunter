@@ -20,6 +20,10 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
 	mux.HandleFunc("/api/resorts", h.Resort.ListAllResorts)
 	mux.HandleFunc("/api/alerts", h.Alert.CreateAlert)
 	mux.HandleFunc("/api/user/alerts", h.Alert.GetUserAlerts)
@@ -64,15 +68,21 @@ func main() {
 func corsMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		allowedOrigin := "*"
+
 		if os.Getenv("ENVIRONMENT") == "production" {
 			allowedOrigin = "https://www.powhunter.app"
 		}
 		origin := r.Header.Get("Origin")
-		if origin == allowedOrigin || allowedOrigin == "*" {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		if allowedOrigin == "*" {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		} else {
+			w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+			if origin == allowedOrigin {
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+			}
 		}
-		w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().
 			Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, Authorization")
 
