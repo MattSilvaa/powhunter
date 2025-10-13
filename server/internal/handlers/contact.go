@@ -123,16 +123,10 @@ func (h *ContactHandler) sendContactEmail(ctx context.Context, req ContactReques
 	smtpPort := os.Getenv("SMTP_PORT")
 	smtpUser := os.Getenv("SMTP_USER")
 	smtpPass := os.Getenv("SMTP_PASSWORD")
-	fromEmail := os.Getenv("SMTP_FROM_EMAIL")
-
 	// If SMTP is not configured, skip sending email
 	if smtpHost == "" || smtpPort == "" {
 		log.Println("SMTP not configured, skipping email send")
 		return nil
-	}
-
-	if fromEmail == "" {
-		fromEmail = "noreply@powhunter.app"
 	}
 
 	toEmail := "support@powhunter.app"
@@ -151,7 +145,7 @@ Message:
 This email was sent from the Powhunter contact form.
 `, req.Name, req.Email, time.Now().Format("January 2, 2006 at 3:04 PM MST"), req.Message)
 
-	message := fmt.Sprintf("From: %s\r\n", fromEmail)
+	message := fmt.Sprintf("From: %s\r\n", req.Email)
 	message += fmt.Sprintf("To: %s\r\n", toEmail)
 	message += fmt.Sprintf("Reply-To: %s\r\n", req.Email)
 	message += fmt.Sprintf("Subject: %s\r\n", subject)
@@ -164,7 +158,7 @@ This email was sent from the Powhunter contact form.
 	auth := smtp.PlainAuth("", smtpUser, smtpPass, smtpHost)
 	addr := fmt.Sprintf("%s:%s", smtpHost, smtpPort)
 
-	err := smtp.SendMail(addr, auth, fromEmail, []string{toEmail}, []byte(message))
+	err := smtp.SendMail(addr, auth, req.Email, []string{toEmail}, []byte(message))
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
