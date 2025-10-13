@@ -9,6 +9,7 @@ import {
 	CircularProgress,
 } from '@mui/material'
 import { Email as EmailIcon } from '@mui/icons-material'
+import {BASE_SERVER_URL} from "../shared/types";
 
 interface ContactFormData {
 	name: string
@@ -43,8 +44,7 @@ export default function ContactUs() {
 		setSuccess(false)
 
 		try {
-			const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
-			const response = await fetch(`${apiUrl}/api/contact`, {
+			const response = await fetch(`${BASE_SERVER_URL}/api/contact`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
