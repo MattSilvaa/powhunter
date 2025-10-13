@@ -6,10 +6,10 @@
 	"scripts": {
 		"build": "bun install && cross-env NODE_ENV=production react-router build",
 		"dev": "react-router dev",
-		"fmt": "bunx prettier . --write",
-		"lint:fix": "bunx eslint . --fix",
-		"lint": "bunx eslint .",
-		"serve": "bunx serve build/client -p 3000",
+		"fmt": "bun x prettier . --write",
+		"lint:fix": "bun x eslint . --fix",
+		"lint": "bun x eslint .",
+		"serve": "bun x serve build/client -p 3000",
 		"start": "bun run serve",
 		"test": "bun test src/**/*.test.{ts,tsx}"
 	},
