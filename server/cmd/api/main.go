@@ -29,6 +29,7 @@ func main() {
 	mux.HandleFunc("/api/user/alerts", h.Alert.GetUserAlerts)
 	mux.HandleFunc("/api/user/alerts/delete", h.Alert.DeleteUserAlert)
 	mux.HandleFunc("/api/user/alerts/delete-all", h.Alert.DeleteAllUserAlerts)
+	mux.HandleFunc("/api/contact", h.Contact.HandleContact)
 
 	handler := corsMiddleware(mux)
 

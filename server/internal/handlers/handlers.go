@@ -39,9 +39,10 @@ type AlertHandler struct {
 }
 
 type Handlers struct {
-	Resort *ResortHandler
-	Alert  *AlertHandler
-	store  *db.Store
+	Resort  *ResortHandler
+	Alert   *AlertHandler
+	Contact *ContactHandler
+	store   *db.Store
 }
 
 var METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
@@ -90,10 +91,16 @@ func NewHandlers() (*Handlers, error) {
 		return nil, err
 	}
 
+	contactHandler, err := NewContactHandler()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Handlers{
-		Resort: resortHandler,
-		Alert:  alertHandler,
-		store:  store,
+		Resort:  resortHandler,
+		Alert:   alertHandler,
+		Contact: contactHandler,
+		store:   store,
 	}, nil
 }
 

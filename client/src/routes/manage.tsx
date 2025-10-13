@@ -39,7 +39,6 @@ export default function ManageSubscriptionsPage() {
 		data: alerts = [],
 		isLoading,
 		error,
-		refetch,
 	} = useUserAlerts(searchedEmail)
 
 	const deleteAlertMutation = useDeleteAlert()
@@ -85,41 +84,38 @@ export default function ManageSubscriptionsPage() {
 	}
 
 	return (
-		<Container maxWidth='md' sx={{ py: 4 }}>
+		<Container maxWidth="md" sx={{ py: 4 }}>
 			<Paper elevation={3} sx={{ p: 4 }}>
-				<Typography variant='h2' component='h1' gutterBottom>
+				<Typography variant="h2" component="h1" gutterBottom>
 					Manage Your Subscriptions
 				</Typography>
-				<Typography
-					variant='body1'
-					color='text.secondary'
-					sx={{ mb: 2 }}
-				>
+				<Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
 					Enter your email address to view and manage your powder alert
 					subscriptions.
 				</Typography>
 
-				<Alert severity='info' icon={<Warning />} sx={{ mb: 4 }}>
-					<Typography variant='body2'>
-						<strong>Note:</strong> We're working on adding email verification for enhanced security. 
-						For now, only use the email address you signed up with.
+				<Alert severity="info" icon={<Warning />} sx={{ mb: 4 }}>
+					<Typography variant="body2">
+						<strong>Note:</strong> We're working on adding email verification
+						for enhanced security. For now, only use the email address you
+						signed up with.
 					</Typography>
 				</Alert>
 
-				<Box component='form' onSubmit={handleSearch} sx={{ mb: 4 }}>
+				<Box component="form" onSubmit={handleSearch} sx={{ mb: 4 }}>
 					<Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
 						<TextField
 							fullWidth
-							label='Email Address'
-							type='email'
+							label="Email Address"
+							type="email"
 							value={email}
 							onChange={(e) => setEmail(e.target.value)}
 							required
 						/>
 						<Button
-							type='submit'
-							variant='contained'
-							size='large'
+							type="submit"
+							variant="contained"
+							size="large"
 							disabled={isLoading}
 						>
 							{isLoading ? 'Loading...' : 'Find Subscriptions'}
@@ -128,31 +124,27 @@ export default function ManageSubscriptionsPage() {
 				</Box>
 
 				{error && (
-					<Alert severity='error' sx={{ mb: 3 }}>
+					<Alert severity="error" sx={{ mb: 3 }}>
 						Failed to load subscriptions. Please try again.
 					</Alert>
 				)}
 
 				{deleteAlertMutation.error && (
-					<Alert severity='error' sx={{ mb: 3 }}>
+					<Alert severity="error" sx={{ mb: 3 }}>
 						Failed to delete subscription. Please try again.
 					</Alert>
 				)}
 
 				{deleteAllMutation.error && (
-					<Alert severity='error' sx={{ mb: 3 }}>
+					<Alert severity="error" sx={{ mb: 3 }}>
 						Failed to delete all subscriptions. Please try again.
 					</Alert>
 				)}
 
 				{searchedEmail && alerts.length === 0 && !isLoading && !error && (
-					<Alert severity='info' sx={{ mb: 3 }}>
-						No active subscriptions found for {searchedEmail}. 
-						<Button
-							component={Link}
-							to='/signup'
-							sx={{ ml: 1 }}
-						>
+					<Alert severity="info" sx={{ mb: 3 }}>
+						No active subscriptions found for {searchedEmail}.
+						<Button component={Link} to="/signup" sx={{ ml: 1 }}>
 							Create one?
 						</Button>
 					</Alert>
@@ -168,12 +160,12 @@ export default function ManageSubscriptionsPage() {
 								mb: 2,
 							}}
 						>
-							<Typography variant='h5' component='h2'>
+							<Typography variant="h5" component="h2">
 								Active Subscriptions ({alerts.length})
 							</Typography>
 							<Button
-								variant='outlined'
-								color='error'
+								variant="outlined"
+								color="error"
 								startIcon={<DeleteSweep />}
 								onClick={() => setDeleteAllConfirmOpen(true)}
 								disabled={deleteAllMutation.isPending}
@@ -184,7 +176,7 @@ export default function ManageSubscriptionsPage() {
 
 						<Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
 							{alerts.map((alert) => (
-								<Card key={alert.id} variant='outlined'>
+								<Card key={alert.id} variant="outlined">
 									<CardContent>
 										<Box
 											sx={{
@@ -194,31 +186,27 @@ export default function ManageSubscriptionsPage() {
 											}}
 										>
 											<Box sx={{ flex: 1 }}>
-												<Typography variant='h6' component='h3'>
+												<Typography variant="h6" component="h3">
 													{alert.resort_name}
 												</Typography>
 												<Box sx={{ mt: 1, mb: 1 }}>
 													<Chip
 														label={`${alert.min_snow_amount}" minimum snow`}
-														size='small'
+														size="small"
 														sx={{ mr: 1 }}
 													/>
 													<Chip
 														label={`${alert.notification_days} days notice`}
-														size='small'
+														size="small"
 													/>
 												</Box>
-												<Typography
-													variant='body2'
-													color='text.secondary'
-												>
-													Created:{' '}
-													{console.log(alert)}
+												<Typography variant="body2" color="text.secondary">
+													Created: {console.log(alert)}
 													{new Date(alert.created_at.Time).toLocaleDateString()}
 												</Typography>
 											</Box>
 											<IconButton
-												color='error'
+												color="error"
 												onClick={() =>
 													handleDeleteClick(
 														alert.resort_uuid,
@@ -238,7 +226,7 @@ export default function ManageSubscriptionsPage() {
 				)}
 
 				<Box sx={{ mt: 4, textAlign: 'center' }}>
-					<Button component={Link} to='/' variant='text'>
+					<Button component={Link} to="/" variant="text">
 						← Back to Home
 					</Button>
 				</Box>
@@ -257,13 +245,11 @@ export default function ManageSubscriptionsPage() {
 					</DialogContentText>
 				</DialogContent>
 				<DialogActions>
-					<Button onClick={() => setDeleteConfirmOpen(false)}>
-						Cancel
-					</Button>
+					<Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
 					<Button
 						onClick={handleDeleteConfirm}
-						color='error'
-						variant='contained'
+						color="error"
+						variant="contained"
 						disabled={deleteAlertMutation.isPending}
 					>
 						{deleteAlertMutation.isPending ? 'Deleting...' : 'Delete'}
@@ -278,19 +264,17 @@ export default function ManageSubscriptionsPage() {
 				<DialogTitle>Delete All Subscriptions</DialogTitle>
 				<DialogContent>
 					<DialogContentText>
-						Are you sure you want to delete ALL your powder alert
-						subscriptions? This action cannot be undone and you will no longer
-						receive any powder alerts.
+						Are you sure you want to delete ALL your powder alert subscriptions?
+						This action cannot be undone and you will no longer receive any
+						powder alerts.
 					</DialogContentText>
 				</DialogContent>
 				<DialogActions>
-					<Button onClick={() => setDeleteAllConfirmOpen(false)}>
-						Cancel
-					</Button>
+					<Button onClick={() => setDeleteAllConfirmOpen(false)}>Cancel</Button>
 					<Button
 						onClick={handleDeleteAllConfirm}
-						color='error'
-						variant='contained'
+						color="error"
+						variant="contained"
 						disabled={deleteAllMutation.isPending}
 					>
 						{deleteAllMutation.isPending ? 'Deleting...' : 'Delete All'}

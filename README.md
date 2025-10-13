@@ -12,6 +12,7 @@ Pow Hunter is a web application that sends you SMS alerts when fresh snow is for
 - ❄️ Set minimum snow thresholds for alerts
 - 🗺️ View detailed resort information and forecasts
 - 🌤️ Real-time weather data from Weather.gov API
+- 📧 Contact form with email notifications to support team
 
 ## Technical Stack
 
@@ -39,6 +40,8 @@ Pow Hunter uses the National Weather Service (NWS) API to get accurate snow fore
 
 ### Environment Variables
 
+See `server/.env.example` for a complete list of configuration options.
+
 ```
 # Database
 DATABASE_URL=postgres://user:password@localhost:5432/powhunter
@@ -47,7 +50,16 @@ DATABASE_URL=postgres://user:password@localhost:5432/powhunter
 TWILIO_ACCOUNT_SID=your_account_sid
 TWILIO_AUTH_TOKEN=your_auth_token
 TWILIO_FROM_NUMBER=your_twilio_phone_number
+
+# SMTP (for contact form emails)
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=your-email@example.com
+SMTP_PASSWORD=your-password
+SMTP_FROM_EMAIL=noreply@powhunter.app
 ```
+
+For detailed email configuration, see [server/EMAIL_CONFIGURATION.md](server/EMAIL_CONFIGURATION.md).
 
 ### Setup
 

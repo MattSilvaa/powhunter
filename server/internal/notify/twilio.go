@@ -56,7 +56,21 @@ func (t *TwilioClient) SendSMS(to, message string) error {
 
 // FormatSnowAlertMessage formats a snow alert SMS message.
 func FormatSnowAlertMessage(resortName string, snowAmount float64, forecastDate time.Time) string {
-	dateStr := forecastDate.Format("Monday, Jan 2")
-	return fmt.Sprintf("Powder Alert! %s is expecting %.1f inches of snow on %s. Time to hit the slopes!",
-		resortName, snowAmount, dateStr)
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	tomorrow := today.Add(24 * time.Hour)
+	forecastDay := time.Date(forecastDate.Year(), forecastDate.Month(), forecastDate.Day(), 0, 0, 0, 0, forecastDate.Location())
+
+	var timeStr string
+	switch {
+	case forecastDay.Equal(today):
+		timeStr = "today"
+	case forecastDay.Equal(tomorrow):
+		timeStr = "tomorrow"
+	default:
+		timeStr = "on " + forecastDate.Format("Monday, Jan 2")
+	}
+
+	return fmt.Sprintf("Powder Alert! %s is expecting %.1f inches of snow %s. Time to hit the slopes!",
+		resortName, snowAmount, timeStr)
 }
