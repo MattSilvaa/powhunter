@@ -52,7 +52,7 @@ func TestCreateAlert(t *testing.T) {
 	}{
 		{
 			name:   "Success",
-			method: http.MethodPut,
+			method: http.MethodPost,
 			requestBody: CreateAlertRequest{
 				Email:            "test@example.com",
 				Phone:            "1234567890",
@@ -106,7 +106,7 @@ func TestCreateAlert(t *testing.T) {
 		},
 		{
 			name:        "Invalid JSON Body",
-			method:      http.MethodPut,
+			method:      http.MethodPost,
 			requestBody: "this is not valid json",
 			setupMock: func(m *mocks.MockStoreService) {
 				// No calls expected
@@ -119,7 +119,7 @@ func TestCreateAlert(t *testing.T) {
 		},
 		{
 			name:   "Missing Required Fields - Empty Email",
-			method: http.MethodPut,
+			method: http.MethodPost,
 			requestBody: CreateAlertRequest{
 				Email:            "", // Empty email
 				Phone:            "1234567890",
@@ -138,7 +138,7 @@ func TestCreateAlert(t *testing.T) {
 		},
 		{
 			name:   "Missing Required Fields - Empty Phone",
-			method: http.MethodPut,
+			method: http.MethodPost,
 			requestBody: CreateAlertRequest{
 				Email:            "test@example.com",
 				Phone:            "", // Empty phone
@@ -157,7 +157,7 @@ func TestCreateAlert(t *testing.T) {
 		},
 		{
 			name:   "Missing Required Fields - Empty Resorts",
-			method: http.MethodPut,
+			method: http.MethodPost,
 			requestBody: CreateAlertRequest{
 				Email:            "test@example.com",
 				Phone:            "1234567890",
@@ -175,8 +175,8 @@ func TestCreateAlert(t *testing.T) {
 			},
 		},
 		{
-			name:   "Duplicate Alert Error",
-			method: http.MethodPut,
+			name:   "Duplicate Email Error",
+			method: http.MethodPost,
 			requestBody: CreateAlertRequest{
 				Email:            "existing@example.com",
 				Phone:            "1234567890",
@@ -208,7 +208,7 @@ func TestCreateAlert(t *testing.T) {
 		},
 		{
 			name:   "Database Error",
-			method: http.MethodPut,
+			method: http.MethodPost,
 			requestBody: CreateAlertRequest{
 				Email:            "test@example.com",
 				Phone:            "1234567890",
