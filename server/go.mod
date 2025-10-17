@@ -8,6 +8,7 @@ require (
 )
 
 require (
+	github.com/resend/resend-go/v2 v2.27.0
 	github.com/stretchr/testify v1.9.0
 	github.com/twilio/twilio-go v1.26.0
 	go.uber.org/mock v0.5.1

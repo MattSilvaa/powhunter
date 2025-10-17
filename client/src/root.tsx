@@ -166,10 +166,18 @@ const theme = createTheme({
 
 export default function Root() {
 	return (
-		<>
-			<Outlet />
+		<div
+			style={{
+				minHeight: '100vh',
+				display: 'flex',
+				flexDirection: 'column',
+			}}
+		>
+			<div style={{ flex: 1 }}>
+				<Outlet />
+			</div>
 			<Footer />
-		</>
+		</div>
 	)
 }
 
