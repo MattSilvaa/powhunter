@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/smtp"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/resend/resend-go/v2"
 )
 
 type ContactHandler struct{}
@@ -118,51 +119,39 @@ func (h *ContactHandler) recordContactMessage(ctx context.Context, req ContactRe
 }
 
 func (h *ContactHandler) sendContactEmail(ctx context.Context, req ContactRequest) error {
-	// Get SMTP configuration from environment
-	smtpHost := os.Getenv("SMTP_HOST")
-	smtpPort := os.Getenv("SMTP_PORT")
-	smtpUser := os.Getenv("SMTP_USER")
-	smtpPass := os.Getenv("SMTP_PASSWORD")
-	// If SMTP is not configured, skip sending email
-	if smtpHost == "" || smtpPort == "" {
-		log.Println("SMTP not configured, skipping email send")
+	// Get Resend API key from environment
+	apiKey := os.Getenv("RESEND_API_KEY")
+	if apiKey == "" {
+		log.Println("RESEND_API_KEY not configured, skipping email send")
 		return nil
 	}
 
-	toEmail := "support@powhunter.app"
+	client := resend.NewClient(apiKey)
 
-	// Construct email
-	subject := fmt.Sprintf("Contact Form Submission from %s", req.Name)
-	body := fmt.Sprintf(`New contact form submission:
+	// Construct email body
+	htmlBody := fmt.Sprintf(`
+		<h2>New Contact Form Submission</h2>
+		<p><strong>From:</strong> %s (%s)</p>
+		<p><strong>Submitted:</strong> %s</p>
+		<h3>Message:</h3>
+		<p>%s</p>
+		<hr>
+		<p><em>This email was sent from the Powhunter contact form.</em></p>
+	`, req.Name, req.Email, time.Now().Format("January 2, 2006 at 3:04 PM MST"), strings.ReplaceAll(req.Message, "\n", "<br>"))
 
-From: %s <%s>
-Submitted: %s
+	params := &resend.SendEmailRequest{
+		From:    "Powhunter <noreply@powhunter.app>",
+		To:      []string{"support@powhunter.app"},
+		ReplyTo: req.Email,
+		Subject: fmt.Sprintf("Contact Form Submission from %s", req.Name),
+		Html:    htmlBody,
+	}
 
-Message:
-%s
-
----
-This email was sent from the Powhunter contact form.
-`, req.Name, req.Email, time.Now().Format("January 2, 2006 at 3:04 PM MST"), req.Message)
-
-	message := fmt.Sprintf("From: %s\r\n", req.Email)
-	message += fmt.Sprintf("To: %s\r\n", toEmail)
-	message += fmt.Sprintf("Reply-To: %s\r\n", req.Email)
-	message += fmt.Sprintf("Subject: %s\r\n", subject)
-	message += "MIME-Version: 1.0\r\n"
-	message += "Content-Type: text/plain; charset=UTF-8\r\n"
-	message += "\r\n"
-	message += body
-
-	// Send email
-	auth := smtp.PlainAuth("", smtpUser, smtpPass, smtpHost)
-	addr := fmt.Sprintf("%s:%s", smtpHost, smtpPort)
-
-	err := smtp.SendMail(addr, auth, req.Email, []string{toEmail}, []byte(message))
+	sent, err := client.Emails.Send(params)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
-	log.Printf("Contact email sent to %s from %s (%s)", toEmail, req.Name, req.Email)
+	log.Printf("Contact email sent to support@powhunter.app from %s (%s) - ID: %s", req.Name, req.Email, sent.Id)
 	return nil
 }
