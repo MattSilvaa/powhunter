@@ -1,0 +1,27 @@
+# Caddyfile for PowHunter
+# This serves the frontend SPA and proxies API requests to the Go backend
+
+# Development configuration (localhost)
+:3000 {
+	# Root directory for static files
+	root * ./client/build/client
+
+	# Proxy API routes to Go backend
+	@api {
+		path /api/* /health
+	}
+	reverse_proxy @api localhost:8080
+
+	# Enable compression
+	encode gzip
+
+	# Try to serve static files, fall back to index.html for SPA routing
+	try_files {path} /index.html
+	file_server
+
+	# Logging
+	log {
+		output stdout
+		format console
+	}
+}

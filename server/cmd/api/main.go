@@ -71,7 +71,7 @@ func corsMiddleware(h http.Handler) http.Handler {
 		allowedOrigin := "*"
 
 		if os.Getenv("ENVIRONMENT") == "production" {
-			allowedOrigin = "https://www.powhunter.app"
+			allowedOrigin = "https://powhunter.app"
 		}
 		origin := r.Header.Get("Origin")
 

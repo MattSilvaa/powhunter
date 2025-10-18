@@ -1,8 +1,13 @@
-.PHONY: dev build clean server client db-setup db-migrate db-reset generate-db-code db-seed check-forecasts
+.PHONY: dev dev-caddy build clean server client caddy db-setup db-migrate db-reset generate-db-code db-seed check-forecasts
 
 dev:
 	@echo "Starting development environment..."
 	@make -j2 server client
+
+dev-caddy:
+	@echo "Starting development environment with Caddy..."
+	@echo "Caddy will serve the app on http://localhost:3000"
+	@make -j2 server caddy
 build:
 	@echo "Building client and server..."
 	@cd client && bun run build
@@ -22,9 +27,18 @@ client:
 	@echo "Starting client..."
 	@cd client && bun run dev
 
+caddy:
+	@echo "Starting Caddy reverse proxy..."
+	@caddy run --config Caddyfile --adapter caddyfile
+
 start-prod:
 	@echo "Starting production environment..."
 	@make -j2 prod-server prod-client
+
+start-caddy:
+	@echo "Starting production environment with Caddy..."
+	@echo "Make sure to build first: make build"
+	@make -j2 prod-server caddy
 
 prod-server:
 	@cd server && ./bin/powhunter
