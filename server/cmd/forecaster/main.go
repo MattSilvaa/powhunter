@@ -88,7 +88,7 @@ func main() {
 				log.Printf("Alert for %s (Phone: %s)", alert.ResortName, alert.UserPhone)
 
 				if alert.UserPhone != "" {
-					message := notify.FormatSnowAlertMessage(alert.ResortName, pred.SnowAmount, alert.ForecastDate)
+					message := notify.FormatSnowAlertMessage(alert)
 					if err := twilioClient.SendSMS(alert.UserPhone, message); err != nil {
 						log.Printf("Error sending SMS to %s: %v", alert.UserPhone, err)
 					} else {

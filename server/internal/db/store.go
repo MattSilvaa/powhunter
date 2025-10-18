@@ -184,6 +184,16 @@ func (s *Store) GetAlertMatches(
 		}
 
 		for _, alert := range alerts {
+			// Only process alerts where the forecast is within the user's notification window
+			if daysAhead > alert.NotificationDays {
+				continue
+			}
+
+			// Only process alerts where the predicted snow meets the user's minimum threshold
+			if predictedSnowAmount < alert.MinSnowAmount {
+				continue
+			}
+
 			lastAlertSnowAmount, err := q.GetLastAlertSnowAmount(ctx, dbgen.GetLastAlertSnowAmountParams{
 				UserUuid:     alert.UserUuid,
 				ResortUuid:   ruuid,

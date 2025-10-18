@@ -57,6 +57,34 @@ func (mr *MockStoreServiceMockRecorder) CreateUserWithAlerts(ctx, email, phone, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUserWithAlerts", reflect.TypeOf((*MockStoreService)(nil).CreateUserWithAlerts), ctx, email, phone, minSnowAmount, notificationDays, resortUUIDs)
 }
 
+// DeleteAllUserAlerts mocks base method.
+func (m *MockStoreService) DeleteAllUserAlerts(ctx context.Context, email string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteAllUserAlerts", ctx, email)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteAllUserAlerts indicates an expected call of DeleteAllUserAlerts.
+func (mr *MockStoreServiceMockRecorder) DeleteAllUserAlerts(ctx, email any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAllUserAlerts", reflect.TypeOf((*MockStoreService)(nil).DeleteAllUserAlerts), ctx, email)
+}
+
+// DeleteUserAlert mocks base method.
+func (m *MockStoreService) DeleteUserAlert(ctx context.Context, email, resortUuid string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteUserAlert", ctx, email, resortUuid)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteUserAlert indicates an expected call of DeleteUserAlert.
+func (mr *MockStoreServiceMockRecorder) DeleteUserAlert(ctx, email, resortUuid any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserAlert", reflect.TypeOf((*MockStoreService)(nil).DeleteUserAlert), ctx, email, resortUuid)
+}
+
 // GetAlertMatches mocks base method.
 func (m *MockStoreService) GetAlertMatches(ctx context.Context, resortUUID string, forecastDate time.Time, predictedSnowAmount float64, daysAhead int32) ([]db.AlertToSend, error) {
 	m.ctrl.T.Helper()
@@ -70,6 +98,21 @@ func (m *MockStoreService) GetAlertMatches(ctx context.Context, resortUUID strin
 func (mr *MockStoreServiceMockRecorder) GetAlertMatches(ctx, resortUUID, forecastDate, predictedSnowAmount, daysAhead any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAlertMatches", reflect.TypeOf((*MockStoreService)(nil).GetAlertMatches), ctx, resortUUID, forecastDate, predictedSnowAmount, daysAhead)
+}
+
+// GetUserAlertsByEmail mocks base method.
+func (m *MockStoreService) GetUserAlertsByEmail(ctx context.Context, email string) ([]db0.GetUserAlertsByEmailRow, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserAlertsByEmail", ctx, email)
+	ret0, _ := ret[0].([]db0.GetUserAlertsByEmailRow)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUserAlertsByEmail indicates an expected call of GetUserAlertsByEmail.
+func (mr *MockStoreServiceMockRecorder) GetUserAlertsByEmail(ctx, email any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserAlertsByEmail", reflect.TypeOf((*MockStoreService)(nil).GetUserAlertsByEmail), ctx, email)
 }
 
 // ListAllResorts mocks base method.
@@ -99,47 +142,4 @@ func (m *MockStoreService) RecordAlertSent(ctx context.Context, alert db.AlertTo
 func (mr *MockStoreServiceMockRecorder) RecordAlertSent(ctx, alert any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordAlertSent", reflect.TypeOf((*MockStoreService)(nil).RecordAlertSent), ctx, alert)
-}
-
-// GetUserAlertsByEmail mocks base method.
-func (m *MockStoreService) GetUserAlertsByEmail(ctx context.Context, email string) ([]db0.GetUserAlertsByEmailRow, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUserAlertsByEmail", ctx, email)
-	ret0, _ := ret[0].([]db0.GetUserAlertsByEmailRow)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetUserAlertsByEmail indicates an expected call of GetUserAlertsByEmail.
-func (mr *MockStoreServiceMockRecorder) GetUserAlertsByEmail(ctx, email any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserAlertsByEmail", reflect.TypeOf((*MockStoreService)(nil).GetUserAlertsByEmail), ctx, email)
-}
-
-// DeleteUserAlert mocks base method.
-func (m *MockStoreService) DeleteUserAlert(ctx context.Context, email, resortUuid string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteUserAlert", ctx, email, resortUuid)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DeleteUserAlert indicates an expected call of DeleteUserAlert.
-func (mr *MockStoreServiceMockRecorder) DeleteUserAlert(ctx, email, resortUuid any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserAlert", reflect.TypeOf((*MockStoreService)(nil).DeleteUserAlert), ctx, email, resortUuid)
-}
-
-// DeleteAllUserAlerts mocks base method.
-func (m *MockStoreService) DeleteAllUserAlerts(ctx context.Context, email string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteAllUserAlerts", ctx, email)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DeleteAllUserAlerts indicates an expected call of DeleteAllUserAlerts.
-func (mr *MockStoreServiceMockRecorder) DeleteAllUserAlerts(ctx, email any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAllUserAlerts", reflect.TypeOf((*MockStoreService)(nil).DeleteAllUserAlerts), ctx, email)
 }

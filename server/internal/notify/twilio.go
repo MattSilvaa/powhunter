@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/MattSilvaa/powhunter/internal/db"
 	"github.com/twilio/twilio-go"
 	twilioAPI "github.com/twilio/twilio-go/rest/api/v2010"
 )
@@ -55,7 +56,11 @@ func (t *TwilioClient) SendSMS(to, message string) error {
 }
 
 // FormatSnowAlertMessage formats a snow alert SMS message.
-func FormatSnowAlertMessage(resortName string, snowAmount float64, forecastDate time.Time) string {
+func FormatSnowAlertMessage(alert db.AlertToSend) string {
+	forecastDate := alert.ForecastDate
+	resortName := alert.ResortName
+	snowAmount := alert.SnowAmount
+
 	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	tomorrow := today.Add(24 * time.Hour)
@@ -69,6 +74,11 @@ func FormatSnowAlertMessage(resortName string, snowAmount float64, forecastDate 
 		timeStr = "tomorrow"
 	default:
 		timeStr = "on " + forecastDate.Format("Monday, Jan 2")
+	}
+
+	if alert.IsUpdate {
+		return fmt.Sprintf("Powder Alert Update! %s is now expecting %.1f inches of snow %s - even more powder than before! Time to hit the slopes!",
+			resortName, snowAmount, timeStr)
 	}
 
 	return fmt.Sprintf("Powder Alert! %s is expecting %.1f inches of snow %s. Time to hit the slopes!",
