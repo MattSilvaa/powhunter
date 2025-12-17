@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
 	Alert,
 	Box,
@@ -14,20 +14,20 @@ import {
 	DialogTitle,
 	IconButton,
 	Paper,
-	TextField,
 	Typography,
 } from '@mui/material'
-import { Delete, DeleteSweep, Warning } from '@mui/icons-material'
-import { Link } from 'react-router'
+import { Delete, DeleteSweep, Logout } from '@mui/icons-material'
+import { Link, useNavigate } from 'react-router'
 import {
 	useUserAlerts,
 	useDeleteAlert,
 	useDeleteAllAlerts,
 } from '../shared/useManageAlerts.ts'
+import { useAuth } from '../shared/useAuth.ts'
 
 export default function ManageSubscriptionsPage() {
-	const [email, setEmail] = useState('')
-	const [searchedEmail, setSearchedEmail] = useState('')
+	const navigate = useNavigate()
+	const { user, token, isAuthenticated, logout, isLoading: authLoading } = useAuth()
 	const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 	const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false)
 	const [alertToDelete, setAlertToDelete] = useState<{
@@ -39,17 +39,17 @@ export default function ManageSubscriptionsPage() {
 		data: alerts = [],
 		isLoading,
 		error,
-	} = useUserAlerts(searchedEmail)
+	} = useUserAlerts(token)
 
 	const deleteAlertMutation = useDeleteAlert()
 	const deleteAllMutation = useDeleteAllAlerts()
 
-	const handleSearch = (e: React.FormEvent) => {
-		e.preventDefault()
-		if (email.trim()) {
-			setSearchedEmail(email.trim())
+	// Redirect to login if not authenticated
+	useEffect(() => {
+		if (!authLoading && !isAuthenticated) {
+			navigate('/login')
 		}
-	}
+	}, [isAuthenticated, authLoading, navigate])
 
 	const handleDeleteClick = (resortUuid: string, resortName: string) => {
 		setAlertToDelete({ resortUuid, resortName })
@@ -57,10 +57,10 @@ export default function ManageSubscriptionsPage() {
 	}
 
 	const handleDeleteConfirm = () => {
-		if (alertToDelete && searchedEmail) {
+		if (alertToDelete && token) {
 			deleteAlertMutation.mutate(
 				{
-					email: searchedEmail,
+					token,
 					resortUuid: alertToDelete.resortUuid,
 				},
 				{
@@ -74,8 +74,8 @@ export default function ManageSubscriptionsPage() {
 	}
 
 	const handleDeleteAllConfirm = () => {
-		if (searchedEmail) {
-			deleteAllMutation.mutate(searchedEmail, {
+		if (token) {
+			deleteAllMutation.mutate(token, {
 				onSuccess: () => {
 					setDeleteAllConfirmOpen(false)
 				},
@@ -83,45 +83,43 @@ export default function ManageSubscriptionsPage() {
 		}
 	}
 
+	const handleLogout = async () => {
+		await logout()
+		navigate('/login')
+	}
+
+	if (authLoading) {
+		return (
+			<Container maxWidth="md" sx={{ py: 4, textAlign: 'center' }}>
+				<Typography>Loading...</Typography>
+			</Container>
+		)
+	}
+
+	if (!isAuthenticated) {
+		return null // Will redirect via useEffect
+	}
+
 	return (
 		<Container maxWidth="md" sx={{ py: 4 }}>
 			<Paper elevation={3} sx={{ p: 4 }}>
-				<Typography variant="h2" component="h1" gutterBottom>
-					Manage Your Subscriptions
-				</Typography>
-				<Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
-					Enter your email address to view and manage your powder alert
-					subscriptions.
-				</Typography>
-
-				<Alert severity="info" icon={<Warning />} sx={{ mb: 4 }}>
-					<Typography variant="body2">
-						<strong>Note:</strong> We're working on adding email verification
-						for enhanced security. For now, only use the email address you
-						signed up with.
+				<Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+					<Typography variant="h2" component="h1">
+						Manage Your Subscriptions
 					</Typography>
-				</Alert>
-
-				<Box component="form" onSubmit={handleSearch} sx={{ mb: 4 }}>
-					<Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-						<TextField
-							fullWidth
-							label="Email Address"
-							type="email"
-							value={email}
-							onChange={(e) => setEmail(e.target.value)}
-							required
-						/>
-						<Button
-							type="submit"
-							variant="contained"
-							size="large"
-							disabled={isLoading}
-						>
-							{isLoading ? 'Loading...' : 'Find Subscriptions'}
-						</Button>
-					</Box>
+					<Button
+						variant="outlined"
+						startIcon={<Logout />}
+						onClick={handleLogout}
+						size="small"
+					>
+						Logout
+					</Button>
 				</Box>
+
+				<Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+					Welcome back, {user?.email}! Here you can view and manage your powder alert subscriptions.
+				</Typography>
 
 				{error && (
 					<Alert severity="error" sx={{ mb: 3 }}>
@@ -141,13 +139,19 @@ export default function ManageSubscriptionsPage() {
 					</Alert>
 				)}
 
-				{searchedEmail && alerts.length === 0 && !isLoading && !error && (
+				{!isLoading && alerts.length === 0 && !error && (
 					<Alert severity="info" sx={{ mb: 3 }}>
-						No active subscriptions found for {searchedEmail}.
+						You don't have any active subscriptions yet.
 						<Button component={Link} to="/signup" sx={{ ml: 1 }}>
 							Create one?
 						</Button>
 					</Alert>
+				)}
+
+				{isLoading && (
+					<Box sx={{ textAlign: 'center', py: 4 }}>
+						<Typography>Loading your subscriptions...</Typography>
+					</Box>
 				)}
 
 				{alerts.length > 0 && (
@@ -201,8 +205,7 @@ export default function ManageSubscriptionsPage() {
 													/>
 												</Box>
 												<Typography variant="body2" color="text.secondary">
-													Created: {console.log(alert)}
-													{new Date(alert.created_at.Time).toLocaleDateString()}
+													Created: {new Date(alert.created_at.Time).toLocaleDateString()}
 												</Typography>
 											</Box>
 											<IconButton

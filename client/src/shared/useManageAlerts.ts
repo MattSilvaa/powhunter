@@ -1,14 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BASE_SERVER_URL, UserAlert } from './types.ts'
+import { getAuthHeaders } from './useAuth.ts'
 
-const fetchUserAlerts = async (email: string): Promise<UserAlert[]> => {
+const fetchUserAlerts = async (token: string | null): Promise<UserAlert[]> => {
 	const response = await fetch(
-		`${BASE_SERVER_URL}/api/user/alerts?email=${encodeURIComponent(email)}`,
+		`${BASE_SERVER_URL}/api/user/alerts`,
 		{
 			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json',
-			},
+			headers: getAuthHeaders(token),
 			credentials: 'include',
 		}
 	)
@@ -24,21 +23,17 @@ const fetchUserAlerts = async (email: string): Promise<UserAlert[]> => {
 }
 
 const deleteAlert = async ({
-	email,
+	token,
 	resortUuid,
 }: {
-	email: string
+	token: string | null
 	resortUuid: string
 }): Promise<void> => {
 	const response = await fetch(
-		`${BASE_SERVER_URL}/api/user/alerts/delete?email=${encodeURIComponent(
-			email
-		)}&resort_uuid=${encodeURIComponent(resortUuid)}`,
+		`${BASE_SERVER_URL}/api/user/alerts/delete?resort_uuid=${encodeURIComponent(resortUuid)}`,
 		{
 			method: 'DELETE',
-			headers: {
-				'Content-Type': 'application/json',
-			},
+			headers: getAuthHeaders(token),
 			credentials: 'include',
 		}
 	)
@@ -48,16 +43,12 @@ const deleteAlert = async ({
 	}
 }
 
-const deleteAllAlerts = async (email: string): Promise<void> => {
+const deleteAllAlerts = async (token: string | null): Promise<void> => {
 	const response = await fetch(
-		`${BASE_SERVER_URL}/api/user/alerts/delete-all?email=${encodeURIComponent(
-			email
-		)}`,
+		`${BASE_SERVER_URL}/api/user/alerts/delete-all`,
 		{
 			method: 'DELETE',
-			headers: {
-				'Content-Type': 'application/json',
-			},
+			headers: getAuthHeaders(token),
 			credentials: 'include',
 		}
 	)
@@ -67,11 +58,11 @@ const deleteAllAlerts = async (email: string): Promise<void> => {
 	}
 }
 
-export function useUserAlerts(email: string) {
+export function useUserAlerts(token: string | null) {
 	return useQuery<UserAlert[]>({
-		queryKey: ['userAlerts', email],
-		queryFn: () => fetchUserAlerts(email),
-		enabled: !!email,
+		queryKey: ['userAlerts', token],
+		queryFn: () => fetchUserAlerts(token),
+		enabled: !!token,
 		retry: 1,
 	})
 }
@@ -79,10 +70,10 @@ export function useUserAlerts(email: string) {
 export function useDeleteAlert() {
 	const queryClient = useQueryClient()
 
-	return useMutation<void, Error, { email: string; resortUuid: string }>({
+	return useMutation<void, Error, { token: string | null; resortUuid: string }>({
 		mutationFn: deleteAlert,
-		onSuccess: (_, { email }) => {
-			queryClient.invalidateQueries({ queryKey: ['userAlerts', email] })
+		onSuccess: (_, { token }) => {
+			queryClient.invalidateQueries({ queryKey: ['userAlerts', token] })
 		},
 	})
 }
@@ -90,10 +81,10 @@ export function useDeleteAlert() {
 export function useDeleteAllAlerts() {
 	const queryClient = useQueryClient()
 
-	return useMutation<void, Error, string>({
+	return useMutation<void, Error, string | null>({
 		mutationFn: deleteAllAlerts,
-		onSuccess: (_, email) => {
-			queryClient.invalidateQueries({ queryKey: ['userAlerts', email] })
+		onSuccess: (_, token) => {
+			queryClient.invalidateQueries({ queryKey: ['userAlerts', token] })
 		},
 	})
 }

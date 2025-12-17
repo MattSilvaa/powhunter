@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/MattSilvaa/powhunter/internal/auth"
 	"github.com/MattSilvaa/powhunter/internal/db"
 	"github.com/lib/pq"
 )
@@ -142,7 +143,6 @@ func NewAlertHandler(store db.StoreService) (*AlertHandler, error) {
 }
 
 type CreateAlertRequest struct {
-	Email            string   `json:"email"`
 	Phone            string   `json:"phone"`
 	NotificationDays int      `json:"notificationDays"`
 	MinSnowAmount    float64  `json:"minSnowAmount"`
@@ -157,16 +157,17 @@ func (h *AlertHandler) GetUserAlerts(w http.ResponseWriter, r *http.Request) {
 
 	setSecurityHeaders(w)
 
-	email := r.URL.Query().Get("email")
-	if email == "" {
-		sendErrorResponse(w, "MISSING_EMAIL", "Email parameter is required", http.StatusBadRequest)
+	// Get authenticated user from context
+	claims := r.Context().Value("claims").(*auth.JWTClaims)
+	if claims == nil {
+		sendErrorResponse(w, "UNAUTHORIZED", "Authentication required", http.StatusUnauthorized)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 1000*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	alerts, err := h.store.GetUserAlertsByEmail(ctx, email)
+	alerts, err := h.store.GetUserAlertsByEmail(ctx, claims.Email)
 	if err != nil {
 		log.Printf("Failed to get user alerts: %v", err)
 		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to retrieve alerts", http.StatusInternalServerError)
@@ -189,9 +190,10 @@ func (h *AlertHandler) DeleteUserAlert(w http.ResponseWriter, r *http.Request) {
 
 	setSecurityHeaders(w)
 
-	email := r.URL.Query().Get("email")
-	if email == "" {
-		sendErrorResponse(w, "MISSING_EMAIL", "Email parameter is required", http.StatusBadRequest)
+	// Get authenticated user from context
+	claims := r.Context().Value("claims").(*auth.JWTClaims)
+	if claims == nil {
+		sendErrorResponse(w, "UNAUTHORIZED", "Authentication required", http.StatusUnauthorized)
 		return
 	}
 
@@ -204,7 +206,7 @@ func (h *AlertHandler) DeleteUserAlert(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	err := h.store.DeleteUserAlert(ctx, email, resortUuid)
+	err := h.store.DeleteUserAlert(ctx, claims.Email, resortUuid)
 	if err != nil {
 		log.Printf("Failed to delete user alert: %v", err)
 		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to delete alert", http.StatusInternalServerError)
@@ -227,16 +229,17 @@ func (h *AlertHandler) DeleteAllUserAlerts(w http.ResponseWriter, r *http.Reques
 
 	setSecurityHeaders(w)
 
-	email := r.URL.Query().Get("email")
-	if email == "" {
-		sendErrorResponse(w, "MISSING_EMAIL", "Email parameter is required", http.StatusBadRequest)
+	// Get authenticated user from context
+	claims := r.Context().Value("claims").(*auth.JWTClaims)
+	if claims == nil {
+		sendErrorResponse(w, "UNAUTHORIZED", "Authentication required", http.StatusUnauthorized)
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	err := h.store.DeleteAllUserAlerts(ctx, email)
+	err := h.store.DeleteAllUserAlerts(ctx, claims.Email)
 	if err != nil {
 		log.Printf("Failed to delete all user alerts: %v", err)
 		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to delete alerts", http.StatusInternalServerError)
@@ -259,14 +262,16 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 
 	setSecurityHeaders(w)
 
-	var req CreateAlertRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendErrorResponse(w, "INVALID_REQUEST", "Invalid request body", http.StatusBadRequest)
+	// Get authenticated user from context
+	claims := r.Context().Value("claims").(*auth.JWTClaims)
+	if claims == nil {
+		sendErrorResponse(w, "UNAUTHORIZED", "Authentication required", http.StatusUnauthorized)
 		return
 	}
 
-	if req.Email == "" {
-		sendErrorResponse(w, "MISSING_EMAIL", "Email is required", http.StatusBadRequest)
+	var req CreateAlertRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendErrorResponse(w, "INVALID_REQUEST", "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
@@ -283,9 +288,10 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
+	// Use email from authenticated user
 	err := h.store.CreateUserWithAlerts(
 		ctx,
-		req.Email,
+		claims.Email,
 		req.Phone,
 		req.MinSnowAmount,
 		int32(req.NotificationDays),
