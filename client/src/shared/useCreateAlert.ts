@@ -1,14 +1,15 @@
 import { useMutation } from '@tanstack/react-query'
 import { BASE_SERVER_URL } from './types.ts'
+import { getAuthHeaders } from './useAuth.ts'
 
 const CREATE_ALERT_RETRIES = 2
 
 type AlertData = {
-	email: string
 	phone: string
 	notificationDays: number
 	minSnowAmount: number
 	resortsUuids: string[]
+	token?: string | null
 }
 
 type ErrorResponse = {
@@ -43,13 +44,12 @@ const getErrorMessage = (errorResponse: ErrorResponse): string => {
 }
 
 const createAlert = async (data: AlertData): Promise<void> => {
+	const { token, ...alertData } = data
 	const response = await fetch(`${BASE_SERVER_URL}/api/alerts`, {
 		method: 'POST',
 		mode: 'cors',
-		headers: {
-			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify(data),
+		headers: getAuthHeaders(token),
+		body: JSON.stringify(alertData),
 	})
 
 	if (!response.ok) {

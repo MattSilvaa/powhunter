@@ -2,7 +2,9 @@ version: "2"
 sql:
   - engine: "postgresql"
     queries: "internal/db/queries/*.sql"
-    schema: "internal/db/migrations/001_create_schema.sql"
+    schema: 
+      - "internal/db/migrations/001_create_schema.sql"
+      - "internal/db/migrations/002_add_auth_tables.sql"
     gen:
       go:
         package: "db"
