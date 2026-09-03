@@ -12,7 +12,7 @@ import (
 )
 
 func TestContactHandler_HandleContact(t *testing.T) {
-	handler := &ContactHandler{}
+	handler := &ContactHandler{mailer: &captureMailer{}, support: "support@powhunter.app"}
 
 	tests := []struct {
 		name           string
@@ -163,7 +163,7 @@ func TestContactHandler_HandleContact(t *testing.T) {
 }
 
 func TestContactHandler_SecurityHeaders(t *testing.T) {
-	handler := &ContactHandler{}
+	handler := &ContactHandler{mailer: &captureMailer{}, support: "support@powhunter.app"}
 
 	requestBody := ContactRequest{
 		Name:    "John Doe",

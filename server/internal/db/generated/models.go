@@ -20,6 +20,15 @@ type AlertHistory struct {
 	SnowAmount   float64       `json:"snow_amount"`
 }
 
+type LoginToken struct {
+	ID         int32        `json:"id"`
+	UserUuid   uuid.UUID    `json:"user_uuid"`
+	TokenHash  string       `json:"token_hash"`
+	ExpiresAt  time.Time    `json:"expires_at"`
+	ConsumedAt sql.NullTime `json:"consumed_at"`
+	CreatedAt  time.Time    `json:"created_at"`
+}
+
 type Resort struct {
 	ID          int32           `json:"id"`
 	Uuid        uuid.UUID       `json:"uuid"`

@@ -45,6 +45,9 @@ const ERROR_MESSAGES: Record<string, string> = {
 		'Invalid information provided. Please check your entries and try again.',
 	REQUEST_TOO_LARGE: 'That message is too long. Please shorten it.',
 	RATE_LIMITED: 'Too many requests. Please wait a moment and try again.',
+	UNAUTHENTICATED: 'Please sign in to continue.',
+	INVALID_TOKEN:
+		'That sign-in link has expired or has already been used. Request a new one.',
 	INTERNAL_ERROR:
 		'Something went wrong on our end. Please try again in a few moments.',
 }
@@ -117,7 +120,11 @@ export async function apiRequest<T>(
 	} catch (err) {
 		// Status 0 marks a transport failure, which is worth retrying.
 		if (err instanceof DOMException && err.name === 'TimeoutError') {
-			throw new ApiError('The request timed out. Please try again.', 0, 'TIMEOUT')
+			throw new ApiError(
+				'The request timed out. Please try again.',
+				0,
+				'TIMEOUT'
+			)
 		}
 
 		throw new ApiError(

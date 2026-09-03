@@ -48,6 +48,15 @@ type StoreService interface {
 
 	// DeleteAllUserAlerts deletes all alerts for a user
 	DeleteAllUserAlerts(ctx context.Context, email string) error
+
+	// GetUserAlerts returns all alerts belonging to the given user.
+	GetUserAlerts(ctx context.Context, userUUID uuid.UUID) ([]dbgen.GetUserAlertsByUserUUIDRow, error)
+
+	// DeleteAlertForUser deletes one of the given user's alerts.
+	DeleteAlertForUser(ctx context.Context, userUUID uuid.UUID, resortUUID string) error
+
+	// DeleteAllAlertsForUser deletes every alert belonging to the given user.
+	DeleteAllAlertsForUser(ctx context.Context, userUUID uuid.UUID) error
 }
 
 type Store struct {
@@ -310,5 +319,53 @@ func (s *Store) DeleteAllUserAlerts(ctx context.Context, email string) error {
 	if err != nil {
 		return fmt.Errorf("error deleting all user alerts: %w", err)
 	}
+	return nil
+}
+
+// Queries exposes the generated query set for packages that need it directly.
+func (s *Store) Queries() *dbgen.Queries {
+	return s.queries
+}
+
+// GetUserAlerts returns all alerts belonging to the given user. Scoping by the
+// authenticated user's UUID, rather than by an email the caller supplies, is
+// what keeps one account's alerts out of another account's reach.
+func (s *Store) GetUserAlerts(
+	ctx context.Context,
+	userUUID uuid.UUID,
+) ([]dbgen.GetUserAlertsByUserUUIDRow, error) {
+	alerts, err := s.queries.GetUserAlertsByUserUUID(ctx, uuid.NullUUID{UUID: userUUID, Valid: true})
+	if err != nil {
+		return nil, fmt.Errorf("error getting alerts for user: %w", err)
+	}
+
+	return alerts, nil
+}
+
+// DeleteAlertForUser deletes one of the given user's alerts.
+func (s *Store) DeleteAlertForUser(ctx context.Context, userUUID uuid.UUID, resortUUID string) error {
+	parsed, err := uuid.Parse(resortUUID)
+	if err != nil {
+		return fmt.Errorf("error parsing resort UUID: %w", err)
+	}
+
+	err = s.queries.DeleteUserAlertByUserUUID(ctx, dbgen.DeleteUserAlertByUserUUIDParams{
+		UserUuid:   uuid.NullUUID{UUID: userUUID, Valid: true},
+		ResortUuid: uuid.NullUUID{UUID: parsed, Valid: true},
+	})
+	if err != nil {
+		return fmt.Errorf("error deleting user alert: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteAllAlertsForUser deletes every alert belonging to the given user.
+func (s *Store) DeleteAllAlertsForUser(ctx context.Context, userUUID uuid.UUID) error {
+	err := s.queries.DeleteAllUserAlertsByUserUUID(ctx, uuid.NullUUID{UUID: userUUID, Valid: true})
+	if err != nil {
+		return fmt.Errorf("error deleting all alerts for user: %w", err)
+	}
+
 	return nil
 }

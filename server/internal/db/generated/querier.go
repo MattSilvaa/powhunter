@@ -13,21 +13,46 @@ import (
 type Querier interface {
 	CheckAlertSent(ctx context.Context, arg CheckAlertSentParams) (bool, error)
 	ClearResorts(ctx context.Context) error
+	// Redeeming a token is a conditional UPDATE rather than a SELECT followed by an
+	// UPDATE: only one caller can win the race, so a link forwarded to someone else
+	// cannot be redeemed twice.
+	ConsumeLoginToken(ctx context.Context, tokenHash string) (uuid.UUID, error)
+	CreateLoginToken(ctx context.Context, arg CreateLoginTokenParams) (LoginToken, error)
+	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserAlert(ctx context.Context, arg CreateUserAlertParams) (UserAlert, error)
 	DeleteAllUserAlerts(ctx context.Context, email string) error
+	DeleteAllUserAlertsByUserUUID(ctx context.Context, userUuid uuid.NullUUID) error
+	DeleteExpiredLoginTokens(ctx context.Context) error
+	DeleteExpiredSessions(ctx context.Context) error
+	DeleteSession(ctx context.Context, tokenHash string) error
 	DeleteUserAlert(ctx context.Context, arg DeleteUserAlertParams) error
+	DeleteUserAlertByUserUUID(ctx context.Context, arg DeleteUserAlertByUserUUIDParams) error
 	GetLastAlertSnowAmount(ctx context.Context, arg GetLastAlertSnowAmountParams) (float64, error)
+	// Requesting a login link for an address that has no account creates one, so
+	// signup and login are the same flow. DO UPDATE rather than DO NOTHING because
+	// DO NOTHING returns no row on conflict.
+	GetOrCreateUserByEmail(ctx context.Context, email string) (User, error)
 	GetResortAlerts(ctx context.Context, resortUuid uuid.NullUUID) ([]UserAlert, error)
 	GetResortByUUID(ctx context.Context, argUuid uuid.UUID) (Resort, error)
+	// Returns the session together with its user so authenticating a request is a
+	// single round trip. Expired rows never match, so a stale cookie reads as
+	// signed out even before the reaper removes it.
+	GetSessionByTokenHash(ctx context.Context, tokenHash string) (GetSessionByTokenHashRow, error)
 	GetUserAlert(ctx context.Context, arg GetUserAlertParams) (UserAlert, error)
 	GetUserAlertsByEmail(ctx context.Context, email string) ([]GetUserAlertsByEmailRow, error)
+	// The three queries below key off the authenticated user's UUID rather than an
+	// email supplied by the caller. Taking the identity from the session is what
+	// stops one person reading or deleting another person's alerts.
+	GetUserAlertsByUserUUID(ctx context.Context, userUuid uuid.NullUUID) ([]GetUserAlertsByUserUUIDRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUUID(ctx context.Context, argUuid uuid.UUID) (User, error)
 	InsertAlertHistory(ctx context.Context, arg InsertAlertHistoryParams) error
 	InsertResort(ctx context.Context, arg InsertResortParams) (Resort, error)
 	ListActiveAlerts(ctx context.Context) ([]ListActiveAlertsRow, error)
 	ListResorts(ctx context.Context) ([]Resort, error)
+	MarkEmailVerified(ctx context.Context, argUuid uuid.UUID) error
+	TouchSession(ctx context.Context, arg TouchSessionParams) error
 	UpdateUserAlert(ctx context.Context, arg UpdateUserAlertParams) (UserAlert, error)
 	// Get-or-create in a single statement. A read-then-write race meant two
 	// concurrent signups with the same email both attempted an insert, and one

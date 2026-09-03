@@ -26,6 +26,13 @@ const (
 	defaultRateBurst       = 20
 	defaultWriteRatePerSec = 1.0
 	defaultWriteRateBurst  = 5
+	defaultAppBaseURL      = "http://localhost:3000"
+	defaultMailFrom        = "Powhunter <noreply@powhunter.app>"
+	defaultSupportEmail    = "support@powhunter.app"
+	// Requesting a login link sends mail to an address the caller names, so it
+	// gets a bucket far tighter than ordinary writes.
+	defaultLoginRatePerSec = 0.2
+	defaultLoginRateBurst  = 3
 )
 
 // ErrMissingConfig reports configuration that must be set in production.
@@ -64,6 +71,12 @@ type Config struct {
 	RateBurst         int
 	WriteRatePerSec   float64
 	WriteRateBurst    int
+	LoginRatePerSec   float64
+	LoginRateBurst    int
+	AppBaseURL        string
+	MailFrom          string
+	SupportEmail      string
+	ResendAPIKey      string
 	Database          Database
 }
 
@@ -101,6 +114,12 @@ func Load() (Config, error) {
 		RateBurst:         envInt("RATE_LIMIT_BURST", defaultRateBurst),
 		WriteRatePerSec:   envFloat("WRITE_RATE_LIMIT_PER_SECOND", defaultWriteRatePerSec),
 		WriteRateBurst:    envInt("WRITE_RATE_LIMIT_BURST", defaultWriteRateBurst),
+		LoginRatePerSec:   envFloat("LOGIN_RATE_LIMIT_PER_SECOND", defaultLoginRatePerSec),
+		LoginRateBurst:    envInt("LOGIN_RATE_LIMIT_BURST", defaultLoginRateBurst),
+		AppBaseURL:        strings.TrimRight(envOrDefault("APP_BASE_URL", defaultAppBaseURL), "/"),
+		MailFrom:          envOrDefault("MAIL_FROM", defaultMailFrom),
+		SupportEmail:      envOrDefault("SUPPORT_EMAIL", defaultSupportEmail),
+		ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
 		Database: Database{
 			Host:     envOrDefault("DB_HOST", defaultDBHost),
 			Port:     envOrDefault("DB_PORT", defaultDBPort),
@@ -141,6 +160,18 @@ func (c Config) validateProduction() error {
 
 	if c.AllowedOrigins == "" || c.AllowedOrigins == "*" {
 		missing = append(missing, "ALLOWED_ORIGINS (a wildcard is not allowed in production)")
+	}
+
+	// A production deploy left on the default would email login links pointing
+	// at localhost, which no recipient can open.
+	if c.AppBaseURL == "" || c.AppBaseURL == defaultAppBaseURL {
+		missing = append(missing, "APP_BASE_URL (the default localhost value is not usable in production)")
+	}
+
+	// Without a mail provider the login link is only written to the server log,
+	// so nobody could sign in.
+	if c.ResendAPIKey == "" {
+		missing = append(missing, "RESEND_API_KEY (required to deliver login links)")
 	}
 
 	if len(missing) > 0 {

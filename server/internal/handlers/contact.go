@@ -11,14 +11,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MattSilvaa/powhunter/internal/notify"
 	"github.com/MattSilvaa/powhunter/internal/validate"
-	"github.com/resend/resend-go/v2"
 )
 
-type ContactHandler struct{}
+type ContactHandler struct {
+	mailer  notify.Mailer
+	support string
+}
 
-func NewContactHandler() (*ContactHandler, error) {
-	return &ContactHandler{}, nil
+func NewContactHandler(mailer notify.Mailer, supportEmail string) (*ContactHandler, error) {
+	return &ContactHandler{mailer: mailer, support: supportEmail}, nil
 }
 
 type ContactRequest struct {
@@ -118,15 +121,6 @@ func (h *ContactHandler) recordContactMessage(ctx context.Context, req ContactRe
 }
 
 func (h *ContactHandler) sendContactEmail(ctx context.Context, req ContactRequest) error {
-	// Get Resend API key from environment
-	apiKey := os.Getenv("RESEND_API_KEY")
-	if apiKey == "" {
-		log.Println("RESEND_API_KEY not configured, skipping email send")
-		return nil
-	}
-
-	client := resend.NewClient(apiKey)
-
 	// Construct email body
 	// Every interpolated value is submitter-controlled, so escape it before it
 	// reaches the support inbox as HTML.
@@ -145,19 +139,14 @@ func (h *ContactHandler) sendContactEmail(ctx context.Context, req ContactReques
 		strings.ReplaceAll(html.EscapeString(req.Message), "\n", "<br>"),
 	)
 
-	params := &resend.SendEmailRequest{
-		From:    "Powhunter <noreply@powhunter.app>",
-		To:      []string{"support@powhunter.app"},
+	if err := h.mailer.Send(ctx, notify.Email{
+		To:      []string{h.support},
 		ReplyTo: req.Email,
 		Subject: fmt.Sprintf("Contact Form Submission from %s", req.Name),
-		Html:    htmlBody,
+		HTML:    htmlBody,
+	}); err != nil {
+		return fmt.Errorf("failed to send contact email: %w", err)
 	}
 
-	sent, err := client.Emails.Send(params)
-	if err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
-	}
-
-	log.Printf("Contact email sent to support@powhunter.app from %s (%s) - ID: %s", req.Name, req.Email, sent.Id)
 	return nil
 }

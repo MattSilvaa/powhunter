@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/MattSilvaa/powhunter/internal/auth"
 	"github.com/MattSilvaa/powhunter/internal/config"
 	"github.com/MattSilvaa/powhunter/internal/handlers"
 	"github.com/MattSilvaa/powhunter/internal/metrics"
@@ -18,6 +19,36 @@ import (
 
 // shutdownTimeout bounds how long in-flight requests may finish on shutdown.
 const shutdownTimeout = 10 * time.Second
+
+// reapInterval is how often expired sessions and login tokens are swept. Expiry
+// is already enforced on read, so this only keeps the tables from growing.
+const reapInterval = time.Hour
+
+// reapTimeout bounds one sweep.
+const reapTimeout = 30 * time.Second
+
+// reapExpiredCredentials periodically deletes expired sessions and login
+// tokens. A failed sweep is logged and retried on the next tick rather than
+// taking the server down: stale rows are untidy, not dangerous.
+func reapExpiredCredentials(ctx context.Context, service *auth.Service, logger *slog.Logger) {
+	ticker := time.NewTicker(reapInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			sweepCtx, cancel := context.WithTimeout(ctx, reapTimeout)
+
+			if err := service.Reap(sweepCtx); err != nil {
+				logger.Error("failed to reap expired credentials", "error", err)
+			}
+
+			cancel()
+		}
+	}
+}
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -34,7 +65,7 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	h, err := handlers.NewHandlers()
+	h, err := handlers.NewHandlers(cfg, logger)
 	if err != nil {
 		return err
 	}
@@ -48,8 +79,14 @@ func run(logger *slog.Logger) error {
 		Metrics:  registry,
 		Logger:   logger,
 		DB:       h.Store().DB(),
+		Auth:     h.AuthService(),
 	})
 	defer cleanup()
+
+	reaperCtx, stopReaper := context.WithCancel(context.Background())
+	defer stopReaper()
+
+	go reapExpiredCredentials(reaperCtx, h.AuthService(), logger)
 
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,

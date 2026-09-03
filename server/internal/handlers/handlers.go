@@ -6,10 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/MattSilvaa/powhunter/internal/auth"
+	"github.com/MattSilvaa/powhunter/internal/config"
 	"github.com/MattSilvaa/powhunter/internal/db"
+	"github.com/MattSilvaa/powhunter/internal/middleware"
+	"github.com/MattSilvaa/powhunter/internal/notify"
 	"github.com/MattSilvaa/powhunter/internal/validate"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
@@ -44,6 +49,8 @@ type Handlers struct {
 	Resort  *ResortHandler
 	Alert   *AlertHandler
 	Contact *ContactHandler
+	Auth    *AuthHandler
+	auth    *auth.Service
 	store   *db.Store
 }
 
@@ -56,6 +63,12 @@ const handlerTimeout = 10 * time.Second
 // Store returns the store used by the handlers.
 func (h *Handlers) Store() *db.Store {
 	return h.store
+}
+
+// Auth returns the authentication service, for the session middleware and the
+// background reaper.
+func (h *Handlers) AuthService() *auth.Service {
+	return h.auth
 }
 
 // decodeJSON reads a JSON body, rejecting unknown fields so a typo in a client
@@ -90,6 +103,16 @@ func setSecurityHeaders(w http.ResponseWriter) {
 	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 }
 
+// writeJSON encodes a successful response body.
+func writeJSON(w http.ResponseWriter, status int, body any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		log.Printf("Failed to encode response: %v", err)
+	}
+}
+
 func sendErrorResponse(w http.ResponseWriter, errorCode string, message string, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
@@ -104,8 +127,8 @@ func sendErrorResponse(w http.ResponseWriter, errorCode string, message string, 
 	}
 }
 
-func NewHandlers() (*Handlers, error) {
-	dbConn, err := db.New()
+func NewHandlers(cfg config.Config, logger *slog.Logger) (*Handlers, error) {
+	dbConn, err := db.Open(cfg.Database)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -122,15 +145,27 @@ func NewHandlers() (*Handlers, error) {
 		return nil, err
 	}
 
-	contactHandler, err := NewContactHandler()
+	// Without an API key mail is logged rather than sent, so local development
+	// works without a Resend account. config.Load makes the key mandatory in
+	// production, where that fallback would strand every user at the login screen.
+	var mailer notify.Mailer = notify.NewLogMailer(logger)
+	if cfg.ResendAPIKey != "" {
+		mailer = notify.NewResendMailer(cfg.ResendAPIKey, cfg.MailFrom)
+	}
+
+	contactHandler, err := NewContactHandler(mailer, cfg.SupportEmail)
 	if err != nil {
 		return nil, err
 	}
+
+	authService := auth.NewService(store.Queries(), cfg.IsProduction())
 
 	return &Handlers{
 		Resort:  resortHandler,
 		Alert:   alertHandler,
 		Contact: contactHandler,
+		Auth:    NewAuthHandler(authService, mailer, cfg.AppBaseURL, logger),
+		auth:    authService,
 		store:   store,
 	}, nil
 }
@@ -180,110 +215,79 @@ type CreateAlertRequest struct {
 	ResortsUuids     []string `json:"resortsUuids"`
 }
 
+// The three handlers below take the account from the session established by
+// middleware.RequireUser. They previously read an email out of the query
+// string, which meant anyone who guessed an address could read or delete that
+// person's alerts.
+
 func (h *AlertHandler) GetUserAlerts(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		sendErrorResponse(w, "METHOD_NOT_ALLOWED", "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	setSecurityHeaders(w)
-
-	email, err := validate.Email(r.URL.Query().Get("email"))
-	if err != nil {
-		sendErrorResponse(w, "MISSING_EMAIL", "A valid email parameter is required", http.StatusBadRequest)
+	user, ok := middleware.UserFromContext(r.Context())
+	if !ok {
+		sendErrorResponse(w, "UNAUTHENTICATED", "Please sign in to continue", http.StatusUnauthorized)
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), handlerTimeout)
 	defer cancel()
 
-	alerts, err := h.store.GetUserAlertsByEmail(ctx, email)
+	alerts, err := h.store.GetUserAlerts(ctx, user.UUID)
 	if err != nil {
 		log.Printf("Failed to get user alerts: %v", err)
 		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to retrieve alerts", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(alerts); err != nil {
-		log.Printf("Failed to encode alerts response: %v", err)
-		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
+	writeJSON(w, http.StatusOK, alerts)
 }
 
 func (h *AlertHandler) DeleteUserAlert(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
-		sendErrorResponse(w, "METHOD_NOT_ALLOWED", "Method not allowed", http.StatusMethodNotAllowed)
+	user, ok := middleware.UserFromContext(r.Context())
+	if !ok {
+		sendErrorResponse(w, "UNAUTHENTICATED", "Please sign in to continue", http.StatusUnauthorized)
 		return
 	}
 
-	setSecurityHeaders(w)
-
-	email, err := validate.Email(r.URL.Query().Get("email"))
-	if err != nil {
-		sendErrorResponse(w, "MISSING_EMAIL", "A valid email parameter is required", http.StatusBadRequest)
-		return
-	}
-
-	resortUuid := r.URL.Query().Get("resort_uuid")
-	if resortUuid == "" {
-		sendErrorResponse(w, "MISSING_RESORT", "Resort UUID parameter is required", http.StatusBadRequest)
+	resortUUID := r.URL.Query().Get("resort_uuid")
+	if _, err := uuid.Parse(resortUUID); err != nil {
+		sendErrorResponse(w, "MISSING_RESORT", "A valid resort UUID is required", http.StatusBadRequest)
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), handlerTimeout)
 	defer cancel()
 
-	err = h.store.DeleteUserAlert(ctx, email, resortUuid)
-	if err != nil {
+	if err := h.store.DeleteAlertForUser(ctx, user.UUID, resortUUID); err != nil {
 		log.Printf("Failed to delete user alert: %v", err)
 		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to delete alert", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if encodeErr := json.NewEncoder(w).Encode(map[string]string{
+	writeJSON(w, http.StatusOK, map[string]string{
 		"status":  "success",
 		"message": "Alert deleted successfully",
-	}); encodeErr != nil {
-		log.Printf("Failed to encode delete response: %v", encodeErr)
-	}
+	})
 }
 
 func (h *AlertHandler) DeleteAllUserAlerts(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
-		sendErrorResponse(w, "METHOD_NOT_ALLOWED", "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	setSecurityHeaders(w)
-
-	email, err := validate.Email(r.URL.Query().Get("email"))
-	if err != nil {
-		sendErrorResponse(w, "MISSING_EMAIL", "A valid email parameter is required", http.StatusBadRequest)
+	user, ok := middleware.UserFromContext(r.Context())
+	if !ok {
+		sendErrorResponse(w, "UNAUTHENTICATED", "Please sign in to continue", http.StatusUnauthorized)
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), handlerTimeout)
 	defer cancel()
 
-	err = h.store.DeleteAllUserAlerts(ctx, email)
-	if err != nil {
+	if err := h.store.DeleteAllAlertsForUser(ctx, user.UUID); err != nil {
 		log.Printf("Failed to delete all user alerts: %v", err)
 		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to delete alerts", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if encodeErr := json.NewEncoder(w).Encode(map[string]string{
+	writeJSON(w, http.StatusOK, map[string]string{
 		"status":  "success",
 		"message": "All alerts deleted successfully",
-	}); encodeErr != nil {
-		log.Printf("Failed to encode delete-all response: %v", encodeErr)
-	}
+	})
 }
 
 func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {

@@ -16,6 +16,7 @@ import (
 
 	db "github.com/MattSilvaa/powhunter/internal/db"
 	db0 "github.com/MattSilvaa/powhunter/internal/db/generated"
+	uuid "github.com/google/uuid"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -55,6 +56,34 @@ func (m *MockStoreService) CreateUserWithAlerts(ctx context.Context, email, phon
 func (mr *MockStoreServiceMockRecorder) CreateUserWithAlerts(ctx, email, phone, minSnowAmount, notificationDays, resortUUIDs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUserWithAlerts", reflect.TypeOf((*MockStoreService)(nil).CreateUserWithAlerts), ctx, email, phone, minSnowAmount, notificationDays, resortUUIDs)
+}
+
+// DeleteAlertForUser mocks base method.
+func (m *MockStoreService) DeleteAlertForUser(ctx context.Context, userUUID uuid.UUID, resortUUID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteAlertForUser", ctx, userUUID, resortUUID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteAlertForUser indicates an expected call of DeleteAlertForUser.
+func (mr *MockStoreServiceMockRecorder) DeleteAlertForUser(ctx, userUUID, resortUUID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAlertForUser", reflect.TypeOf((*MockStoreService)(nil).DeleteAlertForUser), ctx, userUUID, resortUUID)
+}
+
+// DeleteAllAlertsForUser mocks base method.
+func (m *MockStoreService) DeleteAllAlertsForUser(ctx context.Context, userUUID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteAllAlertsForUser", ctx, userUUID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteAllAlertsForUser indicates an expected call of DeleteAllAlertsForUser.
+func (mr *MockStoreServiceMockRecorder) DeleteAllAlertsForUser(ctx, userUUID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAllAlertsForUser", reflect.TypeOf((*MockStoreService)(nil).DeleteAllAlertsForUser), ctx, userUUID)
 }
 
 // DeleteAllUserAlerts mocks base method.
@@ -98,6 +127,21 @@ func (m *MockStoreService) GetAlertMatches(ctx context.Context, resortUUID strin
 func (mr *MockStoreServiceMockRecorder) GetAlertMatches(ctx, resortUUID, forecastDate, predictedSnowAmount, daysAhead any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAlertMatches", reflect.TypeOf((*MockStoreService)(nil).GetAlertMatches), ctx, resortUUID, forecastDate, predictedSnowAmount, daysAhead)
+}
+
+// GetUserAlerts mocks base method.
+func (m *MockStoreService) GetUserAlerts(ctx context.Context, userUUID uuid.UUID) ([]db0.GetUserAlertsByUserUUIDRow, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserAlerts", ctx, userUUID)
+	ret0, _ := ret[0].([]db0.GetUserAlertsByUserUUIDRow)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUserAlerts indicates an expected call of GetUserAlerts.
+func (mr *MockStoreServiceMockRecorder) GetUserAlerts(ctx, userUUID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserAlerts", reflect.TypeOf((*MockStoreService)(nil).GetUserAlerts), ctx, userUUID)
 }
 
 // GetUserAlertsByEmail mocks base method.
