@@ -78,6 +78,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.updateUserAlertStmt, err = db.PrepareContext(ctx, updateUserAlert); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateUserAlert: %w", err)
 	}
+	if q.upsertUserStmt, err = db.PrepareContext(ctx, upsertUser); err != nil {
+		return nil, fmt.Errorf("error preparing query UpsertUser: %w", err)
+	}
 	return &q, nil
 }
 
@@ -173,6 +176,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing updateUserAlertStmt: %w", cerr)
 		}
 	}
+	if q.upsertUserStmt != nil {
+		if cerr := q.upsertUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing upsertUserStmt: %w", cerr)
+		}
+	}
 	return err
 }
 
@@ -230,6 +238,7 @@ type Queries struct {
 	listActiveAlertsStmt       *sql.Stmt
 	listResortsStmt            *sql.Stmt
 	updateUserAlertStmt        *sql.Stmt
+	upsertUserStmt             *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
@@ -254,5 +263,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		listActiveAlertsStmt:       q.listActiveAlertsStmt,
 		listResortsStmt:            q.listResortsStmt,
 		updateUserAlertStmt:        q.updateUserAlertStmt,
+		upsertUserStmt:             q.upsertUserStmt,
 	}
 }

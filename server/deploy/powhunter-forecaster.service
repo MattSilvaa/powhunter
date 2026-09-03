@@ -1,0 +1,35 @@
+# The repository has never contained a scheduler, although the documentation
+# claims the forecaster runs every twelve hours. Whatever triggers it in
+# production is unversioned, so this makes the schedule reproducible.
+#
+# Install:
+#   sudo cp deploy/powhunter-forecaster.* /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now powhunter-forecaster.timer
+
+[Unit]
+Description=Powhunter snow forecast check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=powhunter
+WorkingDirectory=/opt/powhunter
+ExecStart=/opt/powhunter/bin/check_forecasts
+
+# Credentials live outside the unit file. The job runs under cron-like
+# conditions with no login shell, so every variable must be supplied here.
+EnvironmentFile=/etc/powhunter/forecaster.env
+
+# The binary has no internal locking, so overlapping runs would double-send.
+# oneshot plus this timer's Persistent=true keeps runs strictly sequential.
+TimeoutStartSec=35min
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

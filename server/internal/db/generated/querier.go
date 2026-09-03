@@ -29,6 +29,10 @@ type Querier interface {
 	ListActiveAlerts(ctx context.Context) ([]ListActiveAlertsRow, error)
 	ListResorts(ctx context.Context) ([]Resort, error)
 	UpdateUserAlert(ctx context.Context, arg UpdateUserAlertParams) (UserAlert, error)
+	// Get-or-create in a single statement. A read-then-write race meant two
+	// concurrent signups with the same email both attempted an insert, and one
+	// failed on the unique constraint as a 500.
+	UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error)
 }
 
 var _ Querier = (*Queries)(nil)

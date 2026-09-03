@@ -5,6 +5,7 @@ package db_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -255,4 +256,51 @@ func TestStoreIntegration_ListAllResorts(t *testing.T) {
 		assert.Contains(t, names, "Resort B")
 		assert.Contains(t, names, "Resort C")
 	})
+}
+
+// Two people signing up at the same moment with the same email previously both
+// saw no existing row, both inserted, and one failed on the unique constraint.
+func TestStoreIntegration_ConcurrentSignupsShareOneUser(t *testing.T) {
+	testDB, store, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+
+	queries := dbgen.New(testDB)
+
+	resortA := testutil.SeedTestResort(t, queries, "Alta", 40.5883, -111.6372)
+	resortB := testutil.SeedTestResort(t, queries, "Snowbird", 40.5830, -111.6556)
+
+	const email = "race@example.com"
+
+	var wg sync.WaitGroup
+
+	errs := make([]error, 2)
+	resorts := []string{resortA.Uuid.String(), resortB.Uuid.String()}
+
+	for i, resort := range resorts {
+		wg.Add(1)
+
+		go func(index int, resortUUID string) {
+			defer wg.Done()
+
+			errs[index] = store.CreateUserWithAlerts(
+				context.Background(), email, "+15551234567", 6.0, 3, []string{resortUUID},
+			)
+		}(i, resort)
+	}
+
+	wg.Wait()
+
+	for _, err := range errs {
+		require.NoError(t, err, "concurrent signups for the same email must both succeed")
+	}
+
+	var userCount int
+
+	require.NoError(t,
+		testDB.QueryRow("SELECT count(*) FROM users WHERE email = $1", email).Scan(&userCount))
+	assert.Equal(t, 1, userCount, "the same email must map to exactly one user")
+
+	alerts, err := store.GetUserAlertsByEmail(context.Background(), email)
+	require.NoError(t, err)
+	assert.Len(t, alerts, 2)
 }

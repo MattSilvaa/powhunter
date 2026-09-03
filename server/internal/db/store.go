@@ -106,21 +106,15 @@ func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
 			Valid:  phone != "",
 		}
 
-		// Try to get existing user first
-		user, err := q.GetUserByEmail(ctx, email)
+		// Get-or-create in one statement. Reading first and then inserting raced:
+		// two concurrent signups with the same email both saw no row, both
+		// inserted, and one failed on the unique constraint as a 500.
+		user, err := q.UpsertUser(ctx, dbgen.UpsertUserParams{
+			Email: email,
+			Phone: phoneParam,
+		})
 		if err != nil {
-			// If user doesn't exist, create them
-			if errors.Is(err, sql.ErrNoRows) {
-				user, err = q.CreateUser(ctx, dbgen.CreateUserParams{
-					Email: email,
-					Phone: phoneParam,
-				})
-				if err != nil {
-					return fmt.Errorf("error creating user: %w", err)
-				}
-			} else {
-				return fmt.Errorf("error checking for existing user: %w", err)
-			}
+			return fmt.Errorf("error creating user: %w", err)
 		}
 
 		for _, resortUUID := range resortUUIDs {

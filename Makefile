@@ -1,4 +1,4 @@
-.PHONY: dev dev-caddy build clean server client caddy db-setup db-migrate db-drop generate-db-code db-seed test test-integration lint typecheck
+.PHONY: dev dev-caddy build clean server client caddy db-setup db-migrate db-drop generate-db-code db-seed test test-integration lint typecheck monitoring-up monitoring-down
 
 dev:
 	@echo "Starting development environment..."
@@ -84,7 +84,17 @@ db-setup:
 
 db-migrate:
 	@echo "Running database migrations..."
-	@cd server && ./scripts/migrate_db.sh
+	@cd server && go run ./cmd/migrate
+
+monitoring-up:
+	@echo "Starting the monitoring stack (Prometheus, Grafana, Alertmanager, Pushgateway)..."
+	@cd server && docker compose up -d prometheus grafana alertmanager pushgateway
+	@echo "Grafana:      http://localhost:3001"
+	@echo "Prometheus:   http://localhost:9090"
+	@echo "Alertmanager: http://localhost:9093"
+
+monitoring-down:
+	@cd server && docker compose stop prometheus grafana alertmanager pushgateway
 
 db-drop:
 	@echo "Dropping database..."
