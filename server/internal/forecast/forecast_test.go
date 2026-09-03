@@ -1,7 +1,6 @@
 package forecast_test
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"io"
@@ -103,7 +102,7 @@ func TestASuccessfulSendIsRecordedExactlyOnce(t *testing.T) {
 	h.notifier.EXPECT().SendSMS(alert.UserPhone, gomock.Any()).Return(nil).Times(1)
 	h.store.EXPECT().RecordAlertSent(gomock.Any(), alert).Return(nil).Times(1)
 
-	run, err := h.runner.Run(context.Background())
+	run, err := h.runner.Run(t.Context())
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, run.AlertsSent)
@@ -121,7 +120,7 @@ func TestAFailedSendIsNotRecorded(t *testing.T) {
 	h.notifier.EXPECT().SendSMS(alert.UserPhone, gomock.Any()).Return(errors.New("twilio down"))
 	h.store.EXPECT().RecordAlertSent(gomock.Any(), gomock.Any()).Times(0)
 
-	run, err := h.runner.Run(context.Background())
+	run, err := h.runner.Run(t.Context())
 
 	require.NoError(t, err)
 	assert.Zero(t, run.AlertsSent)
@@ -139,7 +138,7 @@ func TestAUserWithoutAPhoneNumberIsNeitherSentNorRecorded(t *testing.T) {
 	h.notifier.EXPECT().SendSMS(gomock.Any(), gomock.Any()).Times(0)
 	h.store.EXPECT().RecordAlertSent(gomock.Any(), gomock.Any()).Times(0)
 
-	run, err := h.runner.Run(context.Background())
+	run, err := h.runner.Run(t.Context())
 
 	require.NoError(t, err)
 	assert.Zero(t, run.AlertsSent)
@@ -153,7 +152,7 @@ func TestADeliveredAlertWithAFailedRecordIsReported(t *testing.T) {
 	h.notifier.EXPECT().SendSMS(alert.UserPhone, gomock.Any()).Return(nil)
 	h.store.EXPECT().RecordAlertSent(gomock.Any(), alert).Return(errors.New("write failed"))
 
-	run, err := h.runner.Run(context.Background())
+	run, err := h.runner.Run(t.Context())
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, run.AlertsSent)
@@ -178,7 +177,7 @@ func TestATransientForecastFailureIsRetried(t *testing.T) {
 		GetAlertMatches(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, nil)
 
-	run, err := h.runner.Run(context.Background())
+	run, err := h.runner.Run(t.Context())
 
 	require.NoError(t, err)
 	assert.Zero(t, run.ResortsFailed)
@@ -207,7 +206,7 @@ func TestOneFailingResortDoesNotStopTheOthers(t *testing.T) {
 		GetAlertMatches(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, nil)
 
-	run, err := h.runner.Run(context.Background())
+	run, err := h.runner.Run(t.Context())
 
 	require.NoError(t, err)
 	assert.Equal(t, 2, run.ResortsChecked)
@@ -224,7 +223,7 @@ func TestResortsWithoutCoordinatesAreSkipped(t *testing.T) {
 	h.store.EXPECT().ListAllResorts(gomock.Any()).Return([]dbgen.Resort{incomplete}, nil)
 	h.weather.EXPECT().GetSnowForecast(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
-	run, err := h.runner.Run(context.Background())
+	run, err := h.runner.Run(t.Context())
 
 	require.NoError(t, err)
 	assert.Zero(t, run.ResortsChecked)

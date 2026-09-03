@@ -121,7 +121,7 @@ func TestStoredTokenIsOnlyAHash(t *testing.T) {
 	queries := newFakeQueries()
 	service := auth.NewService(queries, true)
 
-	token, err := service.IssueLoginToken(context.Background(), "rider@example.com")
+	token, err := service.IssueLoginToken(t.Context(), "rider@example.com")
 
 	require.NoError(t, err)
 	require.NotEmpty(t, token)
@@ -133,17 +133,17 @@ func TestALoginLinkWorksExactlyOnce(t *testing.T) {
 	queries := newFakeQueries()
 	service := auth.NewService(queries, true)
 
-	token, err := service.IssueLoginToken(context.Background(), "rider@example.com")
+	token, err := service.IssueLoginToken(t.Context(), "rider@example.com")
 	require.NoError(t, err)
 
-	sessionToken, expiresAt, err := service.Redeem(context.Background(), token)
+	sessionToken, expiresAt, err := service.Redeem(t.Context(), token)
 
 	require.NoError(t, err)
 	assert.NotEmpty(t, sessionToken)
 	assert.True(t, expiresAt.After(time.Now()))
 	assert.Equal(t, []uuid.UUID{queries.user.Uuid}, queries.verified)
 
-	_, _, err = service.Redeem(context.Background(), token)
+	_, _, err = service.Redeem(t.Context(), token)
 
 	require.ErrorIs(t, err, auth.ErrInvalidToken)
 }
@@ -151,7 +151,7 @@ func TestALoginLinkWorksExactlyOnce(t *testing.T) {
 func TestRedeemRejectsAnUnknownToken(t *testing.T) {
 	service := auth.NewService(newFakeQueries(), true)
 
-	_, _, err := service.Redeem(context.Background(), "not-a-real-token")
+	_, _, err := service.Redeem(t.Context(), "not-a-real-token")
 
 	require.ErrorIs(t, err, auth.ErrInvalidToken)
 }
@@ -160,13 +160,13 @@ func TestAuthenticateResolvesTheSessionUser(t *testing.T) {
 	queries := newFakeQueries()
 	service := auth.NewService(queries, true)
 
-	token, err := service.IssueLoginToken(context.Background(), "rider@example.com")
+	token, err := service.IssueLoginToken(t.Context(), "rider@example.com")
 	require.NoError(t, err)
 
-	sessionToken, _, err := service.Redeem(context.Background(), token)
+	sessionToken, _, err := service.Redeem(t.Context(), token)
 	require.NoError(t, err)
 
-	user, err := service.Authenticate(context.Background(), sessionToken)
+	user, err := service.Authenticate(t.Context(), sessionToken)
 
 	require.NoError(t, err)
 	assert.Equal(t, queries.user.Uuid, user.UUID)
@@ -176,10 +176,10 @@ func TestAuthenticateResolvesTheSessionUser(t *testing.T) {
 func TestAuthenticateRejectsAbsentAndUnknownTokens(t *testing.T) {
 	service := auth.NewService(newFakeQueries(), true)
 
-	_, err := service.Authenticate(context.Background(), "")
+	_, err := service.Authenticate(t.Context(), "")
 	require.ErrorIs(t, err, auth.ErrNoSession)
 
-	_, err = service.Authenticate(context.Background(), "some-other-token")
+	_, err = service.Authenticate(t.Context(), "some-other-token")
 	require.ErrorIs(t, err, auth.ErrNoSession)
 }
 
@@ -188,14 +188,14 @@ func TestLogoutRevokesTheSession(t *testing.T) {
 	queries := newFakeQueries()
 	service := auth.NewService(queries, true)
 
-	token, err := service.IssueLoginToken(context.Background(), "rider@example.com")
+	token, err := service.IssueLoginToken(t.Context(), "rider@example.com")
 	require.NoError(t, err)
 
-	sessionToken, _, err := service.Redeem(context.Background(), token)
+	sessionToken, _, err := service.Redeem(t.Context(), token)
 	require.NoError(t, err)
 
-	require.NoError(t, service.Logout(context.Background(), sessionToken))
+	require.NoError(t, service.Logout(t.Context(), sessionToken))
 
-	_, err = service.Authenticate(context.Background(), sessionToken)
+	_, err = service.Authenticate(t.Context(), sessionToken)
 	require.ErrorIs(t, err, auth.ErrNoSession)
 }
