@@ -147,6 +147,10 @@ func Load() (Config, error) {
 	return cfg, nil
 }
 
+// validateProduction checks the settings every process needs, whatever it does.
+// Anything only the HTTP API needs belongs in ValidateWeb instead: the
+// forecaster talks to the database and Twilio and serves no traffic, so
+// demanding a CORS allowlist from it would stop alerts for no reason.
 func (c Config) validateProduction() error {
 	var missing []string
 
@@ -157,6 +161,23 @@ func (c Config) validateProduction() error {
 	if c.Database.Password == "" {
 		missing = append(missing, "DB_PASSWORD")
 	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("%w: %s", ErrMissingConfig, strings.Join(missing, ", "))
+	}
+
+	return nil
+}
+
+// ValidateWeb checks the settings only the HTTP API needs. Call it from the API
+// binary after Load; background processes must not, or a missing web setting
+// takes them down too.
+func (c Config) ValidateWeb() error {
+	if !c.IsProduction() {
+		return nil
+	}
+
+	var missing []string
 
 	if c.AllowedOrigins == "" || c.AllowedOrigins == "*" {
 		missing = append(missing, "ALLOWED_ORIGINS (a wildcard is not allowed in production)")

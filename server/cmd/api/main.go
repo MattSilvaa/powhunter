@@ -65,6 +65,12 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
+	// Only this binary serves HTTP, so only this binary requires the settings
+	// that serving HTTP needs.
+	if webErr := cfg.ValidateWeb(); webErr != nil {
+		return webErr
+	}
+
 	h, err := handlers.NewHandlers(cfg, logger)
 	if err != nil {
 		return err
