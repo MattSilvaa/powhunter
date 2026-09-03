@@ -48,6 +48,15 @@ type StoreService interface {
 
 	// DeleteAllUserAlerts deletes all alerts for a user
 	DeleteAllUserAlerts(ctx context.Context, email string) error
+
+	// GetUserAlerts returns all alerts belonging to the given user.
+	GetUserAlerts(ctx context.Context, userUUID uuid.UUID) ([]dbgen.GetUserAlertsByUserUUIDRow, error)
+
+	// DeleteAlertForUser deletes one of the given user's alerts.
+	DeleteAlertForUser(ctx context.Context, userUUID uuid.UUID, resortUUID string) error
+
+	// DeleteAllAlertsForUser deletes every alert belonging to the given user.
+	DeleteAllAlertsForUser(ctx context.Context, userUUID uuid.UUID) error
 }
 
 type Store struct {
@@ -60,6 +69,11 @@ func NewStore(db *sql.DB) *Store {
 		db:      db,
 		queries: dbgen.New(db),
 	}
+}
+
+// DB exposes the underlying pool for health checks and metrics.
+func (s *Store) DB() *sql.DB {
+	return s.db
 }
 
 func (s *Store) ExecTx(ctx context.Context, fn func(*dbgen.Queries) error) error {
@@ -101,21 +115,15 @@ func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
 			Valid:  phone != "",
 		}
 
-		// Try to get existing user first
-		user, err := q.GetUserByEmail(ctx, email)
+		// Get-or-create in one statement. Reading first and then inserting raced:
+		// two concurrent signups with the same email both saw no row, both
+		// inserted, and one failed on the unique constraint as a 500.
+		user, err := q.UpsertUser(ctx, dbgen.UpsertUserParams{
+			Email: email,
+			Phone: phoneParam,
+		})
 		if err != nil {
-			// If user doesn't exist, create them
-			if errors.Is(err, sql.ErrNoRows) {
-				user, err = q.CreateUser(ctx, dbgen.CreateUserParams{
-					Email: email,
-					Phone: phoneParam,
-				})
-				if err != nil {
-					return fmt.Errorf("error creating user: %w", err)
-				}
-			} else {
-				return fmt.Errorf("error checking for existing user: %w", err)
-			}
+			return fmt.Errorf("error creating user: %w", err)
 		}
 
 		for _, resortUUID := range resortUUIDs {
@@ -222,6 +230,11 @@ func (s *Store) GetAlertMatches(
 						ForecastDate: forecastDate,
 						IsUpdate:     false,
 					})
+
+					// A first-time alert has been queued; do not also evaluate the
+					// "significant increase" rule below, which would compare against a
+					// zero-valued lastAlertSnowAmount and queue a duplicate update alert.
+					continue
 				} else {
 					return fmt.Errorf("error getting latest alert for resort %s: %w", resortUUID, err)
 				}
@@ -306,5 +319,53 @@ func (s *Store) DeleteAllUserAlerts(ctx context.Context, email string) error {
 	if err != nil {
 		return fmt.Errorf("error deleting all user alerts: %w", err)
 	}
+	return nil
+}
+
+// Queries exposes the generated query set for packages that need it directly.
+func (s *Store) Queries() *dbgen.Queries {
+	return s.queries
+}
+
+// GetUserAlerts returns all alerts belonging to the given user. Scoping by the
+// authenticated user's UUID, rather than by an email the caller supplies, is
+// what keeps one account's alerts out of another account's reach.
+func (s *Store) GetUserAlerts(
+	ctx context.Context,
+	userUUID uuid.UUID,
+) ([]dbgen.GetUserAlertsByUserUUIDRow, error) {
+	alerts, err := s.queries.GetUserAlertsByUserUUID(ctx, uuid.NullUUID{UUID: userUUID, Valid: true})
+	if err != nil {
+		return nil, fmt.Errorf("error getting alerts for user: %w", err)
+	}
+
+	return alerts, nil
+}
+
+// DeleteAlertForUser deletes one of the given user's alerts.
+func (s *Store) DeleteAlertForUser(ctx context.Context, userUUID uuid.UUID, resortUUID string) error {
+	parsed, err := uuid.Parse(resortUUID)
+	if err != nil {
+		return fmt.Errorf("error parsing resort UUID: %w", err)
+	}
+
+	err = s.queries.DeleteUserAlertByUserUUID(ctx, dbgen.DeleteUserAlertByUserUUIDParams{
+		UserUuid:   uuid.NullUUID{UUID: userUUID, Valid: true},
+		ResortUuid: uuid.NullUUID{UUID: parsed, Valid: true},
+	})
+	if err != nil {
+		return fmt.Errorf("error deleting user alert: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteAllAlertsForUser deletes every alert belonging to the given user.
+func (s *Store) DeleteAllAlertsForUser(ctx context.Context, userUUID uuid.UUID) error {
+	err := s.queries.DeleteAllUserAlertsByUserUUID(ctx, uuid.NullUUID{UUID: userUUID, Valid: true})
+	if err != nil {
+		return fmt.Errorf("error deleting all alerts for user: %w", err)
+	}
+
 	return nil
 }

@@ -20,6 +20,15 @@ type AlertHistory struct {
 	SnowAmount   float64       `json:"snow_amount"`
 }
 
+type LoginToken struct {
+	ID         int32        `json:"id"`
+	UserUuid   uuid.UUID    `json:"user_uuid"`
+	TokenHash  string       `json:"token_hash"`
+	ExpiresAt  time.Time    `json:"expires_at"`
+	ConsumedAt sql.NullTime `json:"consumed_at"`
+	CreatedAt  time.Time    `json:"created_at"`
+}
+
 type Resort struct {
 	ID          int32           `json:"id"`
 	Uuid        uuid.UUID       `json:"uuid"`
@@ -30,12 +39,25 @@ type Resort struct {
 	Longitude   sql.NullFloat64 `json:"longitude"`
 }
 
+type Session struct {
+	ID         int32     `json:"id"`
+	Uuid       uuid.UUID `json:"uuid"`
+	UserUuid   uuid.UUID `json:"user_uuid"`
+	TokenHash  string    `json:"token_hash"`
+	ExpiresAt  time.Time `json:"expires_at"`
+	CreatedAt  time.Time `json:"created_at"`
+	LastSeenAt time.Time `json:"last_seen_at"`
+}
+
 type User struct {
-	ID        int32          `json:"id"`
-	Uuid      uuid.UUID      `json:"uuid"`
-	Email     string         `json:"email"`
-	Phone     sql.NullString `json:"phone"`
-	CreatedAt sql.NullTime   `json:"created_at"`
+	ID              int32          `json:"id"`
+	Uuid            uuid.UUID      `json:"uuid"`
+	Email           string         `json:"email"`
+	Phone           sql.NullString `json:"phone"`
+	CreatedAt       sql.NullTime   `json:"created_at"`
+	PasswordHash    sql.NullString `json:"password_hash"`
+	EmailVerifiedAt sql.NullTime   `json:"email_verified_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
 }
 
 type UserAlert struct {

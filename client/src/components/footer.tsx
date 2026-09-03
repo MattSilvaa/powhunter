@@ -1,4 +1,3 @@
-import React from 'react'
 import { Link } from 'react-router'
 import { Box, Container, Typography, Link as MuiLink } from '@mui/material'
 

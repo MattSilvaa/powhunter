@@ -1,43 +1,28 @@
 import { useQuery } from '@tanstack/react-query'
-import { BASE_SERVER_URL, Resort, ResortApiResponse } from './types.ts'
+import { apiRequest, retryOnlyTransport } from './apiClient.ts'
+import { Resort, ResortApiResponse } from './types.ts'
 
-const fetchResorts = async (): Promise<ResortApiResponse[]> => {
-	try {
-		const response = await fetch(`${BASE_SERVER_URL}/api/resorts`, {
-			method: 'GET',
-			mode: 'cors',
-			cache: 'no-store',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		})
+const RESORT_RETRIES = 2
+const RESORT_STALE_TIME_MS = 5 * 60 * 1000
 
-		if (!response.ok) {
-			throw new Error(`Request failed: ${response.status}`)
-		}
+const fetchResorts = (): Promise<ResortApiResponse[]> =>
+	apiRequest<ResortApiResponse[]>('/api/resorts')
 
-		return response.json()
-	} catch (err) {
-		console.log(err)
-		throw err
-	}
-}
-
-const transformResortData = (data?: ResortApiResponse[]): Resort[] => {
-	return (
-		data?.map((resort) => ({
-			id: resort.id,
-			uuid: resort.uuid,
-			name: resort.name,
-			urlHost: resort.url_host.Valid ? resort.url_host.String : null,
-			urlPathname: resort.url_pathname.Valid
-				? resort.url_pathname.String
-				: null,
-			latitude: resort.latitude.Valid ? resort.latitude.Float64 : null,
-			longitude: resort.longitude.Valid ? resort.longitude.Float64 : null,
-		})) || []
-	) // Default to empty array if data is undefined
-}
+// Nullable columns arrive from Go as {Valid, ...} wrappers. Guarding each one
+// matters because this runs during render, where React Query cannot catch a
+// throw, so a single incomplete row would blank the signup page.
+const transformResortData = (data?: ResortApiResponse[]): Resort[] =>
+	(data ?? []).map((resort) => ({
+		id: resort.id,
+		uuid: resort.uuid,
+		name: resort.name,
+		urlHost: resort.url_host?.Valid ? resort.url_host.String : null,
+		urlPathname: resort.url_pathname?.Valid
+			? resort.url_pathname.String
+			: null,
+		latitude: resort.latitude?.Valid ? resort.latitude.Float64 : null,
+		longitude: resort.longitude?.Valid ? resort.longitude.Float64 : null,
+	}))
 
 export function useResorts() {
 	const { data, isLoading, isError, error, refetch } = useQuery<
@@ -45,8 +30,8 @@ export function useResorts() {
 	>({
 		queryKey: ['resorts'],
 		queryFn: fetchResorts,
-		staleTime: 5 * 60 * 1000,
-		retry: 2,
+		staleTime: RESORT_STALE_TIME_MS,
+		retry: retryOnlyTransport(RESORT_RETRIES),
 	})
 
 	return {

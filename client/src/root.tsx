@@ -1,4 +1,5 @@
 import React from 'react'
+import appStylesHref from './app.css?url'
 import {
 	isRouteErrorResponse,
 	Outlet,
@@ -187,7 +188,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 			<head>
 				<meta charSet="utf-8" />
 				<meta name="viewport" content="width=device-width, initial-scale=1" />
-				<link rel="stylesheet" href="/src/app.css" />
+				<link rel="stylesheet" href={appStylesHref} />
+				<title>Pow Hunter</title>
 			</head>
 			<body style={{ height: '100%', margin: 0, padding: 0 }}>
 				<QueryClientProvider client={queryClient}>
@@ -214,7 +216,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 // The top most error boundary for the app, rendered when your app throws an error
 // For more information, see https://reactrouter.com/start/framework/route-module#errorboundary
-export function ErrorBoundary({ error }: { error: any }) {
+export function ErrorBoundary({ error }: { error: unknown }) {
 	let message = 'Oops!'
 	let details = 'An unexpected error occurred.'
 	let stack: string | undefined
@@ -225,7 +227,7 @@ export function ErrorBoundary({ error }: { error: any }) {
 			error.status === 404
 				? 'The requested page could not be found.'
 				: error.statusText || details
-	} else if (Deno.env.get('ENV') && error && error instanceof Error) {
+	} else if (import.meta.env.DEV && error instanceof Error) {
 		details = error.message
 		stack = error.stack
 	}

@@ -30,6 +30,15 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.clearResortsStmt, err = db.PrepareContext(ctx, clearResorts); err != nil {
 		return nil, fmt.Errorf("error preparing query ClearResorts: %w", err)
 	}
+	if q.consumeLoginTokenStmt, err = db.PrepareContext(ctx, consumeLoginToken); err != nil {
+		return nil, fmt.Errorf("error preparing query ConsumeLoginToken: %w", err)
+	}
+	if q.createLoginTokenStmt, err = db.PrepareContext(ctx, createLoginToken); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateLoginToken: %w", err)
+	}
+	if q.createSessionStmt, err = db.PrepareContext(ctx, createSession); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateSession: %w", err)
+	}
 	if q.createUserStmt, err = db.PrepareContext(ctx, createUser); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateUser: %w", err)
 	}
@@ -39,11 +48,29 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.deleteAllUserAlertsStmt, err = db.PrepareContext(ctx, deleteAllUserAlerts); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteAllUserAlerts: %w", err)
 	}
+	if q.deleteAllUserAlertsByUserUUIDStmt, err = db.PrepareContext(ctx, deleteAllUserAlertsByUserUUID); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteAllUserAlertsByUserUUID: %w", err)
+	}
+	if q.deleteExpiredLoginTokensStmt, err = db.PrepareContext(ctx, deleteExpiredLoginTokens); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteExpiredLoginTokens: %w", err)
+	}
+	if q.deleteExpiredSessionsStmt, err = db.PrepareContext(ctx, deleteExpiredSessions); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteExpiredSessions: %w", err)
+	}
+	if q.deleteSessionStmt, err = db.PrepareContext(ctx, deleteSession); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteSession: %w", err)
+	}
 	if q.deleteUserAlertStmt, err = db.PrepareContext(ctx, deleteUserAlert); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteUserAlert: %w", err)
 	}
+	if q.deleteUserAlertByUserUUIDStmt, err = db.PrepareContext(ctx, deleteUserAlertByUserUUID); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteUserAlertByUserUUID: %w", err)
+	}
 	if q.getLastAlertSnowAmountStmt, err = db.PrepareContext(ctx, getLastAlertSnowAmount); err != nil {
 		return nil, fmt.Errorf("error preparing query GetLastAlertSnowAmount: %w", err)
+	}
+	if q.getOrCreateUserByEmailStmt, err = db.PrepareContext(ctx, getOrCreateUserByEmail); err != nil {
+		return nil, fmt.Errorf("error preparing query GetOrCreateUserByEmail: %w", err)
 	}
 	if q.getResortAlertsStmt, err = db.PrepareContext(ctx, getResortAlerts); err != nil {
 		return nil, fmt.Errorf("error preparing query GetResortAlerts: %w", err)
@@ -51,11 +78,17 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getResortByUUIDStmt, err = db.PrepareContext(ctx, getResortByUUID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetResortByUUID: %w", err)
 	}
+	if q.getSessionByTokenHashStmt, err = db.PrepareContext(ctx, getSessionByTokenHash); err != nil {
+		return nil, fmt.Errorf("error preparing query GetSessionByTokenHash: %w", err)
+	}
 	if q.getUserAlertStmt, err = db.PrepareContext(ctx, getUserAlert); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserAlert: %w", err)
 	}
 	if q.getUserAlertsByEmailStmt, err = db.PrepareContext(ctx, getUserAlertsByEmail); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserAlertsByEmail: %w", err)
+	}
+	if q.getUserAlertsByUserUUIDStmt, err = db.PrepareContext(ctx, getUserAlertsByUserUUID); err != nil {
+		return nil, fmt.Errorf("error preparing query GetUserAlertsByUserUUID: %w", err)
 	}
 	if q.getUserByEmailStmt, err = db.PrepareContext(ctx, getUserByEmail); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserByEmail: %w", err)
@@ -75,8 +108,17 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.listResortsStmt, err = db.PrepareContext(ctx, listResorts); err != nil {
 		return nil, fmt.Errorf("error preparing query ListResorts: %w", err)
 	}
+	if q.markEmailVerifiedStmt, err = db.PrepareContext(ctx, markEmailVerified); err != nil {
+		return nil, fmt.Errorf("error preparing query MarkEmailVerified: %w", err)
+	}
+	if q.touchSessionStmt, err = db.PrepareContext(ctx, touchSession); err != nil {
+		return nil, fmt.Errorf("error preparing query TouchSession: %w", err)
+	}
 	if q.updateUserAlertStmt, err = db.PrepareContext(ctx, updateUserAlert); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateUserAlert: %w", err)
+	}
+	if q.upsertUserStmt, err = db.PrepareContext(ctx, upsertUser); err != nil {
+		return nil, fmt.Errorf("error preparing query UpsertUser: %w", err)
 	}
 	return &q, nil
 }
@@ -91,6 +133,21 @@ func (q *Queries) Close() error {
 	if q.clearResortsStmt != nil {
 		if cerr := q.clearResortsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing clearResortsStmt: %w", cerr)
+		}
+	}
+	if q.consumeLoginTokenStmt != nil {
+		if cerr := q.consumeLoginTokenStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing consumeLoginTokenStmt: %w", cerr)
+		}
+	}
+	if q.createLoginTokenStmt != nil {
+		if cerr := q.createLoginTokenStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createLoginTokenStmt: %w", cerr)
+		}
+	}
+	if q.createSessionStmt != nil {
+		if cerr := q.createSessionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createSessionStmt: %w", cerr)
 		}
 	}
 	if q.createUserStmt != nil {
@@ -108,14 +165,44 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing deleteAllUserAlertsStmt: %w", cerr)
 		}
 	}
+	if q.deleteAllUserAlertsByUserUUIDStmt != nil {
+		if cerr := q.deleteAllUserAlertsByUserUUIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteAllUserAlertsByUserUUIDStmt: %w", cerr)
+		}
+	}
+	if q.deleteExpiredLoginTokensStmt != nil {
+		if cerr := q.deleteExpiredLoginTokensStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteExpiredLoginTokensStmt: %w", cerr)
+		}
+	}
+	if q.deleteExpiredSessionsStmt != nil {
+		if cerr := q.deleteExpiredSessionsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteExpiredSessionsStmt: %w", cerr)
+		}
+	}
+	if q.deleteSessionStmt != nil {
+		if cerr := q.deleteSessionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteSessionStmt: %w", cerr)
+		}
+	}
 	if q.deleteUserAlertStmt != nil {
 		if cerr := q.deleteUserAlertStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing deleteUserAlertStmt: %w", cerr)
 		}
 	}
+	if q.deleteUserAlertByUserUUIDStmt != nil {
+		if cerr := q.deleteUserAlertByUserUUIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteUserAlertByUserUUIDStmt: %w", cerr)
+		}
+	}
 	if q.getLastAlertSnowAmountStmt != nil {
 		if cerr := q.getLastAlertSnowAmountStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getLastAlertSnowAmountStmt: %w", cerr)
+		}
+	}
+	if q.getOrCreateUserByEmailStmt != nil {
+		if cerr := q.getOrCreateUserByEmailStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getOrCreateUserByEmailStmt: %w", cerr)
 		}
 	}
 	if q.getResortAlertsStmt != nil {
@@ -128,6 +215,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getResortByUUIDStmt: %w", cerr)
 		}
 	}
+	if q.getSessionByTokenHashStmt != nil {
+		if cerr := q.getSessionByTokenHashStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getSessionByTokenHashStmt: %w", cerr)
+		}
+	}
 	if q.getUserAlertStmt != nil {
 		if cerr := q.getUserAlertStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getUserAlertStmt: %w", cerr)
@@ -136,6 +228,11 @@ func (q *Queries) Close() error {
 	if q.getUserAlertsByEmailStmt != nil {
 		if cerr := q.getUserAlertsByEmailStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getUserAlertsByEmailStmt: %w", cerr)
+		}
+	}
+	if q.getUserAlertsByUserUUIDStmt != nil {
+		if cerr := q.getUserAlertsByUserUUIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getUserAlertsByUserUUIDStmt: %w", cerr)
 		}
 	}
 	if q.getUserByEmailStmt != nil {
@@ -168,9 +265,24 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing listResortsStmt: %w", cerr)
 		}
 	}
+	if q.markEmailVerifiedStmt != nil {
+		if cerr := q.markEmailVerifiedStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing markEmailVerifiedStmt: %w", cerr)
+		}
+	}
+	if q.touchSessionStmt != nil {
+		if cerr := q.touchSessionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing touchSessionStmt: %w", cerr)
+		}
+	}
 	if q.updateUserAlertStmt != nil {
 		if cerr := q.updateUserAlertStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateUserAlertStmt: %w", cerr)
+		}
+	}
+	if q.upsertUserStmt != nil {
+		if cerr := q.upsertUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing upsertUserStmt: %w", cerr)
 		}
 	}
 	return err
@@ -210,49 +322,77 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                         DBTX
-	tx                         *sql.Tx
-	checkAlertSentStmt         *sql.Stmt
-	clearResortsStmt           *sql.Stmt
-	createUserStmt             *sql.Stmt
-	createUserAlertStmt        *sql.Stmt
-	deleteAllUserAlertsStmt    *sql.Stmt
-	deleteUserAlertStmt        *sql.Stmt
-	getLastAlertSnowAmountStmt *sql.Stmt
-	getResortAlertsStmt        *sql.Stmt
-	getResortByUUIDStmt        *sql.Stmt
-	getUserAlertStmt           *sql.Stmt
-	getUserAlertsByEmailStmt   *sql.Stmt
-	getUserByEmailStmt         *sql.Stmt
-	getUserByUUIDStmt          *sql.Stmt
-	insertAlertHistoryStmt     *sql.Stmt
-	insertResortStmt           *sql.Stmt
-	listActiveAlertsStmt       *sql.Stmt
-	listResortsStmt            *sql.Stmt
-	updateUserAlertStmt        *sql.Stmt
+	db                                DBTX
+	tx                                *sql.Tx
+	checkAlertSentStmt                *sql.Stmt
+	clearResortsStmt                  *sql.Stmt
+	consumeLoginTokenStmt             *sql.Stmt
+	createLoginTokenStmt              *sql.Stmt
+	createSessionStmt                 *sql.Stmt
+	createUserStmt                    *sql.Stmt
+	createUserAlertStmt               *sql.Stmt
+	deleteAllUserAlertsStmt           *sql.Stmt
+	deleteAllUserAlertsByUserUUIDStmt *sql.Stmt
+	deleteExpiredLoginTokensStmt      *sql.Stmt
+	deleteExpiredSessionsStmt         *sql.Stmt
+	deleteSessionStmt                 *sql.Stmt
+	deleteUserAlertStmt               *sql.Stmt
+	deleteUserAlertByUserUUIDStmt     *sql.Stmt
+	getLastAlertSnowAmountStmt        *sql.Stmt
+	getOrCreateUserByEmailStmt        *sql.Stmt
+	getResortAlertsStmt               *sql.Stmt
+	getResortByUUIDStmt               *sql.Stmt
+	getSessionByTokenHashStmt         *sql.Stmt
+	getUserAlertStmt                  *sql.Stmt
+	getUserAlertsByEmailStmt          *sql.Stmt
+	getUserAlertsByUserUUIDStmt       *sql.Stmt
+	getUserByEmailStmt                *sql.Stmt
+	getUserByUUIDStmt                 *sql.Stmt
+	insertAlertHistoryStmt            *sql.Stmt
+	insertResortStmt                  *sql.Stmt
+	listActiveAlertsStmt              *sql.Stmt
+	listResortsStmt                   *sql.Stmt
+	markEmailVerifiedStmt             *sql.Stmt
+	touchSessionStmt                  *sql.Stmt
+	updateUserAlertStmt               *sql.Stmt
+	upsertUserStmt                    *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                         tx,
-		tx:                         tx,
-		checkAlertSentStmt:         q.checkAlertSentStmt,
-		clearResortsStmt:           q.clearResortsStmt,
-		createUserStmt:             q.createUserStmt,
-		createUserAlertStmt:        q.createUserAlertStmt,
-		deleteAllUserAlertsStmt:    q.deleteAllUserAlertsStmt,
-		deleteUserAlertStmt:        q.deleteUserAlertStmt,
-		getLastAlertSnowAmountStmt: q.getLastAlertSnowAmountStmt,
-		getResortAlertsStmt:        q.getResortAlertsStmt,
-		getResortByUUIDStmt:        q.getResortByUUIDStmt,
-		getUserAlertStmt:           q.getUserAlertStmt,
-		getUserAlertsByEmailStmt:   q.getUserAlertsByEmailStmt,
-		getUserByEmailStmt:         q.getUserByEmailStmt,
-		getUserByUUIDStmt:          q.getUserByUUIDStmt,
-		insertAlertHistoryStmt:     q.insertAlertHistoryStmt,
-		insertResortStmt:           q.insertResortStmt,
-		listActiveAlertsStmt:       q.listActiveAlertsStmt,
-		listResortsStmt:            q.listResortsStmt,
-		updateUserAlertStmt:        q.updateUserAlertStmt,
+		db:                                tx,
+		tx:                                tx,
+		checkAlertSentStmt:                q.checkAlertSentStmt,
+		clearResortsStmt:                  q.clearResortsStmt,
+		consumeLoginTokenStmt:             q.consumeLoginTokenStmt,
+		createLoginTokenStmt:              q.createLoginTokenStmt,
+		createSessionStmt:                 q.createSessionStmt,
+		createUserStmt:                    q.createUserStmt,
+		createUserAlertStmt:               q.createUserAlertStmt,
+		deleteAllUserAlertsStmt:           q.deleteAllUserAlertsStmt,
+		deleteAllUserAlertsByUserUUIDStmt: q.deleteAllUserAlertsByUserUUIDStmt,
+		deleteExpiredLoginTokensStmt:      q.deleteExpiredLoginTokensStmt,
+		deleteExpiredSessionsStmt:         q.deleteExpiredSessionsStmt,
+		deleteSessionStmt:                 q.deleteSessionStmt,
+		deleteUserAlertStmt:               q.deleteUserAlertStmt,
+		deleteUserAlertByUserUUIDStmt:     q.deleteUserAlertByUserUUIDStmt,
+		getLastAlertSnowAmountStmt:        q.getLastAlertSnowAmountStmt,
+		getOrCreateUserByEmailStmt:        q.getOrCreateUserByEmailStmt,
+		getResortAlertsStmt:               q.getResortAlertsStmt,
+		getResortByUUIDStmt:               q.getResortByUUIDStmt,
+		getSessionByTokenHashStmt:         q.getSessionByTokenHashStmt,
+		getUserAlertStmt:                  q.getUserAlertStmt,
+		getUserAlertsByEmailStmt:          q.getUserAlertsByEmailStmt,
+		getUserAlertsByUserUUIDStmt:       q.getUserAlertsByUserUUIDStmt,
+		getUserByEmailStmt:                q.getUserByEmailStmt,
+		getUserByUUIDStmt:                 q.getUserByUUIDStmt,
+		insertAlertHistoryStmt:            q.insertAlertHistoryStmt,
+		insertResortStmt:                  q.insertResortStmt,
+		listActiveAlertsStmt:              q.listActiveAlertsStmt,
+		listResortsStmt:                   q.listResortsStmt,
+		markEmailVerifiedStmt:             q.markEmailVerifiedStmt,
+		touchSessionStmt:                  q.touchSessionStmt,
+		updateUserAlertStmt:               q.updateUserAlertStmt,
+		upsertUserStmt:                    q.upsertUserStmt,
 	}
 }

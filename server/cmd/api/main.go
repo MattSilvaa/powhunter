@@ -3,95 +3,133 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/MattSilvaa/powhunter/internal/auth"
+	"github.com/MattSilvaa/powhunter/internal/config"
 	"github.com/MattSilvaa/powhunter/internal/handlers"
+	"github.com/MattSilvaa/powhunter/internal/metrics"
+	"github.com/MattSilvaa/powhunter/internal/server"
 )
 
+// shutdownTimeout bounds how long in-flight requests may finish on shutdown.
+const shutdownTimeout = 10 * time.Second
+
+// reapInterval is how often expired sessions and login tokens are swept. Expiry
+// is already enforced on read, so this only keeps the tables from growing.
+const reapInterval = time.Hour
+
+// reapTimeout bounds one sweep.
+const reapTimeout = 30 * time.Second
+
+// reapExpiredCredentials periodically deletes expired sessions and login
+// tokens. A failed sweep is logged and retried on the next tick rather than
+// taking the server down: stale rows are untidy, not dangerous.
+func reapExpiredCredentials(ctx context.Context, service *auth.Service, logger *slog.Logger) {
+	ticker := time.NewTicker(reapInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			sweepCtx, cancel := context.WithTimeout(ctx, reapTimeout)
+
+			if err := service.Reap(sweepCtx); err != nil {
+				logger.ErrorContext(sweepCtx, "failed to reap expired credentials", "error", err)
+			}
+
+			cancel()
+		}
+	}
+}
+
 func main() {
-	h, err := handlers.NewHandlers()
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	if err := run(logger); err != nil {
+		logger.Error("server exited with error", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run(logger *slog.Logger) error {
+	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to initialize handlers: %v", err)
+		return err
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+	h, err := handlers.NewHandlers(cfg, logger)
+	if err != nil {
+		return err
+	}
+
+	registry := metrics.NewRegistry()
+	registry.RegisterDBStats(h.Store().DB())
+
+	handler, cleanup := server.New(server.Deps{
+		Config:   cfg,
+		Handlers: h,
+		Metrics:  registry,
+		Logger:   logger,
+		DB:       h.Store().DB(),
+		Auth:     h.AuthService(),
 	})
-	mux.HandleFunc("/api/resorts", h.Resort.ListAllResorts)
-	mux.HandleFunc("/api/alerts", h.Alert.CreateAlert)
-	mux.HandleFunc("/api/user/alerts", h.Alert.GetUserAlerts)
-	mux.HandleFunc("/api/user/alerts/delete", h.Alert.DeleteUserAlert)
-	mux.HandleFunc("/api/user/alerts/delete-all", h.Alert.DeleteAllUserAlerts)
-	mux.HandleFunc("/api/contact", h.Contact.HandleContact)
+	defer cleanup()
 
-	handler := corsMiddleware(mux)
+	reaperCtx, stopReaper := context.WithCancel(context.Background())
+	defer stopReaper()
 
-	server := &http.Server{
-		Addr:         ":8080",
-		Handler:      handler,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+	go reapExpiredCredentials(reaperCtx, h.AuthService(), logger)
+
+	httpServer := &http.Server{
+		Addr:              ":" + cfg.Port,
+		Handler:           handler,
+		ReadTimeout:       cfg.ReadTimeout,
+		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+		WriteTimeout:      cfg.WriteTimeout,
+		IdleTimeout:       cfg.IdleTimeout,
 	}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
-	go func() {
-		log.Printf("Server starting on %s", server.Addr)
+	serverErrors := make(chan error, 1)
 
-		serverErr := server.ListenAndServe()
-		if serverErr != nil && !errors.Is(serverErr, http.ErrServerClosed) {
-			log.Fatalf("Server failed to start: %v", serverErr)
+	go func() {
+		logger.Info("server starting",
+			"addr", httpServer.Addr,
+			"environment", cfg.Environment,
+			"allowed_origins", cfg.AllowedOrigins,
+		)
+
+		if listenErr := httpServer.ListenAndServe(); listenErr != nil &&
+			!errors.Is(listenErr, http.ErrServerClosed) {
+			serverErrors <- listenErr
 		}
 	}()
 
-	<-stop
-	log.Println("Shutting down API server...")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+	select {
+	case listenErr := <-serverErrors:
+		return listenErr
+	case <-stop:
+		logger.Info("shutting down api server")
 	}
 
-	log.Println("Server exited gracefully")
-}
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
 
-func corsMiddleware(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		allowedOrigin := "*"
+	if shutdownErr := httpServer.Shutdown(ctx); shutdownErr != nil {
+		return shutdownErr
+	}
 
-		if os.Getenv("ENVIRONMENT") == "production" {
-			allowedOrigin = "https://powhunter.app"
-		}
-		origin := r.Header.Get("Origin")
+	logger.Info("server exited gracefully")
 
-		if allowedOrigin == "*" {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-		} else {
-			w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
-			if origin == allowedOrigin {
-				w.Header().Set("Access-Control-Allow-Credentials", "true")
-			}
-		}
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().
-			Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, Authorization")
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		h.ServeHTTP(w, r)
-	})
+	return nil
 }

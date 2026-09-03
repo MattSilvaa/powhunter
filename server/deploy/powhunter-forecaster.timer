@@ -1,0 +1,14 @@
+[Unit]
+Description=Run the Powhunter forecast check twice daily
+
+[Timer]
+# Morning and evening, matching the twelve-hour cadence the docs describe.
+OnCalendar=*-*-* 05,17:00:00
+# Spread load and avoid every deployment hitting the weather API at once.
+RandomizedDelaySec=300
+# Catch up after downtime rather than silently skipping a storm.
+Persistent=true
+Unit=powhunter-forecaster.service
+
+[Install]
+WantedBy=timers.target

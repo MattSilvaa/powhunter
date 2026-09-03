@@ -4,19 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/resend/resend-go/v2"
+	"github.com/MattSilvaa/powhunter/internal/notify"
+	"github.com/MattSilvaa/powhunter/internal/validate"
 )
 
-type ContactHandler struct{}
+type ContactHandler struct {
+	mailer  notify.Mailer
+	support string
+}
 
-func NewContactHandler() (*ContactHandler, error) {
-	return &ContactHandler{}, nil
+func NewContactHandler(mailer notify.Mailer, supportEmail string) (*ContactHandler, error) {
+	return &ContactHandler{mailer: mailer, support: supportEmail}, nil
 }
 
 type ContactRequest struct {
@@ -34,38 +39,35 @@ func (h *ContactHandler) HandleContact(w http.ResponseWriter, r *http.Request) {
 	setSecurityHeaders(w)
 
 	var req ContactRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendErrorResponse(w, "INVALID_REQUEST", "Invalid request body", http.StatusBadRequest)
+	if err := decodeJSON(r, &req); err != nil {
+		sendDecodeError(w, err)
 		return
 	}
 
-	// Validate required fields
-	if strings.TrimSpace(req.Name) == "" {
-		sendErrorResponse(w, "MISSING_NAME", "Name is required", http.StatusBadRequest)
+	name, err := validate.Text("name", req.Name, validate.MaxNameLength)
+	if err != nil {
+		sendErrorResponse(w, "MISSING_NAME", "Please enter your name", http.StatusBadRequest)
 		return
 	}
 
-	if strings.TrimSpace(req.Email) == "" {
-		sendErrorResponse(w, "MISSING_EMAIL", "Email is required", http.StatusBadRequest)
+	message, err := validate.Text("message", req.Message, validate.MaxMessageLength)
+	if err != nil {
+		sendErrorResponse(w, "MISSING_MESSAGE", "Please enter a message", http.StatusBadRequest)
 		return
 	}
 
-	if strings.TrimSpace(req.Message) == "" {
-		sendErrorResponse(w, "MISSING_MESSAGE", "Message is required", http.StatusBadRequest)
+	email, err := validate.Email(req.Email)
+	if err != nil {
+		sendErrorResponse(w, "INVALID_EMAIL", "Please enter a valid email address", http.StatusBadRequest)
 		return
 	}
 
-	// Basic email validation
-	if !strings.Contains(req.Email, "@") || !strings.Contains(req.Email, ".") {
-		sendErrorResponse(w, "INVALID_EMAIL", "Invalid email address", http.StatusBadRequest)
-		return
-	}
+	req.Name = name
+	req.Email = email
+	req.Message = message
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-
-	// Log the contact message
-	log.Printf("Contact form submission from %s (%s): %s", req.Name, req.Email, req.Message)
 
 	// TODO: Send email notification
 	// For now, we'll just log it and optionally write to a file
@@ -75,9 +77,9 @@ func (h *ContactHandler) HandleContact(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(map[string]string{
+	w.WriteHeader(http.StatusOK)
+	err = json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "Thank you for contacting us! We'll get back to you soon.",
 	})
@@ -119,16 +121,9 @@ func (h *ContactHandler) recordContactMessage(ctx context.Context, req ContactRe
 }
 
 func (h *ContactHandler) sendContactEmail(ctx context.Context, req ContactRequest) error {
-	// Get Resend API key from environment
-	apiKey := os.Getenv("RESEND_API_KEY")
-	if apiKey == "" {
-		log.Println("RESEND_API_KEY not configured, skipping email send")
-		return nil
-	}
-
-	client := resend.NewClient(apiKey)
-
 	// Construct email body
+	// Every interpolated value is submitter-controlled, so escape it before it
+	// reaches the support inbox as HTML.
 	htmlBody := fmt.Sprintf(`
 		<h2>New Contact Form Submission</h2>
 		<p><strong>From:</strong> %s (%s)</p>
@@ -137,21 +132,21 @@ func (h *ContactHandler) sendContactEmail(ctx context.Context, req ContactReques
 		<p>%s</p>
 		<hr>
 		<p><em>This email was sent from the Powhunter contact form.</em></p>
-	`, req.Name, req.Email, time.Now().Format("January 2, 2006 at 3:04 PM MST"), strings.ReplaceAll(req.Message, "\n", "<br>"))
+	`,
+		html.EscapeString(req.Name),
+		html.EscapeString(req.Email),
+		time.Now().Format("January 2, 2006 at 3:04 PM MST"),
+		strings.ReplaceAll(html.EscapeString(req.Message), "\n", "<br>"),
+	)
 
-	params := &resend.SendEmailRequest{
-		From:    "Powhunter <noreply@powhunter.app>",
-		To:      []string{"support@powhunter.app"},
+	if err := h.mailer.Send(ctx, notify.Email{
+		To:      []string{h.support},
 		ReplyTo: req.Email,
 		Subject: fmt.Sprintf("Contact Form Submission from %s", req.Name),
-		Html:    htmlBody,
+		HTML:    htmlBody,
+	}); err != nil {
+		return fmt.Errorf("failed to send contact email: %w", err)
 	}
 
-	sent, err := client.Emails.Send(params)
-	if err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
-	}
-
-	log.Printf("Contact email sent to support@powhunter.app from %s (%s) - ID: %s", req.Name, req.Email, sent.Id)
 	return nil
 }

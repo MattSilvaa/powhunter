@@ -1,6 +1,8 @@
 import { useMutation } from '@tanstack/react-query'
-import { BASE_SERVER_URL } from './types.ts'
+import { apiRequest, retryOnlyTransport } from './apiClient.ts'
 
+// A create is not idempotent. Retrying a request the server already committed
+// produces a duplicate-alert conflict, so only transport failures are retried.
 const CREATE_ALERT_RETRIES = 2
 
 type AlertData = {
@@ -11,81 +13,8 @@ type AlertData = {
 	resortsUuids: string[]
 }
 
-type ErrorResponse = {
-	error: string
-	message: string
-}
-
-const getErrorMessage = (errorResponse: ErrorResponse): string => {
-	switch (errorResponse.error) {
-		case 'DUPLICATE_ALERT':
-			return 'You already have an alert for this resort. Try selecting a different resort or managing your existing alerts.'
-		case 'MISSING_EMAIL':
-			return 'Please enter a valid email address.'
-		case 'MISSING_PHONE':
-			return 'Please enter a phone number to receive SMS alerts.'
-		case 'MISSING_RESORTS':
-			return 'Please select at least one resort to receive alerts for.'
-		case 'VALIDATION_ERROR':
-			return 'Please check your information and try again.'
-		case 'METHOD_NOT_ALLOWED':
-			return 'Something went wrong. Please refresh the page and try again.'
-		case 'INVALID_REQUEST':
-			return 'Invalid information provided. Please check your entries and try again.'
-		case 'INTERNAL_ERROR':
-			return 'Something went wrong on our end. Please try again in a few moments.'
-		default:
-			return (
-				errorResponse.message ||
-				'An unexpected error occurred. Please try again.'
-			)
-	}
-}
-
-const createAlert = async (data: AlertData): Promise<void> => {
-	const response = await fetch(`${BASE_SERVER_URL}/api/alerts`, {
-		method: 'POST',
-		mode: 'cors',
-		headers: {
-			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify(data),
-	})
-
-	if (!response.ok) {
-		const responseText = await response.text()
-
-		let errorMessage = 'An unexpected error occurred. Please try again.'
-
-		try {
-			const errorData: ErrorResponse = JSON.parse(responseText)
-			errorMessage = getErrorMessage(errorData)
-		} catch (parseError) {
-			console.warn('Failed to parse error response as JSON:', parseError)
-
-			switch (response.status) {
-				case 409:
-					errorMessage =
-						'You already have an alert for this resort. Try selecting a different resort.'
-					break
-				case 400:
-					errorMessage = 'Please check your information and try again.'
-					break
-				case 500:
-				default:
-					if (response.status >= 500) {
-						errorMessage =
-							'Something went wrong on our end. Please try again in a few moments.'
-					} else {
-						errorMessage = `Request failed with status ${response.status}`
-					}
-					break
-			}
-		}
-
-		throw new Error(errorMessage)
-	}
-}
+const createAlert = (data: AlertData): Promise<void> =>
+	apiRequest<void>('/api/alerts', { method: 'POST', body: data })
 
 export function useCreateAlert() {
 	const { mutate, isPending, isError, error } = useMutation<
@@ -94,7 +23,7 @@ export function useCreateAlert() {
 		AlertData
 	>({
 		mutationFn: createAlert,
-		retry: CREATE_ALERT_RETRIES,
+		retry: retryOnlyTransport(CREATE_ALERT_RETRIES),
 	})
 
 	return {

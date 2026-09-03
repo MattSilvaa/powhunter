@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
 	Alert,
 	Box,
@@ -6,6 +6,7 @@ import {
 	Card,
 	CardContent,
 	Chip,
+	CircularProgress,
 	Container,
 	Dialog,
 	DialogActions,
@@ -14,20 +15,38 @@ import {
 	DialogTitle,
 	IconButton,
 	Paper,
-	TextField,
 	Typography,
 } from '@mui/material'
-import { Delete, DeleteSweep, Warning } from '@mui/icons-material'
-import { Link } from 'react-router'
+import { Delete, DeleteSweep } from '@mui/icons-material'
+import { Link, useNavigate } from 'react-router'
 import {
 	useUserAlerts,
 	useDeleteAlert,
 	useDeleteAllAlerts,
 } from '../shared/useManageAlerts.ts'
+import { useCurrentUser, useLogout } from '../shared/useAuth.ts'
+import { UserAlert } from '../shared/types.ts'
+
+// created_at arrives from Go as a nullable timestamp, so guard both the null
+// case and an unparseable value rather than rendering "Invalid Date".
+function formatCreatedAt(createdAt: UserAlert['created_at']): string {
+	if (!createdAt?.Valid) {
+		return 'Unknown'
+	}
+
+	const parsed = new Date(createdAt.Time)
+	if (Number.isNaN(parsed.getTime())) {
+		return 'Unknown'
+	}
+
+	return parsed.toLocaleDateString()
+}
 
 export default function ManageSubscriptionsPage() {
-	const [email, setEmail] = useState('')
-	const [searchedEmail, setSearchedEmail] = useState('')
+	const navigate = useNavigate()
+	const { user, loading: userLoading } = useCurrentUser()
+	const { logout, loading: loggingOut } = useLogout()
+
 	const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 	const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false)
 	const [alertToDelete, setAlertToDelete] = useState<{
@@ -35,21 +54,18 @@ export default function ManageSubscriptionsPage() {
 		resortName: string
 	} | null>(null)
 
-	const {
-		data: alerts = [],
-		isLoading,
-		error,
-	} = useUserAlerts(searchedEmail)
+	// This page only ever shows the signed-in user's own subscriptions, so a
+	// signed-out visitor goes to the sign-in screen rather than a blank list.
+	useEffect(() => {
+		if (!userLoading && !user) {
+			navigate('/login', { replace: true })
+		}
+	}, [userLoading, user, navigate])
+
+	const { data: alerts = [], isLoading, error } = useUserAlerts(!!user)
 
 	const deleteAlertMutation = useDeleteAlert()
 	const deleteAllMutation = useDeleteAllAlerts()
-
-	const handleSearch = (e: React.FormEvent) => {
-		e.preventDefault()
-		if (email.trim()) {
-			setSearchedEmail(email.trim())
-		}
-	}
 
 	const handleDeleteClick = (resortUuid: string, resortName: string) => {
 		setAlertToDelete({ resortUuid, resortName })
@@ -57,70 +73,65 @@ export default function ManageSubscriptionsPage() {
 	}
 
 	const handleDeleteConfirm = () => {
-		if (alertToDelete && searchedEmail) {
-			deleteAlertMutation.mutate(
-				{
-					email: searchedEmail,
-					resortUuid: alertToDelete.resortUuid,
-				},
-				{
-					onSuccess: () => {
-						setDeleteConfirmOpen(false)
-						setAlertToDelete(null)
-					},
-				}
-			)
+		if (!alertToDelete) {
+			return
 		}
+
+		deleteAlertMutation.mutate(alertToDelete.resortUuid, {
+			onSuccess: () => {
+				setDeleteConfirmOpen(false)
+				setAlertToDelete(null)
+			},
+		})
 	}
 
 	const handleDeleteAllConfirm = () => {
-		if (searchedEmail) {
-			deleteAllMutation.mutate(searchedEmail, {
-				onSuccess: () => {
-					setDeleteAllConfirmOpen(false)
-				},
-			})
-		}
+		deleteAllMutation.mutate(undefined, {
+			onSuccess: () => {
+				setDeleteAllConfirmOpen(false)
+			},
+		})
+	}
+
+	if (userLoading || !user) {
+		return (
+			<Container maxWidth="md" sx={{ py: 8, textAlign: 'center' }}>
+				<CircularProgress />
+			</Container>
+		)
 	}
 
 	return (
 		<Container maxWidth="md" sx={{ py: 4 }}>
 			<Paper elevation={3} sx={{ p: 4 }}>
-				<Typography variant="h2" component="h1" gutterBottom>
-					Manage Your Subscriptions
-				</Typography>
-				<Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
-					Enter your email address to view and manage your powder alert
-					subscriptions.
-				</Typography>
-
-				<Alert severity="info" icon={<Warning />} sx={{ mb: 4 }}>
-					<Typography variant="body2">
-						<strong>Note:</strong> We're working on adding email verification
-						for enhanced security. For now, only use the email address you
-						signed up with.
-					</Typography>
-				</Alert>
-
-				<Box component="form" onSubmit={handleSearch} sx={{ mb: 4 }}>
-					<Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-						<TextField
-							fullWidth
-							label="Email Address"
-							type="email"
-							value={email}
-							onChange={(e) => setEmail(e.target.value)}
-							required
-						/>
-						<Button
-							type="submit"
-							variant="contained"
-							size="large"
-							disabled={isLoading}
-						>
-							{isLoading ? 'Loading...' : 'Find Subscriptions'}
-						</Button>
+				<Box
+					sx={{
+						display: 'flex',
+						justifyContent: 'space-between',
+						alignItems: 'flex-start',
+						gap: 2,
+						mb: 2,
+					}}
+				>
+					<Box>
+						<Typography variant="h2" component="h1" gutterBottom>
+							Manage Your Subscriptions
+						</Typography>
+						<Typography variant="body1" color="text.secondary">
+							Signed in as {user.email}
+						</Typography>
 					</Box>
+					<Button
+						variant="text"
+						onClick={() =>
+							logout(undefined, {
+								onSuccess: () => navigate('/login', { replace: true }),
+							})
+						}
+						disabled={loggingOut}
+					>
+						Sign out
+					</Button>
 				</Box>
 
 				{error && (
@@ -141,9 +152,15 @@ export default function ManageSubscriptionsPage() {
 					</Alert>
 				)}
 
-				{searchedEmail && alerts.length === 0 && !isLoading && !error && (
+				{isLoading && (
+					<Box sx={{ textAlign: 'center', py: 4 }}>
+						<CircularProgress />
+					</Box>
+				)}
+
+				{!isLoading && alerts.length === 0 && !error && (
 					<Alert severity="info" sx={{ mb: 3 }}>
-						No active subscriptions found for {searchedEmail}.
+						No active subscriptions yet.
 						<Button component={Link} to="/signup" sx={{ ml: 1 }}>
 							Create one?
 						</Button>
@@ -201,12 +218,12 @@ export default function ManageSubscriptionsPage() {
 													/>
 												</Box>
 												<Typography variant="body2" color="text.secondary">
-													Created: {console.log(alert)}
-													{new Date(alert.created_at.Time).toLocaleDateString()}
+													Created: {formatCreatedAt(alert.created_at)}
 												</Typography>
 											</Box>
 											<IconButton
 												color="error"
+												aria-label={`Delete subscription for ${alert.resort_name}`}
 												onClick={() =>
 													handleDeleteClick(
 														alert.resort_uuid,

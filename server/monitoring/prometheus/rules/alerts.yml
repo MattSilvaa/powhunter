@@ -1,0 +1,82 @@
+groups:
+  - name: powhunter-api
+    rules:
+      - alert: ApiDown
+        expr: up{job="powhunter-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The API is not responding to scrapes"
+          description: "Prometheus has been unable to scrape the API for two minutes."
+
+      - alert: ApiHighErrorRate
+        expr: |
+          sum(rate(powhunter_http_requests_total{status=~"5.."}[5m]))
+            / sum(rate(powhunter_http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "More than 5% of API requests are failing"
+          description: "Server errors exceeded 5% of traffic over five minutes."
+
+      - alert: ApiHighLatency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(powhunter_http_request_duration_seconds_bucket[5m])) by (le, route)
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "95th percentile latency above one second on {{ $labels.route }}"
+
+      - alert: ApiNotReady
+        expr: powhunter_http_requests_total{route="ready",status="503"} > 0
+          and increase(powhunter_http_requests_total{route="ready",status="503"}[5m]) > 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Readiness checks are failing"
+          description: "The API cannot reach its database."
+
+      - alert: DatabasePoolSaturated
+        expr: rate(powhunter_blocked_seconds_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Requests are waiting on database connections"
+          description: "The connection pool is saturated; requests block to acquire one."
+
+  - name: powhunter-forecaster
+    rules:
+      # The forecaster is the product. A silent failure means nobody hears
+      # about a storm, which is invisible without this alert.
+      - alert: ForecasterNotRunning
+        expr: time() - powhunter_forecaster_last_success_timestamp_seconds > 46800
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No successful forecaster run in over 13 hours"
+          description: "The forecaster is expected every 12 hours; alerts are not being delivered."
+
+      - alert: ForecasterSendFailures
+        expr: increase(powhunter_forecaster_alerts_failed_total[1h]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The forecaster failed to deliver alerts"
+
+      - alert: ForecasterRunFailed
+        expr: powhunter_forecaster_run_success == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The most recent forecaster run failed"

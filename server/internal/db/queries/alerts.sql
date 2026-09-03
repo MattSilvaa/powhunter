@@ -32,7 +32,7 @@ SELECT ua.id,
        ua.min_snow_amount,
        ua.notification_days
 FROM user_alerts ua
-         JOIN users u ON ua.user_uuid = u.id
+         JOIN users u ON ua.user_uuid = u.uuid
          JOIN resorts r ON ua.resort_uuid = r.uuid
 WHERE ua.active = true;
 
@@ -58,3 +58,29 @@ WHERE user_uuid = (SELECT uuid FROM users WHERE email = $1)
 -- name: DeleteAllUserAlerts :exec
 DELETE FROM user_alerts
 WHERE user_uuid = (SELECT uuid FROM users WHERE email = $1);
+
+-- The three queries below key off the authenticated user's UUID rather than an
+-- email supplied by the caller. Taking the identity from the session is what
+-- stops one person reading or deleting another person's alerts.
+
+-- name: GetUserAlertsByUserUUID :many
+SELECT ua.id,
+       ua.user_uuid,
+       ua.resort_uuid,
+       r.name as resort_name,
+       ua.min_snow_amount,
+       ua.notification_days,
+       ua.active,
+       ua.created_at
+FROM user_alerts ua
+         JOIN resorts r ON ua.resort_uuid = r.uuid
+WHERE ua.user_uuid = $1 AND ua.active = true;
+
+-- name: DeleteUserAlertByUserUUID :exec
+DELETE FROM user_alerts
+WHERE user_uuid = $1
+  AND resort_uuid = $2;
+
+-- name: DeleteAllUserAlertsByUserUUID :exec
+DELETE FROM user_alerts
+WHERE user_uuid = $1;

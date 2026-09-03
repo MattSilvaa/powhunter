@@ -1,107 +1,111 @@
+// Command forecaster checks every resort's forecast and delivers matching
+// alerts. It is a one-shot job intended to be run on a schedule.
 package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
+	"github.com/MattSilvaa/powhunter/internal/config"
 	"github.com/MattSilvaa/powhunter/internal/db"
+	"github.com/MattSilvaa/powhunter/internal/forecast"
+	"github.com/MattSilvaa/powhunter/internal/metrics"
 	"github.com/MattSilvaa/powhunter/internal/notify"
 	"github.com/MattSilvaa/powhunter/internal/weather"
 
 	_ "github.com/lib/pq"
 )
 
+// runTimeout is a generous ceiling for the whole job. Per-resort deadlines do
+// the real work; this only stops a wedged process from running forever.
+const runTimeout = 30 * time.Minute
+
 func main() {
-	dbConn, err := db.New()
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	if err := run(logger); err != nil {
+		logger.Error("forecast run failed", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run(logger *slog.Logger) error {
+	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		return err
 	}
 
-	store := db.NewStore(dbConn)
-	weatherClient := weather.NewOpenMeteoClient()
+	fromNumber := os.Getenv("TWILIO_FROM_NUMBER")
+	if os.Getenv("TWILIO_ACCOUNT_SID") == "" || os.Getenv("TWILIO_AUTH_TOKEN") == "" || fromNumber == "" {
+		logger.Error("twilio credentials not configured",
+			"required", "TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER")
 
-	var twilioClient notify.NotificationService
-	twilioAccountSID := os.Getenv("TWILIO_ACCOUNT_SID")
-	twilioAuthToken := os.Getenv("TWILIO_AUTH_TOKEN")
-	twilioFromNumber := os.Getenv("TWILIO_FROM_NUMBER")
-
-	if twilioAccountSID == "" || twilioAuthToken == "" || twilioFromNumber == "" {
-		log.Fatalf(
-			"Twilio credentials not found. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER environment variables.",
-		)
+		return errMissingTwilioConfig
 	}
-	twilioClient = notify.NewTwilioClient(
-		twilioFromNumber,
-	)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	conn, err := db.Open(cfg.Database)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	// A signal-aware context lets an in-flight run stop cleanly rather than
+	// being killed midway between sending an SMS and recording it.
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	resorts, err := store.ListAllResorts(ctx)
-	if err != nil {
-		log.Fatalf("Failed to list resorts: %v", err)
+	ctx, timeoutCancel := context.WithTimeout(ctx, runTimeout)
+	defer timeoutCancel()
+
+	runner := forecast.NewRunner(
+		db.NewStore(conn),
+		weather.NewOpenMeteoClient(),
+		notify.NewTwilioClient(fromNumber),
+		logger,
+		time.Now,
+		forecast.Options{},
+	)
+
+	summary, runErr := runner.Run(ctx)
+
+	logger.Info("forecast check complete",
+		"resorts_checked", summary.ResortsChecked,
+		"resorts_failed", summary.ResortsFailed,
+		"alerts_matched", summary.AlertsMatched,
+		"alerts_sent", summary.AlertsSent,
+		"alerts_failed", summary.AlertsFailed,
+		"records_failed", summary.RecordsFailed,
+		"duration_ms", summary.Duration.Milliseconds(),
+		"succeeded", summary.Succeeded,
+	)
+
+	publishMetrics(logger, summary)
+
+	if runErr != nil {
+		return runErr
 	}
 
-	for _, resort := range resorts {
-		if !resort.Latitude.Valid || !resort.Longitude.Valid {
-			log.Printf("Skipping resort %s: missing coordinates", resort.Name)
-			continue
-		}
-
-		log.Printf(
-			"Checking forecast for %s (%.4f, %.4f)",
-			resort.Name,
-			resort.Latitude.Float64,
-			resort.Longitude.Float64,
-		)
-
-		predictions, err := weatherClient.GetSnowForecast(ctx, resort.Latitude.Float64, resort.Longitude.Float64)
-		if err != nil {
-			log.Printf("Error getting forecast for %s: %v", resort.Name, err)
-			continue
-		}
-
-		if len(predictions) == 0 {
-			log.Printf("No snow predicted for %s", resort.Name)
-			continue
-		}
-
-		log.Printf("Found %d snow predictions for %s:", len(predictions), resort.Name)
-		for _, pred := range predictions {
-			log.Printf("  %s: %.1f inches", pred.Date.Format("2006-01-02"), pred.SnowAmount)
-
-			daysAhead := int32(pred.Date.Sub(time.Now().Truncate(24*time.Hour)).Hours() / 24)
-			if daysAhead < 0 {
-				daysAhead = 0
-			}
-
-			alerts, err := store.GetAlertMatches(ctx, resort.Uuid.String(), pred.Date, pred.SnowAmount, daysAhead)
-			if err != nil {
-				log.Printf("Error finding matching alerts: %v", err)
-				continue
-			}
-
-			log.Printf("Found %d matching alerts", len(alerts))
-			for _, alert := range alerts {
-				log.Printf("Alert for %s (Phone: %s)", alert.ResortName, alert.UserPhone)
-
-				if alert.UserPhone != "" {
-					message := notify.FormatSnowAlertMessage(alert)
-					if err := twilioClient.SendSMS(alert.UserPhone, message); err != nil {
-						log.Printf("Error sending SMS to %s: %v", alert.UserPhone, err)
-					} else {
-						log.Printf("Sent SMS alert to %s for %s", alert.UserPhone, alert.ResortName)
-					}
-				}
-
-				if err := store.RecordAlertSent(ctx, alert); err != nil {
-					log.Printf("Error recording alert history: %v", err)
-				}
-			}
-		}
+	// Exiting non-zero lets the scheduler surface a bad run instead of the job
+	// reporting success while having notified nobody.
+	if !summary.Succeeded {
+		return errRunIncomplete
 	}
 
-	log.Println("Forecast check complete")
+	return nil
+}
+
+// publishMetrics reports the run to a Pushgateway when one is configured.
+func publishMetrics(logger *slog.Logger, summary metrics.ForecastRun) {
+	gateway := os.Getenv("PUSHGATEWAY_URL")
+	if gateway == "" {
+		return
+	}
+
+	if err := metrics.PushForecastRun(gateway, summary); err != nil {
+		logger.Warn("failed to publish forecaster metrics", "error", err)
+	}
 }

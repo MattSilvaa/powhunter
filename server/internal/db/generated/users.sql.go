@@ -18,7 +18,7 @@ INSERT INTO users (
 ) VALUES (
   $1, $2
 )
-RETURNING id, uuid, email, phone, created_at
+RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -35,12 +35,42 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Email,
 		&i.Phone,
 		&i.CreatedAt,
+		&i.PasswordHash,
+		&i.EmailVerifiedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getOrCreateUserByEmail = `-- name: GetOrCreateUserByEmail :one
+INSERT INTO users (email)
+VALUES ($1)
+ON CONFLICT (email) DO UPDATE
+    SET updated_at = NOW()
+RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at
+`
+
+// Requesting a login link for an address that has no account creates one, so
+// signup and login are the same flow. DO UPDATE rather than DO NOTHING because
+// DO NOTHING returns no row on conflict.
+func (q *Queries) GetOrCreateUserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.queryRow(ctx, q.getOrCreateUserByEmailStmt, getOrCreateUserByEmail, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.Email,
+		&i.Phone,
+		&i.CreatedAt,
+		&i.PasswordHash,
+		&i.EmailVerifiedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, uuid, email, phone, created_at FROM users
+SELECT id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at FROM users
 WHERE email = $1 LIMIT 1
 `
 
@@ -53,12 +83,15 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Email,
 		&i.Phone,
 		&i.CreatedAt,
+		&i.PasswordHash,
+		&i.EmailVerifiedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getUserByUUID = `-- name: GetUserByUUID :one
-SELECT id, uuid, email, phone, created_at FROM users
+SELECT id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at FROM users
 WHERE uuid = $1 LIMIT 1
 `
 
@@ -71,6 +104,41 @@ func (q *Queries) GetUserByUUID(ctx context.Context, argUuid uuid.UUID) (User, e
 		&i.Email,
 		&i.Phone,
 		&i.CreatedAt,
+		&i.PasswordHash,
+		&i.EmailVerifiedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const upsertUser = `-- name: UpsertUser :one
+INSERT INTO users (email, phone)
+VALUES ($1, $2)
+ON CONFLICT (email) DO UPDATE
+    SET phone = COALESCE(EXCLUDED.phone, users.phone)
+RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at
+`
+
+type UpsertUserParams struct {
+	Email string         `json:"email"`
+	Phone sql.NullString `json:"phone"`
+}
+
+// Get-or-create in a single statement. A read-then-write race meant two
+// concurrent signups with the same email both attempted an insert, and one
+// failed on the unique constraint as a 500.
+func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error) {
+	row := q.queryRow(ctx, q.upsertUserStmt, upsertUser, arg.Email, arg.Phone)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.Email,
+		&i.Phone,
+		&i.CreatedAt,
+		&i.PasswordHash,
+		&i.EmailVerifiedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

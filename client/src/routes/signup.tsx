@@ -31,6 +31,7 @@ export default function SignUpPage() {
 		minSnowAmount: 6,
 		resorts: [] as string[],
 	})
+	const [dismissedError, setDismissedError] = useState(false)
 	const [fieldErrors, setFieldErrors] = useState({
 		email: '',
 		phone: '',
@@ -79,6 +80,8 @@ export default function SignUpPage() {
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
 
+		setDismissedError(false)
+
 		// Clear previous field errors
 		setFieldErrors({
 			email: '',
@@ -101,6 +104,8 @@ export default function SignUpPage() {
 
 		if (!formData.phone.trim()) {
 			errors.phone = 'Phone number is required'
+		} else if (formData.phone.replace(/\D/g, '').length < 10) {
+			errors.phone = 'Please enter a valid phone number'
 		}
 
 		if (formData.resorts.length === 0) {
@@ -113,20 +118,16 @@ export default function SignUpPage() {
 			return
 		}
 
-		const resortsUuids = formData.resorts
-			.map((resortName) => {
-				const resort = resorts.find((r) => r.name === resortName)
-				if (!resort?.uuid) {
-					console.error(`Resort UUID not found for: ${resortName}`)
-				}
-				return resort?.uuid
-			})
-			.filter((uuid) => !!uuid) as string[]
+		const resortsUuids = formData.resorts.filter((uuid) =>
+			resorts.some((r) => r.uuid === uuid)
+		)
 
 		if (resortsUuids.length !== formData.resorts.length) {
-			console.error(
-				"Some selected resorts couldn't be properly mapped to UUIDs"
-			)
+			setFieldErrors((prev) => ({
+				...prev,
+				resorts:
+					'Some selected resorts are no longer available. Please reselect them.',
+			}))
 			return
 		}
 
@@ -186,18 +187,18 @@ export default function SignUpPage() {
 							Sign up to start receiving powder alerts for your favorite resorts
 						</Typography>
 
-						{createAlertError && (
+						{createAlertError && !dismissedError && (
 							<Alert
 								severity="error"
+								role="alert"
 								sx={{ mb: 3 }}
-								onClose={() => {
-									// Reset error when user dismisses
-								}}
+								onClose={() => setDismissedError(true)}
 							>
 								<strong>Oops!</strong> {createAlertError}
 							</Alert>
 						)}
 
+						<Box component="form" onSubmit={handleSubmit} noValidate>
 						<Grid container spacing={3}>
 							<Grid container spacing={3} size={12}>
 								<Grid size={6}>
@@ -239,6 +240,7 @@ export default function SignUpPage() {
 									How many days in advance would you like to receive alerts?
 								</Typography>
 								<Slider
+									aria-label="Days of advance notice"
 									value={formData.notificationDays}
 									onChange={(_, value) =>
 										setFormData((prev) => ({
@@ -265,6 +267,7 @@ export default function SignUpPage() {
 									Minimum snow amount for alerts (inches)?
 								</Typography>
 								<Slider
+									aria-label="Minimum snow amount in inches"
 									value={formData.minSnowAmount}
 									onChange={(_, value) =>
 										setFormData((prev) => ({
@@ -272,7 +275,7 @@ export default function SignUpPage() {
 											minSnowAmount: value as number,
 										}))
 									}
-									min={0}
+									min={1}
 									max={24}
 									marks
 									valueLabelDisplay="auto"
@@ -288,7 +291,7 @@ export default function SignUpPage() {
 
 							<Grid size={{ xs: 12 }}>
 								<FormControl fullWidth error={!!fieldErrors.resorts}>
-									<InputLabel>Select Resorts</InputLabel>
+									<InputLabel id="resorts-label">Select Resorts</InputLabel>
 									{loading && (
 										<Box display="flex" justifyContent="center" p={2}>
 											<CircularProgress />
@@ -299,13 +302,24 @@ export default function SignUpPage() {
 									<Select
 										required
 										multiple
+										labelId="resorts-label"
 										name="resorts"
 										value={formData.resorts}
 										onChange={handleSelectChange}
 										label="Select Resorts"
+										// Values are uuids so resorts sharing a name cannot
+										// collide, but the field must still read as names.
+										renderValue={(selected) =>
+											selected
+												.map(
+													(uuid) =>
+														resorts.find((r) => r.uuid === uuid)?.name ?? uuid
+												)
+												.join(', ')
+										}
 									>
 										{resorts.map((resort: Resort) => (
-											<MenuItem key={resort.uuid} value={resort.name}>
+											<MenuItem key={resort.uuid} value={resort.uuid}>
 												{resort.name}
 											</MenuItem>
 										))}
@@ -330,12 +344,12 @@ export default function SignUpPage() {
 									fullWidth
 									sx={{ mt: 2 }}
 									disabled={isCreateAlertLoading}
-									onClick={handleSubmit}
 								>
 									{isCreateAlertLoading ? 'Creating Alert...' : 'Create Alert'}
 								</Button>
 							</Grid>
 						</Grid>
+						</Box>
 					</>
 				)}
 			</Paper>
