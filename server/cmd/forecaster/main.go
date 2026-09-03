@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -23,6 +24,14 @@ import (
 // runTimeout is a generous ceiling for the whole job. Per-resort deadlines do
 // the real work; this only stops a wedged process from running forever.
 const runTimeout = 30 * time.Minute
+
+// These live here rather than in a sibling file because the deploy builds this
+// command as a single file (`go build cmd/forecaster/main.go`), which silently
+// excludes the rest of the package and fails to compile.
+var (
+	errMissingTwilioConfig = errors.New("twilio credentials are not configured")
+	errRunIncomplete       = errors.New("forecast run did not complete for every resort")
+)
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
