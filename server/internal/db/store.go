@@ -222,6 +222,11 @@ func (s *Store) GetAlertMatches(
 						ForecastDate: forecastDate,
 						IsUpdate:     false,
 					})
+
+					// A first-time alert has been queued; do not also evaluate the
+					// "significant increase" rule below, which would compare against a
+					// zero-valued lastAlertSnowAmount and queue a duplicate update alert.
+					continue
 				} else {
 					return fmt.Errorf("error getting latest alert for resort %s: %w", resortUUID, err)
 				}

@@ -1,7 +1,6 @@
 package notify
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -40,17 +39,13 @@ func (t *TwilioClient) SendSMS(to, message string) error {
 	// This will look for `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` variables inside the current environment to initialize the constructor
 	client := twilio.NewRestClient()
 	params := &twilioAPI.CreateMessageParams{}
-	params.SetTo("6195733405")
+	params.SetTo(to)
 	params.SetFrom(t.fromNumber)
 	params.SetBody(message)
 
-	resp, err := client.Api.CreateMessage(params)
-	if err != nil {
+	if _, err := client.Api.CreateMessage(params); err != nil {
 		return fmt.Errorf("error sending SMS: %w", err)
 	}
-
-	response, _ := json.Marshal(*resp)
-	fmt.Println("Response: " + string(response))
 
 	return nil
 }

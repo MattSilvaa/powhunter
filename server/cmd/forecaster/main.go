@@ -87,17 +87,31 @@ func main() {
 			for _, alert := range alerts {
 				log.Printf("Alert for %s (Phone: %s)", alert.ResortName, alert.UserPhone)
 
-				if alert.UserPhone != "" {
-					message := notify.FormatSnowAlertMessage(alert)
-					if err := twilioClient.SendSMS(alert.UserPhone, message); err != nil {
-						log.Printf("Error sending SMS to %s: %v", alert.UserPhone, err)
-					} else {
-						log.Printf("Sent SMS alert to %s for %s", alert.UserPhone, alert.ResortName)
-					}
+				if alert.UserPhone == "" {
+					// No delivery channel, so nothing was sent. Recording history here
+					// would permanently suppress this forecast for the user even if
+					// they add a phone number later.
+					log.Printf("Skipping alert for %s: user has no phone number", alert.ResortName)
+					continue
 				}
 
+				message := notify.FormatSnowAlertMessage(alert)
+				if err := twilioClient.SendSMS(alert.UserPhone, message); err != nil {
+					// Do not record history for an alert that was never delivered,
+					// otherwise the user silently misses this storm entirely.
+					log.Printf("Error sending SMS to %s: %v", alert.UserPhone, err)
+					continue
+				}
+
+				log.Printf("Sent SMS alert to %s for %s", alert.UserPhone, alert.ResortName)
+
 				if err := store.RecordAlertSent(ctx, alert); err != nil {
-					log.Printf("Error recording alert history: %v", err)
+					// The SMS is already delivered. Failing to record it means the next
+					// run will send a duplicate, so surface this distinctly.
+					log.Printf(
+						"CRITICAL: SMS delivered to %s for %s but recording history failed, next run may duplicate: %v",
+						alert.UserPhone, alert.ResortName, err,
+					)
 				}
 			}
 		}

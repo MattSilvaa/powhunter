@@ -24,6 +24,22 @@ import {
 	useDeleteAlert,
 	useDeleteAllAlerts,
 } from '../shared/useManageAlerts.ts'
+import { UserAlert } from '../shared/types.ts'
+
+// created_at arrives from Go as a nullable timestamp, so guard both the null
+// case and an unparseable value rather than rendering "Invalid Date".
+function formatCreatedAt(createdAt: UserAlert['created_at']): string {
+	if (!createdAt?.Valid) {
+		return 'Unknown'
+	}
+
+	const parsed = new Date(createdAt.Time)
+	if (Number.isNaN(parsed.getTime())) {
+		return 'Unknown'
+	}
+
+	return parsed.toLocaleDateString()
+}
 
 export default function ManageSubscriptionsPage() {
 	const [email, setEmail] = useState('')
@@ -201,8 +217,8 @@ export default function ManageSubscriptionsPage() {
 													/>
 												</Box>
 												<Typography variant="body2" color="text.secondary">
-													Created: {console.log(alert)}
-													{new Date(alert.created_at.Time).toLocaleDateString()}
+													Created:{' '}
+													{formatCreatedAt(alert.created_at)}
 												</Typography>
 											</Box>
 											<IconButton

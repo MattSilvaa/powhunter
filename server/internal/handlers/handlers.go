@@ -113,7 +113,6 @@ func NewResortHandler(store db.StoreService) (*ResortHandler, error) {
 func (h *ResortHandler) ListAllResorts(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		sendErrorResponse(w, METHOD_NOT_ALLOWED, "Method not allowed", http.StatusMethodNotAllowed)
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -124,13 +123,14 @@ func (h *ResortHandler) ListAllResorts(w http.ResponseWriter, r *http.Request) {
 
 	resorts, err := h.store.ListAllResorts(ctx)
 	if err != nil {
-		http.Error(w, "Failed to retrieve resorts", http.StatusInternalServerError)
+		log.Printf("Failed to retrieve resorts: %v", err)
+		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to retrieve resorts", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resorts); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		log.Printf("Failed to encode resorts response: %v", err)
 		return
 	}
 }
@@ -163,7 +163,7 @@ func (h *AlertHandler) GetUserAlerts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 1000*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	alerts, err := h.store.GetUserAlertsByEmail(ctx, email)
@@ -213,10 +213,12 @@ func (h *AlertHandler) DeleteUserAlert(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "Alert deleted successfully",
-	})
+	}); err != nil {
+		log.Printf("Failed to encode delete response: %v", err)
+	}
 }
 
 func (h *AlertHandler) DeleteAllUserAlerts(w http.ResponseWriter, r *http.Request) {
@@ -245,10 +247,12 @@ func (h *AlertHandler) DeleteAllUserAlerts(w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "All alerts deleted successfully",
-	})
+	}); err != nil {
+		log.Printf("Failed to encode delete-all response: %v", err)
+	}
 }
 
 func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
@@ -322,15 +326,15 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 	err = json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "Alert created successfully",
 	})
 
 	if err != nil {
-		log.Printf("Failed to write resposne: %v", err)
+		log.Printf("Failed to write response: %v", err)
 		return
 	}
 }

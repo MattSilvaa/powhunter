@@ -1,7 +1,7 @@
 import { test, expect, describe } from 'bun:test'
 import { render, screen } from '@testing-library/react'
 import { BrowserRouter } from 'react-router'
-import Footer from './Footer'
+import Footer from './footer'
 
 describe('Footer Component', () => {
 	test('renders copyright with current year', () => {

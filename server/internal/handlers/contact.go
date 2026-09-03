@@ -75,8 +75,8 @@ func (h *ContactHandler) HandleContact(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	err := json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "Thank you for contacting us! We'll get back to you soon.",

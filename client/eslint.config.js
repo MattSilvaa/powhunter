@@ -35,7 +35,6 @@ export default [
 				Event: 'readonly',
 				Response: 'readonly',
 				RequestCredentials: 'readonly',
-				Deno: 'readonly',
 			},
 		},
 		plugins: {
