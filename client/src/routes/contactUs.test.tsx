@@ -82,10 +82,9 @@ describe('ContactUs Component', () => {
 
 	test('shows success message on successful submission', async () => {
 		fetchStub.fetch = () =>
-			Promise.resolve({
-				ok: true,
-				json: async () => ({}),
-			} as Response)
+			Promise.resolve(
+				new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+			)
 
 		render(<ContactUs />)
 
@@ -110,10 +109,12 @@ describe('ContactUs Component', () => {
 
 	test('shows error message on failed submission', async () => {
 		fetchStub.fetch = () =>
-			Promise.resolve({
-				ok: false,
-				json: async () => ({ message: 'Server error' }),
-			} as Response)
+			Promise.resolve(
+				new Response(
+					JSON.stringify({ error: 'INTERNAL_ERROR', message: 'Server error' }),
+					{ status: 500 }
+				)
+			)
 
 		render(<ContactUs />)
 
@@ -130,16 +131,15 @@ describe('ContactUs Component', () => {
 		fireEvent.click(screen.getByRole('button', { name: /send message/i }))
 
 		await waitFor(() => {
-			expect(screen.getByText('Server error')).toBeTruthy()
+			expect(screen.getByText(/something went wrong on our end/i)).toBeTruthy()
 		})
 	})
 
 	test('clears form after successful submission', async () => {
 		fetchStub.fetch = () =>
-			Promise.resolve({
-				ok: true,
-				json: async () => ({}),
-			} as Response)
+			Promise.resolve(
+				new Response(JSON.stringify({ status: 'success' }), { status: 200 })
+			)
 
 		render(<ContactUs />)
 

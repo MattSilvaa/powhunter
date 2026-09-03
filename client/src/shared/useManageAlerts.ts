@@ -1,78 +1,50 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BASE_SERVER_URL, UserAlert } from './types.ts'
+import { ApiError, apiRequest, retryOnlyTransport } from './apiClient.ts'
+import { UserAlert } from './types.ts'
+
+const ALERT_RETRIES = 1
 
 const fetchUserAlerts = async (email: string): Promise<UserAlert[]> => {
-	const response = await fetch(
-		`${BASE_SERVER_URL}/api/user/alerts?email=${encodeURIComponent(email)}`,
-		{
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			credentials: 'include',
-		}
-	)
-
-	if (!response.ok) {
-		if (response.status === 404) {
+	try {
+		return await apiRequest<UserAlert[]>(
+			`/api/user/alerts?email=${encodeURIComponent(email)}`
+		)
+	} catch (err) {
+		// No subscriptions is a normal result, not a failure to show the user.
+		if (err instanceof ApiError && err.status === 404) {
 			return []
 		}
-		throw new Error(`Failed to fetch alerts: ${response.status}`)
-	}
 
-	return response.json()
+		throw err
+	}
 }
 
-const deleteAlert = async ({
+const deleteAlert = ({
 	email,
 	resortUuid,
 }: {
 	email: string
 	resortUuid: string
-}): Promise<void> => {
-	const response = await fetch(
-		`${BASE_SERVER_URL}/api/user/alerts/delete?email=${encodeURIComponent(
+}): Promise<void> =>
+	apiRequest<void>(
+		`/api/user/alerts/delete?email=${encodeURIComponent(
 			email
 		)}&resort_uuid=${encodeURIComponent(resortUuid)}`,
-		{
-			method: 'DELETE',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			credentials: 'include',
-		}
+		{ method: 'DELETE' }
 	)
 
-	if (!response.ok) {
-		throw new Error(`Failed to delete alert: ${response.status}`)
-	}
-}
-
-const deleteAllAlerts = async (email: string): Promise<void> => {
-	const response = await fetch(
-		`${BASE_SERVER_URL}/api/user/alerts/delete-all?email=${encodeURIComponent(
-			email
-		)}`,
-		{
-			method: 'DELETE',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			credentials: 'include',
-		}
+const deleteAllAlerts = (email: string): Promise<void> =>
+	apiRequest<void>(
+		`/api/user/alerts/delete-all?email=${encodeURIComponent(email)}`,
+		{ method: 'DELETE' }
 	)
-
-	if (!response.ok) {
-		throw new Error(`Failed to delete all alerts: ${response.status}`)
-	}
-}
 
 export function useUserAlerts(email: string) {
 	return useQuery<UserAlert[]>({
 		queryKey: ['userAlerts', email],
 		queryFn: () => fetchUserAlerts(email),
 		enabled: !!email,
-		retry: 1,
+		retry: retryOnlyTransport(ALERT_RETRIES),
 	})
 }
 

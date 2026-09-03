@@ -1,4 +1,5 @@
 import React from 'react'
+import appStylesHref from './app.css?url'
 import {
 	isRouteErrorResponse,
 	Outlet,
@@ -187,7 +188,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 			<head>
 				<meta charSet="utf-8" />
 				<meta name="viewport" content="width=device-width, initial-scale=1" />
-				<link rel="stylesheet" href="/src/app.css" />
+				<link rel="stylesheet" href={appStylesHref} />
+				<title>Pow Hunter</title>
 			</head>
 			<body style={{ height: '100%', margin: 0, padding: 0 }}>
 				<QueryClientProvider client={queryClient}>

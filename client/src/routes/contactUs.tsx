@@ -9,7 +9,8 @@ import {
 	CircularProgress,
 } from '@mui/material'
 import { Email as EmailIcon } from '@mui/icons-material'
-import {BASE_SERVER_URL} from "../shared/types";
+import { apiRequest } from '../shared/apiClient.ts'
+
 
 interface ContactFormData {
 	name: string
@@ -44,18 +45,7 @@ export default function ContactUs() {
 		setSuccess(false)
 
 		try {
-			const response = await fetch(`${BASE_SERVER_URL}/api/contact`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(formData),
-			})
-
-			if (!response.ok) {
-				const errorData = await response.json()
-				throw new Error(errorData.message || 'Failed to send message')
-			}
+			await apiRequest('/api/contact', { method: 'POST', body: formData })
 
 			setSuccess(true)
 			setFormData({ name: '', email: '', message: '' })
