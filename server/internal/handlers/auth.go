@@ -75,10 +75,10 @@ func (h *AuthHandler) RequestLink(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), handlerTimeout)
 	defer cancel()
 
-	if err := h.sendLoginLink(ctx, email); err != nil {
+	if sendErr := h.sendLoginLink(ctx, email); sendErr != nil {
 		// Log the real reason, tell the caller nothing: see the note above.
-		h.logger.Error("failed to send login link",
-			"error", err,
+		h.logger.ErrorContext(ctx, "failed to send login link",
+			"error", sendErr,
 			"request_id", middleware.RequestIDFromContext(r.Context()),
 		)
 	}
@@ -104,12 +104,12 @@ func (h *AuthHandler) sendLoginLink(ctx context.Context, email string) error {
 		<p>If you did not request this, you can ignore this email.</p>
 	`, int(auth.LoginTokenTTL.Minutes()), html.EscapeString(link))
 
-	if err := h.mailer.Send(ctx, notify.Email{
+	if sendErr := h.mailer.Send(ctx, notify.Email{
 		To:      []string{email},
 		Subject: "Your Powhunter sign-in link",
 		HTML:    body,
-	}); err != nil {
-		return fmt.Errorf("sending login email: %w", err)
+	}); sendErr != nil {
+		return fmt.Errorf("sending login email: %w", sendErr)
 	}
 
 	return nil
@@ -144,7 +144,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		h.logger.Error("failed to redeem login token",
+		h.logger.ErrorContext(ctx, "failed to redeem login token",
 			"error", err,
 			"request_id", middleware.RequestIDFromContext(r.Context()),
 		)
@@ -163,7 +163,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	if err := h.auth.Logout(ctx, auth.TokenFromRequest(r)); err != nil {
-		h.logger.Error("failed to revoke session",
+		h.logger.ErrorContext(ctx, "failed to revoke session",
 			"error", err,
 			"request_id", middleware.RequestIDFromContext(r.Context()),
 		)

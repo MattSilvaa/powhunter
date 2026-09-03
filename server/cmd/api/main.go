@@ -42,7 +42,7 @@ func reapExpiredCredentials(ctx context.Context, service *auth.Service, logger *
 			sweepCtx, cancel := context.WithTimeout(ctx, reapTimeout)
 
 			if err := service.Reap(sweepCtx); err != nil {
-				logger.Error("failed to reap expired credentials", "error", err)
+				logger.ErrorContext(sweepCtx, "failed to reap expired credentials", "error", err)
 			}
 
 			cancel()

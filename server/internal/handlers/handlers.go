@@ -60,17 +60,6 @@ var METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
 // connection. The pool is small, so a long timeout here starves the API.
 const handlerTimeout = 10 * time.Second
 
-// Store returns the store used by the handlers.
-func (h *Handlers) Store() *db.Store {
-	return h.store
-}
-
-// Auth returns the authentication service, for the session middleware and the
-// background reaper.
-func (h *Handlers) AuthService() *auth.Service {
-	return h.auth
-}
-
 // decodeJSON reads a JSON body, rejecting unknown fields so a typo in a client
 // payload is reported rather than silently ignored.
 func decodeJSON(r *http.Request, target any) error {
@@ -168,6 +157,17 @@ func NewHandlers(cfg config.Config, logger *slog.Logger) (*Handlers, error) {
 		auth:    authService,
 		store:   store,
 	}, nil
+}
+
+// Store returns the store used by the handlers.
+func (h *Handlers) Store() *db.Store {
+	return h.store
+}
+
+// AuthService returns the authentication service, for the session middleware
+// and the background reaper.
+func (h *Handlers) AuthService() *auth.Service {
+	return h.auth
 }
 
 func NewResortHandler(store db.StoreService) (*ResortHandler, error) {
@@ -385,12 +385,8 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	if encodeErr := json.NewEncoder(w).Encode(map[string]string{
+	writeJSON(w, http.StatusCreated, map[string]string{
 		"status":  "success",
 		"message": "Alert created successfully",
-	}); encodeErr != nil {
-		log.Printf("Failed to write response: %v", encodeErr)
-	}
+	})
 }

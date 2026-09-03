@@ -87,13 +87,13 @@ func NewService(queries Queries, secure bool) *Service {
 }
 
 // newToken returns a URL-safe bearer token and its storage hash.
-func newToken() (token, hash string, err error) {
+func newToken() (string, string, error) {
 	buf := make([]byte, tokenBytes)
-	if _, err := rand.Read(buf); err != nil {
-		return "", "", fmt.Errorf("generating token: %w", err)
+	if _, readErr := rand.Read(buf); readErr != nil {
+		return "", "", fmt.Errorf("generating token: %w", readErr)
 	}
 
-	token = base64.RawURLEncoding.EncodeToString(buf)
+	token := base64.RawURLEncoding.EncodeToString(buf)
 
 	return token, HashToken(token), nil
 }
@@ -120,12 +120,12 @@ func (s *Service) IssueLoginToken(ctx context.Context, email string) (string, er
 		return "", err
 	}
 
-	if _, err := s.queries.CreateLoginToken(ctx, dbgen.CreateLoginTokenParams{
+	if _, storeErr := s.queries.CreateLoginToken(ctx, dbgen.CreateLoginTokenParams{
 		UserUuid:  user.Uuid,
 		TokenHash: hash,
 		ExpiresAt: s.now().Add(LoginTokenTTL),
-	}); err != nil {
-		return "", fmt.Errorf("storing login token: %w", err)
+	}); storeErr != nil {
+		return "", fmt.Errorf("storing login token: %w", storeErr)
 	}
 
 	return token, nil
@@ -144,8 +144,8 @@ func (s *Service) Redeem(ctx context.Context, loginToken string) (string, time.T
 	}
 
 	// Redeeming a link proves control of the address it was sent to.
-	if err := s.queries.MarkEmailVerified(ctx, userUUID); err != nil {
-		return "", time.Time{}, fmt.Errorf("marking email verified: %w", err)
+	if verifyErr := s.queries.MarkEmailVerified(ctx, userUUID); verifyErr != nil {
+		return "", time.Time{}, fmt.Errorf("marking email verified: %w", verifyErr)
 	}
 
 	token, hash, err := newToken()
@@ -155,12 +155,12 @@ func (s *Service) Redeem(ctx context.Context, loginToken string) (string, time.T
 
 	expiresAt := s.now().Add(SessionTTL)
 
-	if _, err := s.queries.CreateSession(ctx, dbgen.CreateSessionParams{
+	if _, createErr := s.queries.CreateSession(ctx, dbgen.CreateSessionParams{
 		UserUuid:  userUUID,
 		TokenHash: hash,
 		ExpiresAt: expiresAt,
-	}); err != nil {
-		return "", time.Time{}, fmt.Errorf("creating session: %w", err)
+	}); createErr != nil {
+		return "", time.Time{}, fmt.Errorf("creating session: %w", createErr)
 	}
 
 	return token, expiresAt, nil
@@ -185,14 +185,13 @@ func (s *Service) Authenticate(ctx context.Context, sessionToken string) (User, 
 	}
 
 	if time.Until(row.ExpiresAt) < SessionTTL-sessionRefreshInterval {
-		if err := s.queries.TouchSession(ctx, dbgen.TouchSessionParams{
+		// A failed refresh must not fail the request: the session is still valid
+		// for now, and the next request will try again. The error is deliberately
+		// dropped rather than returned.
+		_ = s.queries.TouchSession(ctx, dbgen.TouchSessionParams{
 			TokenHash: hash,
 			ExpiresAt: s.now().Add(SessionTTL),
-		}); err != nil {
-			// A failed refresh must not fail the request; the session is still
-			// valid for now and the next request will try again.
-			return userFromRow(row), nil
-		}
+		})
 	}
 
 	return userFromRow(row), nil

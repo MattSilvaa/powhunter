@@ -1,3 +1,4 @@
+//nolint:testpackage // exercises unexported handler internals, as the sibling handler tests do
 package handlers
 
 import (
@@ -114,7 +115,10 @@ func TestRequestLinkResponseDoesNotRevealWhetherSendingWorked(t *testing.T) {
 	failing.RequestLink(failed, postJSON(t, "/api/auth/request-link", map[string]string{"email": "rider@example.com"}))
 
 	succeeded := httptest.NewRecorder()
-	working.RequestLink(succeeded, postJSON(t, "/api/auth/request-link", map[string]string{"email": "rider@example.com"}))
+	working.RequestLink(
+		succeeded,
+		postJSON(t, "/api/auth/request-link", map[string]string{"email": "rider@example.com"}),
+	)
 
 	assert.Equal(t, http.StatusOK, failed.Code)
 	assert.Equal(t, succeeded.Code, failed.Code)
@@ -238,9 +242,13 @@ func TestUserAlertEndpointsRejectAnUnauthenticatedCaller(t *testing.T) {
 		method string
 		target string
 	}{
-		"read":       {handler.GetUserAlerts, http.MethodGet, "/api/user/alerts?email=victim@example.com"},
-		"delete":     {handler.DeleteUserAlert, http.MethodDelete, "/api/user/alerts/delete?email=victim@example.com"},
-		"delete all": {handler.DeleteAllUserAlerts, http.MethodDelete, "/api/user/alerts/delete-all?email=victim@example.com"},
+		"read":   {handler.GetUserAlerts, http.MethodGet, "/api/user/alerts?email=victim@example.com"},
+		"delete": {handler.DeleteUserAlert, http.MethodDelete, "/api/user/alerts/delete?email=victim@example.com"},
+		"delete all": {
+			handler.DeleteAllUserAlerts,
+			http.MethodDelete,
+			"/api/user/alerts/delete-all?email=victim@example.com",
+		},
 	}
 
 	for name, tc := range cases {

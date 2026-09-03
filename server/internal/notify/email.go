@@ -47,7 +47,7 @@ func (m *ResendMailer) Send(ctx context.Context, msg Email) error {
 		return fmt.Errorf("sending email: %w", err)
 	}
 
-	slog.Default().Info("email sent", "id", sent.Id, "subject", msg.Subject)
+	slog.Default().InfoContext(ctx, "email sent", "id", sent.Id, "subject", msg.Subject)
 
 	return nil
 }
@@ -65,8 +65,8 @@ func NewLogMailer(logger *slog.Logger) *LogMailer {
 }
 
 // Send logs the message instead of delivering it.
-func (m *LogMailer) Send(_ context.Context, msg Email) error {
-	m.logger.Info("email not sent (no mail provider configured)",
+func (m *LogMailer) Send(ctx context.Context, msg Email) error {
+	m.logger.InfoContext(ctx, "email not sent (no mail provider configured)",
 		"to", msg.To,
 		"subject", msg.Subject,
 		"body", msg.HTML,
