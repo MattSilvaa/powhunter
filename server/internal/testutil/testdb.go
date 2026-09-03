@@ -14,6 +14,30 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// requireDBEnv names the environment variable that makes a missing test database
+// a hard failure instead of a skip. CI must set it: an integration suite that
+// silently skips reports green while covering nothing.
+const requireDBEnv = "POWHUNTER_TEST_DB"
+
+func unavailable(t *testing.T, format string, args ...any) {
+	t.Helper()
+
+	if os.Getenv(requireDBEnv) != "" {
+		t.Fatalf("%s is set but the test database is unavailable: "+format, append([]any{requireDBEnv}, args...)...)
+	}
+
+	t.Skipf("Skipping integration test: "+format, args...)
+}
+
+// RunMigrations applies every migration to the given database.
+func RunMigrations(t *testing.T, database *sql.DB) {
+	t.Helper()
+
+	if err := db.Migrate(database); err != nil {
+		t.Fatalf("failed to run migrations: %v", err)
+	}
+}
+
 // TestDBConfig holds configuration for test database
 type TestDBConfig struct {
 	Host     string
@@ -53,7 +77,7 @@ func SetupTestDB(t *testing.T) (*sql.DB, *db.Store, func()) {
 
 	testDB, err := sql.Open("postgres", connStr)
 	if err != nil {
-		t.Skipf("Skipping integration test: cannot connect to test database: %v", err)
+		unavailable(t, "cannot connect to test database: %v", err)
 		return nil, nil, func() {}
 	}
 
@@ -62,9 +86,13 @@ func SetupTestDB(t *testing.T) (*sql.DB, *db.Store, func()) {
 
 	if err := testDB.PingContext(ctx); err != nil {
 		testDB.Close()
-		t.Skipf("Skipping integration test: test database not available: %v", err)
+		unavailable(t, "test database not available: %v", err)
 		return nil, nil, func() {}
 	}
+
+	// Bring the schema up to date before touching any table. The doc comment has
+	// always claimed this happened; until now it did not.
+	RunMigrations(t, testDB)
 
 	// Clean up existing data
 	cleanupDB(t, testDB)

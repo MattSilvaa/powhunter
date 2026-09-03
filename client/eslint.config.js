@@ -1,9 +1,9 @@
 import js from '@eslint/js'
-import tseslint from '@typescript-eslint/eslint-plugin'
-import tsparser from '@typescript-eslint/parser'
+import tseslint from 'typescript-eslint'
 import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
+import prettier from 'eslint-config-prettier'
+import globals from 'globals'
 
 export default [
 	{
@@ -13,7 +13,7 @@ export default [
 	{
 		files: ['**/*.{ts,tsx}'],
 		languageOptions: {
-			parser: tsparser,
+			parser: tseslint.parser,
 			parserOptions: {
 				ecmaVersion: 'latest',
 				sourceType: 'module',
@@ -22,26 +22,13 @@ export default [
 				},
 			},
 			globals: {
-				console: 'readonly',
-				window: 'readonly',
-				document: 'readonly',
-				navigator: 'readonly',
-				fetch: 'readonly',
-				localStorage: 'readonly',
-				sessionStorage: 'readonly',
-				HTMLElement: 'readonly',
-				HTMLInputElement: 'readonly',
-				HTMLTextAreaElement: 'readonly',
-				Event: 'readonly',
-				Response: 'readonly',
-				RequestCredentials: 'readonly',
+				...globals.browser,
 			},
 		},
 		plugins: {
-			'@typescript-eslint': tseslint,
+			'@typescript-eslint': tseslint.plugin,
 			react,
 			'react-hooks': reactHooks,
-			'react-refresh': reactRefresh,
 		},
 		settings: {
 			react: {
@@ -49,7 +36,10 @@ export default [
 			},
 		},
 		rules: {
-			...tseslint.configs.recommended.rules,
+			...tseslint.configs.recommended.reduce(
+				(acc, config) => ({ ...acc, ...config.rules }),
+				{}
+			),
 			...react.configs.recommended.rules,
 			...reactHooks.configs.recommended.rules,
 			'react/react-in-jsx-scope': 'off',
@@ -62,10 +52,6 @@ export default [
 					varsIgnorePattern: '^_',
 				},
 			],
-			'react-refresh/only-export-components': [
-				'warn',
-				{ allowConstantExport: true },
-			],
 			'react/no-unescaped-entities': 'off',
 		},
 	},
@@ -73,12 +59,10 @@ export default [
 		files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
 		languageOptions: {
 			globals: {
-				global: 'readonly',
-				setTimeout: 'readonly',
-				clearTimeout: 'readonly',
-				setInterval: 'readonly',
-				clearInterval: 'readonly',
+				...globals.node,
+				...globals.bun,
 			},
 		},
 	},
+	prettier,
 ]

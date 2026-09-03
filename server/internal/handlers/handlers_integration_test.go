@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package handlers
@@ -11,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	dbgen "github.com/MattSilvaa/powhunter/internal/db/generated"
 	"github.com/MattSilvaa/powhunter/internal/testutil"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -87,7 +88,7 @@ func TestAlertHandlerIntegration_CreateAlert(t *testing.T) {
 		assert.Equal(t, http.StatusCreated, rr.Code)
 
 		// Duplicate request
-		req2 := httptest.NewRequest(http.MethodPut, "/api/alert", bytes.NewReader(body))
+		req2 := httptest.NewRequest(http.MethodPost, "/api/alert", bytes.NewReader(body))
 		req2.Header.Set("Content-Type", "application/json")
 		rr2 := httptest.NewRecorder()
 
@@ -97,7 +98,7 @@ func TestAlertHandlerIntegration_CreateAlert(t *testing.T) {
 		var errorResponse ErrorResponse
 		err = json.NewDecoder(rr2.Body).Decode(&errorResponse)
 		require.NoError(t, err)
-		assert.Equal(t, "DUPLICATE_EMAIL", errorResponse.Error)
+		assert.Equal(t, "DUPLICATE_ALERT", errorResponse.Error)
 	})
 
 	t.Run("Invalid resort UUID returns error", func(t *testing.T) {
@@ -202,7 +203,7 @@ func TestEndToEndFlow_CreateAlertAndVerifyInDatabase(t *testing.T) {
 	body, err := json.Marshal(requestBody)
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodPut, "/api/alert", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/alert", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 

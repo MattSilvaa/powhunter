@@ -2,6 +2,7 @@ import { test, expect, describe, beforeEach, afterEach } from 'bun:test'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import ContactUs from './contactUs'
 
+const fetchStub = global as unknown as { fetch: unknown }
 const originalFetch = global.fetch
 
 describe('ContactUs Component', () => {
@@ -48,7 +49,7 @@ describe('ContactUs Component', () => {
 	})
 
 	test('shows loading state when submitting', async () => {
-		global.fetch = () =>
+		fetchStub.fetch = () =>
 			new Promise((resolve) =>
 				setTimeout(
 					() =>
@@ -80,7 +81,7 @@ describe('ContactUs Component', () => {
 	})
 
 	test('shows success message on successful submission', async () => {
-		global.fetch = () =>
+		fetchStub.fetch = () =>
 			Promise.resolve({
 				ok: true,
 				json: async () => ({}),
@@ -108,7 +109,7 @@ describe('ContactUs Component', () => {
 	})
 
 	test('shows error message on failed submission', async () => {
-		global.fetch = () =>
+		fetchStub.fetch = () =>
 			Promise.resolve({
 				ok: false,
 				json: async () => ({ message: 'Server error' }),
@@ -134,7 +135,7 @@ describe('ContactUs Component', () => {
 	})
 
 	test('clears form after successful submission', async () => {
-		global.fetch = () =>
+		fetchStub.fetch = () =>
 			Promise.resolve({
 				ok: true,
 				json: async () => ({}),
@@ -166,7 +167,7 @@ describe('ContactUs Component', () => {
 	})
 
 	test('disables form fields during submission', async () => {
-		global.fetch = () =>
+		fetchStub.fetch = () =>
 			new Promise((resolve) =>
 				setTimeout(
 					() =>

@@ -1,4 +1,4 @@
-.PHONY: dev dev-caddy build clean server client caddy db-setup db-migrate db-reset generate-db-code db-seed check-forecasts
+.PHONY: dev dev-caddy build clean server client caddy db-setup db-migrate db-drop generate-db-code db-seed test test-integration lint typecheck
 
 dev:
 	@echo "Starting development environment..."
@@ -16,7 +16,7 @@ build:
 
 clean:
 	@echo "Cleaning build artifacts..."
-	@rm -rf client/dist
+	@rm -rf client/build
 	@rm -rf server/bin
 
 server:
@@ -62,6 +62,19 @@ test:
 	@echo "Running tests..."
 	@cd server && go test ./...
 	@cd client && bun test
+
+test-integration:
+	@echo "Running integration tests (requires a running test database)..."
+	@cd server && POWHUNTER_TEST_DB=1 go test -tags=integration -count=1 ./...
+
+lint:
+	@echo "Linting..."
+	@cd server && golangci-lint run
+	@cd client && bun run lint
+
+typecheck:
+	@echo "Typechecking client..."
+	@cd client && bun run typecheck
 
 # Database commands
 db-setup:

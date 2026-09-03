@@ -14,7 +14,6 @@ import {
 	Notifications as NotificationsIcon,
 	Rocket as RocketIcon,
 } from '@mui/icons-material'
-import React from 'react'
 
 export default function Home() {
 	const theme = useTheme()

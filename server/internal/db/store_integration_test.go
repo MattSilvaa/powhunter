@@ -1,15 +1,17 @@
+//go:build integration
 // +build integration
 
-package db
+package db_test
 
 import (
 	"context"
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/MattSilvaa/powhunter/internal/db"
 	dbgen "github.com/MattSilvaa/powhunter/internal/db/generated"
 	"github.com/MattSilvaa/powhunter/internal/testutil"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -55,9 +57,12 @@ func TestStoreIntegration_CreateUserWithAlerts(t *testing.T) {
 		}
 	})
 
-	t.Run("Duplicate email returns error", func(t *testing.T) {
+	t.Run("Existing email reuses the user and rejects a duplicate alert", func(t *testing.T) {
 		ctx := context.Background()
 
+		// The same email must not create a second user; it reuses the existing one
+		// and then fails on the (user_uuid, resort_uuid) uniqueness constraint,
+		// which the handler maps to a 409 DUPLICATE_ALERT.
 		err := store.CreateUserWithAlerts(
 			ctx,
 			"test@example.com", // Same email
@@ -67,7 +72,7 @@ func TestStoreIntegration_CreateUserWithAlerts(t *testing.T) {
 			[]string{resort1.Uuid.String()},
 		)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "error creating user")
+		assert.Contains(t, err.Error(), "user_alerts_user_uuid_resort_uuid_key")
 	})
 }
 
@@ -125,7 +130,7 @@ func TestStoreIntegration_GetAlertMatches(t *testing.T) {
 		forecastDate := time.Now().Add(24 * time.Hour).Truncate(24 * time.Hour)
 
 		// Record first alert
-		firstMatch := AlertToSend{
+		firstMatch := db.AlertToSend{
 			UserUuid:     user.Uuid,
 			UserEmail:    user.Email,
 			UserPhone:    user.Phone.String,
@@ -159,7 +164,7 @@ func TestStoreIntegration_GetAlertMatches(t *testing.T) {
 		forecastDate := time.Now().Add(48 * time.Hour).Truncate(24 * time.Hour)
 
 		// Record first alert
-		firstMatch := AlertToSend{
+		firstMatch := db.AlertToSend{
 			UserUuid:     user.Uuid,
 			UserEmail:    user.Email,
 			UserPhone:    user.Phone.String,
@@ -199,7 +204,7 @@ func TestStoreIntegration_RecordAlertSent(t *testing.T) {
 		ctx := context.Background()
 		forecastDate := time.Now().Add(24 * time.Hour).Truncate(24 * time.Hour)
 
-		alertToSend := AlertToSend{
+		alertToSend := db.AlertToSend{
 			UserUuid:     user.Uuid,
 			UserEmail:    user.Email,
 			UserPhone:    user.Phone.String,

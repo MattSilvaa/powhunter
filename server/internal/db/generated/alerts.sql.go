@@ -203,7 +203,7 @@ SELECT ua.id,
        ua.min_snow_amount,
        ua.notification_days
 FROM user_alerts ua
-         JOIN users u ON ua.user_uuid = u.id
+         JOIN users u ON ua.user_uuid = u.uuid
          JOIN resorts r ON ua.resort_uuid = r.uuid
 WHERE ua.active = true
 `

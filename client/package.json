@@ -11,7 +11,8 @@
 		"lint": "bun x eslint .",
 		"serve": "bun x serve build/client -p 3000",
 		"start": "bun run serve",
-		"test": "bun test src/**/*.test.{ts,tsx}"
+		"test": "bun test src/**/*.test.{ts,tsx}",
+		"typecheck": "bun x tsc --noEmit"
 	},
 	"dependencies": {
 		"@emotion/react": "11.14.0",
