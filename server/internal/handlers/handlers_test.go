@@ -17,6 +17,12 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+// Valid resort identifiers for tests; CreateAlert rejects non-UUID values.
+const (
+	testResortUUID1 = "11111111-1111-4111-8111-111111111111"
+	testResortUUID2 = "22222222-2222-4222-8222-222222222222"
+)
+
 func testAlertHandler(t *testing.T) (*AlertHandler, *mocks.MockStoreService) {
 	ctrl := gomock.NewController(t)
 	mockStore := mocks.NewMockStoreService(ctrl)
@@ -58,17 +64,17 @@ func TestCreateAlert(t *testing.T) {
 				Phone:            "1234567890",
 				NotificationDays: 3,
 				MinSnowAmount:    5.0,
-				ResortsUuids:     []string{"resort1", "resort2"},
+				ResortsUuids:     []string{testResortUUID1, testResortUUID2},
 			},
 			setupMock: func(m *mocks.MockStoreService) {
 				m.EXPECT().
 					CreateUserWithAlerts(
 						gomock.Any(),
 						"test@example.com",
-						"1234567890",
+						"+11234567890",
 						5.0,
 						int32(3),
-						[]string{"resort1", "resort2"},
+						[]string{testResortUUID1, testResortUUID2},
 					).
 					Return(nil)
 			},
@@ -93,7 +99,7 @@ func TestCreateAlert(t *testing.T) {
 				Phone:            "1234567890",
 				NotificationDays: 3,
 				MinSnowAmount:    5.0,
-				ResortsUuids:     []string{"resort1"},
+				ResortsUuids:     []string{testResortUUID1},
 			},
 			setupMock: func(m *mocks.MockStoreService) {
 				// No calls expected
@@ -125,7 +131,7 @@ func TestCreateAlert(t *testing.T) {
 				Phone:            "1234567890",
 				NotificationDays: 3,
 				MinSnowAmount:    5.0,
-				ResortsUuids:     []string{"resort1"},
+				ResortsUuids:     []string{testResortUUID1},
 			},
 			setupMock: func(m *mocks.MockStoreService) {
 				// No calls expected
@@ -133,7 +139,7 @@ func TestCreateAlert(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 			expectedError: &ErrorResponse{
 				Error:   "MISSING_EMAIL",
-				Message: "Email is required",
+				Message: "Please enter a valid email address",
 			},
 		},
 		{
@@ -144,7 +150,7 @@ func TestCreateAlert(t *testing.T) {
 				Phone:            "", // Empty phone
 				NotificationDays: 3,
 				MinSnowAmount:    5.0,
-				ResortsUuids:     []string{"resort1"},
+				ResortsUuids:     []string{testResortUUID1},
 			},
 			setupMock: func(m *mocks.MockStoreService) {
 				// No calls expected
@@ -152,7 +158,7 @@ func TestCreateAlert(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 			expectedError: &ErrorResponse{
 				Error:   "MISSING_PHONE",
-				Message: "Phone number is required",
+				Message: "Please enter a valid phone number",
 			},
 		},
 		{
@@ -182,7 +188,7 @@ func TestCreateAlert(t *testing.T) {
 				Phone:            "1234567890",
 				NotificationDays: 3,
 				MinSnowAmount:    5.0,
-				ResortsUuids:     []string{"resort1"},
+				ResortsUuids:     []string{testResortUUID1},
 			},
 			setupMock: func(m *mocks.MockStoreService) {
 				pqErr := &pq.Error{
@@ -193,10 +199,10 @@ func TestCreateAlert(t *testing.T) {
 					CreateUserWithAlerts(
 						gomock.Any(),
 						"existing@example.com",
-						"1234567890",
+						"+11234567890",
 						5.0,
 						int32(3),
-						[]string{"resort1"},
+						[]string{testResortUUID1},
 					).
 					Return(pqErr)
 			},
@@ -214,17 +220,17 @@ func TestCreateAlert(t *testing.T) {
 				Phone:            "1234567890",
 				NotificationDays: 3,
 				MinSnowAmount:    5.0,
-				ResortsUuids:     []string{"resort1"},
+				ResortsUuids:     []string{testResortUUID1},
 			},
 			setupMock: func(m *mocks.MockStoreService) {
 				m.EXPECT().
 					CreateUserWithAlerts(
 						gomock.Any(),
 						"test@example.com",
-						"1234567890",
+						"+11234567890",
 						5.0,
 						int32(3),
-						[]string{"resort1"},
+						[]string{testResortUUID1},
 					).
 					Return(errors.New("database error"))
 			},

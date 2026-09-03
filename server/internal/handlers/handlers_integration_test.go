@@ -101,7 +101,9 @@ func TestAlertHandlerIntegration_CreateAlert(t *testing.T) {
 		assert.Equal(t, "DUPLICATE_ALERT", errorResponse.Error)
 	})
 
-	t.Run("Invalid resort UUID returns error", func(t *testing.T) {
+	// A malformed resort identifier is a client mistake. It previously reached
+	// the database and surfaced as a 500.
+	t.Run("Invalid resort UUID is rejected as a bad request", func(t *testing.T) {
 		requestBody := CreateAlertRequest{
 			Email:            "invalidresort@test.com",
 			Phone:            "+15551111111",
@@ -118,7 +120,7 @@ func TestAlertHandlerIntegration_CreateAlert(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		handler.CreateAlert(rr, req)
-		assert.Equal(t, http.StatusInternalServerError, rr.Code)
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
 	})
 }
 

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/MattSilvaa/powhunter/internal/db"
+	"github.com/MattSilvaa/powhunter/internal/validate"
+	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
 
@@ -54,6 +56,31 @@ const handlerTimeout = 10 * time.Second
 // Store returns the store used by the handlers.
 func (h *Handlers) Store() *db.Store {
 	return h.store
+}
+
+// decodeJSON reads a JSON body, rejecting unknown fields so a typo in a client
+// payload is reported rather than silently ignored.
+func decodeJSON(r *http.Request, target any) error {
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(target); err != nil {
+		return fmt.Errorf("decoding request body: %w", err)
+	}
+
+	return nil
+}
+
+// sendDecodeError distinguishes a body that exceeded the configured limit from
+// one that was merely malformed.
+func sendDecodeError(w http.ResponseWriter, err error) {
+	var maxBytesErr *http.MaxBytesError
+	if errors.As(err, &maxBytesErr) {
+		sendErrorResponse(w, "REQUEST_TOO_LARGE", "Request body is too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+
+	sendErrorResponse(w, "INVALID_REQUEST", "Invalid request body", http.StatusBadRequest)
 }
 
 func setSecurityHeaders(w http.ResponseWriter) {
@@ -161,9 +188,9 @@ func (h *AlertHandler) GetUserAlerts(w http.ResponseWriter, r *http.Request) {
 
 	setSecurityHeaders(w)
 
-	email := r.URL.Query().Get("email")
-	if email == "" {
-		sendErrorResponse(w, "MISSING_EMAIL", "Email parameter is required", http.StatusBadRequest)
+	email, err := validate.Email(r.URL.Query().Get("email"))
+	if err != nil {
+		sendErrorResponse(w, "MISSING_EMAIL", "A valid email parameter is required", http.StatusBadRequest)
 		return
 	}
 
@@ -193,9 +220,9 @@ func (h *AlertHandler) DeleteUserAlert(w http.ResponseWriter, r *http.Request) {
 
 	setSecurityHeaders(w)
 
-	email := r.URL.Query().Get("email")
-	if email == "" {
-		sendErrorResponse(w, "MISSING_EMAIL", "Email parameter is required", http.StatusBadRequest)
+	email, err := validate.Email(r.URL.Query().Get("email"))
+	if err != nil {
+		sendErrorResponse(w, "MISSING_EMAIL", "A valid email parameter is required", http.StatusBadRequest)
 		return
 	}
 
@@ -208,7 +235,7 @@ func (h *AlertHandler) DeleteUserAlert(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), handlerTimeout)
 	defer cancel()
 
-	err := h.store.DeleteUserAlert(ctx, email, resortUuid)
+	err = h.store.DeleteUserAlert(ctx, email, resortUuid)
 	if err != nil {
 		log.Printf("Failed to delete user alert: %v", err)
 		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to delete alert", http.StatusInternalServerError)
@@ -233,16 +260,16 @@ func (h *AlertHandler) DeleteAllUserAlerts(w http.ResponseWriter, r *http.Reques
 
 	setSecurityHeaders(w)
 
-	email := r.URL.Query().Get("email")
-	if email == "" {
-		sendErrorResponse(w, "MISSING_EMAIL", "Email parameter is required", http.StatusBadRequest)
+	email, err := validate.Email(r.URL.Query().Get("email"))
+	if err != nil {
+		sendErrorResponse(w, "MISSING_EMAIL", "A valid email parameter is required", http.StatusBadRequest)
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), handlerTimeout)
 	defer cancel()
 
-	err := h.store.DeleteAllUserAlerts(ctx, email)
+	err = h.store.DeleteAllUserAlerts(ctx, email)
 	if err != nil {
 		log.Printf("Failed to delete all user alerts: %v", err)
 		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to delete alerts", http.StatusInternalServerError)
@@ -268,18 +295,20 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 	setSecurityHeaders(w)
 
 	var req CreateAlertRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendErrorResponse(w, "INVALID_REQUEST", "Invalid request body", http.StatusBadRequest)
+	if err := decodeJSON(r, &req); err != nil {
+		sendDecodeError(w, err)
 		return
 	}
 
-	if req.Email == "" {
-		sendErrorResponse(w, "MISSING_EMAIL", "Email is required", http.StatusBadRequest)
+	email, err := validate.Email(req.Email)
+	if err != nil {
+		sendErrorResponse(w, "MISSING_EMAIL", "Please enter a valid email address", http.StatusBadRequest)
 		return
 	}
 
-	if req.Phone == "" {
-		sendErrorResponse(w, "MISSING_PHONE", "Phone number is required", http.StatusBadRequest)
+	phone, err := validate.Phone(req.Phone)
+	if err != nil {
+		sendErrorResponse(w, "MISSING_PHONE", "Please enter a valid phone number", http.StatusBadRequest)
 		return
 	}
 
@@ -288,13 +317,35 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(req.ResortsUuids) > validate.MaxResortsPerRequest {
+		sendErrorResponse(w, "VALIDATION_ERROR", "Too many resorts selected", http.StatusBadRequest)
+		return
+	}
+
+	if daysErr := validate.NotificationDays(req.NotificationDays); daysErr != nil {
+		sendErrorResponse(w, "VALIDATION_ERROR", "Notification days must be between 1 and 10", http.StatusBadRequest)
+		return
+	}
+
+	if snowErr := validate.SnowAmount(req.MinSnowAmount); snowErr != nil {
+		sendErrorResponse(w, "VALIDATION_ERROR", "Snow amount must be between 0.5 and 24 inches", http.StatusBadRequest)
+		return
+	}
+
+	for _, resortUUID := range req.ResortsUuids {
+		if _, parseErr := uuid.Parse(resortUUID); parseErr != nil {
+			sendErrorResponse(w, "VALIDATION_ERROR", "One of the selected resorts is not valid", http.StatusBadRequest)
+			return
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), handlerTimeout)
 	defer cancel()
 
-	err := h.store.CreateUserWithAlerts(
+	err = h.store.CreateUserWithAlerts(
 		ctx,
-		req.Email,
-		req.Phone,
+		email,
+		phone,
 		req.MinSnowAmount,
 		int32(req.NotificationDays),
 		req.ResortsUuids,
@@ -332,13 +383,10 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	err = json.NewEncoder(w).Encode(map[string]string{
+	if encodeErr := json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "Alert created successfully",
-	})
-
-	if err != nil {
-		log.Printf("Failed to write response: %v", err)
-		return
+	}); encodeErr != nil {
+		log.Printf("Failed to write response: %v", encodeErr)
 	}
 }

@@ -62,6 +62,11 @@ func NewStore(db *sql.DB) *Store {
 	}
 }
 
+// DB exposes the underlying pool for health checks and metrics.
+func (s *Store) DB() *sql.DB {
+	return s.db
+}
+
 func (s *Store) ExecTx(ctx context.Context, fn func(*dbgen.Queries) error) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

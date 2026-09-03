@@ -66,7 +66,7 @@ func TestContactHandler_HandleContact(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 			expectedError: &ErrorResponse{
 				Error:   "MISSING_NAME",
-				Message: "Name is required",
+				Message: "Please enter your name",
 			},
 		},
 		{
@@ -79,8 +79,8 @@ func TestContactHandler_HandleContact(t *testing.T) {
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedError: &ErrorResponse{
-				Error:   "MISSING_EMAIL",
-				Message: "Email is required",
+				Error:   "INVALID_EMAIL",
+				Message: "Please enter a valid email address",
 			},
 		},
 		{
@@ -94,7 +94,7 @@ func TestContactHandler_HandleContact(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 			expectedError: &ErrorResponse{
 				Error:   "MISSING_MESSAGE",
-				Message: "Message is required",
+				Message: "Please enter a message",
 			},
 		},
 		{
@@ -108,7 +108,7 @@ func TestContactHandler_HandleContact(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 			expectedError: &ErrorResponse{
 				Error:   "INVALID_EMAIL",
-				Message: "Invalid email address",
+				Message: "Please enter a valid email address",
 			},
 		},
 		{
@@ -122,7 +122,7 @@ func TestContactHandler_HandleContact(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 			expectedError: &ErrorResponse{
 				Error:   "MISSING_NAME",
-				Message: "Name is required",
+				Message: "Please enter your name",
 			},
 		},
 	}

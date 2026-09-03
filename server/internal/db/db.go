@@ -4,63 +4,57 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
 	"time"
+
+	"github.com/MattSilvaa/powhunter/internal/config"
 
 	_ "github.com/lib/pq"
 )
 
 const (
-	dbTimeout = 10 * time.Second
+	dbTimeout       = 10 * time.Second
+	maxOpenConns    = 25
+	maxIdleConns    = 25
+	connMaxLifetime = 5 * time.Minute
+	connMaxIdleTime = 2 * time.Minute
 )
 
+// New opens a verified connection pool using the process configuration.
+//
+// Credentials come from config.Load, which refuses to fall back to defaults in
+// production. Previously a missing DB_PASSWORD silently connected with a
+// well-known credential instead of failing.
 func New() (*sql.DB, error) {
-	dbUser := os.Getenv("DB_USER")
-	if dbUser == "" {
-		dbUser = "powhunter_rw"
-	}
-
-	dbPassword := os.Getenv("DB_PASSWORD")
-	if dbPassword == "" {
-		dbPassword = "powhunter_rw"
-	}
-
-	dbHost := os.Getenv("DB_HOST")
-	if dbHost == "" {
-		dbHost = "localhost"
-	}
-
-	dbPort := os.Getenv("DB_PORT")
-	if dbPort == "" {
-		dbPort = "5432"
-	}
-
-	dbName := os.Getenv("DB_NAME")
-	if dbName == "" {
-		dbName = "powhunter"
-	}
-
-	connStr := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		dbHost, dbPort, dbUser, dbPassword, dbName,
-	)
-
-	db, err := sql.Open("postgres", connStr)
+	cfg, err := config.Load()
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database connection: %w", err)
+		return nil, fmt.Errorf("loading configuration: %w", err)
 	}
 
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(25)
-	db.SetConnMaxLifetime(5 * time.Minute)
+	return Open(cfg.Database)
+}
 
-	// Verify the connection
+// Open connects to the given database and verifies the connection.
+func Open(settings config.Database) (*sql.DB, error) {
+	database, openErr := sql.Open("postgres", settings.DSN())
+	if openErr != nil {
+		return nil, fmt.Errorf("failed to open database connection: %w", openErr)
+	}
+
+	database.SetMaxOpenConns(maxOpenConns)
+	database.SetMaxIdleConns(maxIdleConns)
+	database.SetConnMaxLifetime(connMaxLifetime)
+	database.SetConnMaxIdleTime(connMaxIdleTime)
+
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
-	if err := db.PingContext(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ping database: %w", err)
+	if pingErr := database.PingContext(ctx); pingErr != nil {
+		if closeErr := database.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to ping database (%w) and to close it: %w", pingErr, closeErr)
+		}
+
+		return nil, fmt.Errorf("failed to ping database: %w", pingErr)
 	}
 
-	return db, nil
+	return database, nil
 }
