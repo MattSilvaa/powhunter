@@ -96,21 +96,21 @@ func main() {
 				}
 
 				message := notify.FormatSnowAlertMessage(alert)
-				if err := twilioClient.SendSMS(alert.UserPhone, message); err != nil {
+				if sendErr := twilioClient.SendSMS(alert.UserPhone, message); sendErr != nil {
 					// Do not record history for an alert that was never delivered,
 					// otherwise the user silently misses this storm entirely.
-					log.Printf("Error sending SMS to %s: %v", alert.UserPhone, err)
+					log.Printf("Error sending SMS to %s: %v", alert.UserPhone, sendErr)
 					continue
 				}
 
 				log.Printf("Sent SMS alert to %s for %s", alert.UserPhone, alert.ResortName)
 
-				if err := store.RecordAlertSent(ctx, alert); err != nil {
+				if recordErr := store.RecordAlertSent(ctx, alert); recordErr != nil {
 					// The SMS is already delivered. Failing to record it means the next
 					// run will send a duplicate, so surface this distinctly.
 					log.Printf(
 						"CRITICAL: SMS delivered to %s for %s but recording history failed, next run may duplicate: %v",
-						alert.UserPhone, alert.ResortName, err,
+						alert.UserPhone, alert.ResortName, recordErr,
 					)
 				}
 			}

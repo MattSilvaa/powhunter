@@ -47,6 +47,10 @@ type Handlers struct {
 
 var METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
 
+// handlerTimeout bounds how long a single request may occupy a database
+// connection. The pool is small, so a long timeout here starves the API.
+const handlerTimeout = 10 * time.Second
+
 // Store returns the store used by the handlers.
 func (h *Handlers) Store() *db.Store {
 	return h.store
@@ -116,7 +120,7 @@ func (h *ResortHandler) ListAllResorts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), handlerTimeout)
 	defer cancel()
 
 	setSecurityHeaders(w)
@@ -163,7 +167,7 @@ func (h *AlertHandler) GetUserAlerts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), handlerTimeout)
 	defer cancel()
 
 	alerts, err := h.store.GetUserAlertsByEmail(ctx, email)
@@ -201,7 +205,7 @@ func (h *AlertHandler) DeleteUserAlert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), handlerTimeout)
 	defer cancel()
 
 	err := h.store.DeleteUserAlert(ctx, email, resortUuid)
@@ -213,11 +217,11 @@ func (h *AlertHandler) DeleteUserAlert(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]string{
+	if encodeErr := json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "Alert deleted successfully",
-	}); err != nil {
-		log.Printf("Failed to encode delete response: %v", err)
+	}); encodeErr != nil {
+		log.Printf("Failed to encode delete response: %v", encodeErr)
 	}
 }
 
@@ -235,7 +239,7 @@ func (h *AlertHandler) DeleteAllUserAlerts(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), handlerTimeout)
 	defer cancel()
 
 	err := h.store.DeleteAllUserAlerts(ctx, email)
@@ -247,11 +251,11 @@ func (h *AlertHandler) DeleteAllUserAlerts(w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]string{
+	if encodeErr := json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "All alerts deleted successfully",
-	}); err != nil {
-		log.Printf("Failed to encode delete-all response: %v", err)
+	}); encodeErr != nil {
+		log.Printf("Failed to encode delete-all response: %v", encodeErr)
 	}
 }
 
@@ -284,7 +288,7 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), handlerTimeout)
 	defer cancel()
 
 	err := h.store.CreateUserWithAlerts(

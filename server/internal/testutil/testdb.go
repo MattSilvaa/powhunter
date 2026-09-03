@@ -19,7 +19,7 @@ import (
 // silently skips reports green while covering nothing.
 const requireDBEnv = "POWHUNTER_TEST_DB"
 
-func unavailable(t *testing.T, format string, args ...any) {
+func unavailablef(t *testing.T, format string, args ...any) {
 	t.Helper()
 
 	if os.Getenv(requireDBEnv) != "" {
@@ -77,7 +77,7 @@ func SetupTestDB(t *testing.T) (*sql.DB, *db.Store, func()) {
 
 	testDB, err := sql.Open("postgres", connStr)
 	if err != nil {
-		unavailable(t, "cannot connect to test database: %v", err)
+		unavailablef(t, "cannot connect to test database: %v", err)
 		return nil, nil, func() {}
 	}
 
@@ -86,7 +86,7 @@ func SetupTestDB(t *testing.T) (*sql.DB, *db.Store, func()) {
 
 	if err := testDB.PingContext(ctx); err != nil {
 		testDB.Close()
-		unavailable(t, "test database not available: %v", err)
+		unavailablef(t, "test database not available: %v", err)
 		return nil, nil, func() {}
 	}
 

@@ -1,3 +1,4 @@
+//nolint:testpackage // constructs TwilioClient with its unexported api seam
 package notify
 
 import (
@@ -50,8 +51,8 @@ func TestSendSMSRejectsEmptyInput(t *testing.T) {
 	api := &fakeMessageAPI{}
 	client := &TwilioClient{fromNumber: "+15550000000", api: api}
 
-	assert.Error(t, client.SendSMS("", "body"))
-	assert.Error(t, client.SendSMS("+15551234567", ""))
+	require.Error(t, client.SendSMS("", "body"))
+	require.Error(t, client.SendSMS("+15551234567", ""))
 	assert.Zero(t, api.calls, "no request should reach Twilio for invalid input")
 }
 
