@@ -27,6 +27,26 @@ CREATE INDEX idx_sessions_user_uuid ON sessions(user_uuid);
 -- Supports reaping expired sessions without a full scan.
 CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
 
+-- Rows predating the application's validation can sit outside the bounds below,
+-- and adding a CHECK that existing data violates fails the whole migration.
+-- Production had three alerts stored with a zero threshold, from before signup
+-- enforced a minimum. Bring them to the smallest value the application itself
+-- allows, the same clean-then-constrain order used for alert_history further
+-- down. Zero meant "alert on any forecast", which is what the bound exists to
+-- prevent.
+UPDATE user_alerts
+SET min_snow_amount = 0.5
+WHERE min_snow_amount <= 0;
+
+UPDATE user_alerts
+SET min_snow_amount = 100
+WHERE min_snow_amount > 100;
+
+UPDATE user_alerts
+SET notification_days = LEAST(GREATEST(notification_days, 1), 30)
+WHERE notification_days < 1
+   OR notification_days > 30;
+
 -- Bound the alert preferences at the database level so an out-of-range value
 -- cannot be stored even if a future caller skips validation. A zero or negative
 -- threshold would alert on every forecast.
