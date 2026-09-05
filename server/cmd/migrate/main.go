@@ -16,15 +16,15 @@ import (
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	if err := run(); err != nil {
+	if err := run(logger); err != nil {
+		// A non-zero exit is what makes this usable as a deploy gate: the
+		// release stops rather than serving against a schema it does not have.
 		logger.Error("migration failed", "error", err)
 		os.Exit(1)
 	}
-
-	logger.Info("migrations applied")
 }
 
-func run() error {
+func run(logger *slog.Logger) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
@@ -36,5 +36,17 @@ func run() error {
 	}
 	defer conn.Close()
 
-	return db.Migrate(conn)
+	from, to, err := db.MigrateToLatest(conn)
+	if err != nil {
+		return err
+	}
+
+	if from == to {
+		logger.Info("schema already up to date", "version", to)
+		return nil
+	}
+
+	logger.Info("migrations applied", "from_version", from, "to_version", to)
+
+	return nil
 }
