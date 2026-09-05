@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
 
   prometheus:
-    image: prom/prometheus:v3.1.0
+    image: prom/prometheus:v3
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=15d
@@ -38,7 +38,7 @@ services:
     restart: unless-stopped
 
   alertmanager:
-    image: prom/alertmanager:v0.28.0
+    image: prom/alertmanager:latest
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
     volumes:
@@ -48,13 +48,13 @@ services:
     restart: unless-stopped
 
   pushgateway:
-    image: prom/pushgateway:v1.11.0
+    image: prom/pushgateway:v1
     ports:
       - "127.0.0.1:9091:9091"
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:11.5.1
+    image: grafana/grafana:13.0-slim
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
