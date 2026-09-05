@@ -44,7 +44,7 @@ groups:
           description: "The API cannot reach its database."
 
       - alert: DatabasePoolSaturated
-        expr: rate(powhunter_blocked_seconds_total[5m]) > 0.1
+        expr: rate(powhunter_wait_duration_seconds_total[5m]) > 0.1
         for: 5m
         labels:
           severity: warning

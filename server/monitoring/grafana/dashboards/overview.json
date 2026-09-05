@@ -147,7 +147,7 @@
       },
       "targets": [
         {
-          "expr": "powhunter_open_connections",
+          "expr": "powhunter_in_use_connections",
           "legendFormat": "open",
           "refId": "A"
         }
@@ -175,7 +175,7 @@
       },
       "targets": [
         {
-          "expr": "rate(powhunter_blocked_seconds_total[5m])",
+          "expr": "rate(powhunter_wait_duration_seconds_total[5m])",
           "legendFormat": "blocked seconds/s",
           "refId": "A"
         }

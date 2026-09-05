@@ -1,6 +1,10 @@
 # Alertmanager needs a real receiver to be useful. Set ALERT_WEBHOOK_URL to a
 # Slack incoming webhook, an email relay, or a paging integration before relying
 # on this: with an unroutable receiver, alerts fire and are silently dropped.
+#
+# __ALERT_WEBHOOK_URL__ is replaced at start-up by entrypoint.sh. Alertmanager
+# does not expand environment variables, so referencing ${ALERT_WEBHOOK_URL}
+# here directly would post every alert to that literal string.
 global:
   resolve_timeout: 5m
 
@@ -19,7 +23,7 @@ route:
 receivers:
   - name: default
     webhook_configs:
-      - url: '${ALERT_WEBHOOK_URL}'
+      - url: '__ALERT_WEBHOOK_URL__'
         send_resolved: true
 
 inhibit_rules:
