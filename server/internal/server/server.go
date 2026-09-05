@@ -40,7 +40,9 @@ func New(deps Deps) (http.Handler, func()) {
 	// database would turn a brief database blip into a restart loop.
 	mux.Handle("GET /health", deps.Metrics.Instrument("health", http.HandlerFunc(healthHandler)))
 	mux.Handle("GET /ready", deps.Metrics.Instrument("ready", readyHandler(deps.DB)))
-	mux.Handle("GET /metrics", deps.Metrics.Handler())
+	// Only a scraper needs this, and it maps the service: request counts, route
+	// names and database pool statistics. It was served to anyone who asked.
+	mux.Handle("GET /metrics", middleware.RequireBearerToken(deps.Config.MetricsToken)(deps.Metrics.Handler()))
 
 	writeLimiter := middleware.NewRateLimiter(middleware.RateLimitConfig{
 		RequestsPerSecond: deps.Config.WriteRatePerSec,
