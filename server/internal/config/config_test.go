@@ -139,3 +139,28 @@ func TestDevelopmentKeepsConvenientDefaults(t *testing.T) {
 	assert.Equal(t, "disable", cfg.Database.SSLMode)
 	assert.False(t, cfg.IsProduction())
 }
+
+// The deployed web app and API are on different sites, so production has to
+// issue a cross-site session cookie by default: getting this wrong makes every
+// sign-in link appear to work and leave the user signed out.
+func TestCookieCrossSiteDefaultsToProduction(t *testing.T) {
+	setProductionEnv(t)
+
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	assert.True(t, cfg.CookieCrossSite)
+}
+
+func TestCookieCrossSiteIsOffInDevelopmentAndOverridable(t *testing.T) {
+	t.Setenv("ENVIRONMENT", "development")
+
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	assert.False(t, cfg.CookieCrossSite)
+
+	t.Setenv("COOKIE_CROSS_SITE", "true")
+
+	cfg, err = config.Load()
+	require.NoError(t, err)
+	assert.True(t, cfg.CookieCrossSite)
+}

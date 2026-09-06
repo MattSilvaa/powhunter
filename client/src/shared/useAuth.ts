@@ -67,17 +67,36 @@ export function useCompleteLogin() {
 	const queryClient = useQueryClient()
 
 	const { mutate, isPending, isError, error } = useMutation<
-		void,
+		AuthUser,
 		Error,
 		string
 	>({
-		mutationFn: (token: string) =>
-			apiRequest<void>('/api/auth/callback', {
+		// Redeeming the token is only half the job: the session lives in a cookie
+		// the browser may decline to keep, and a 200 here says nothing about that.
+		// Reading the session back proves the sign-in actually took, and leaves
+		// the user in the cache so the page we navigate to sees them immediately
+		// rather than reading a stale null and bouncing back to sign-in.
+		mutationFn: async (token: string) => {
+			await apiRequest<void>('/api/auth/callback', {
 				method: 'POST',
 				body: { token },
-			}),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY })
+			})
+
+			const user = await queryClient.fetchQuery({
+				queryKey: AUTH_QUERY_KEY,
+				queryFn: fetchCurrentUser,
+				staleTime: 0,
+			})
+
+			if (!user) {
+				throw new ApiError(
+					'Signed in, but your browser did not keep the session. Check that cookies are enabled and try the link again.',
+					0,
+					'SESSION_NOT_STORED'
+				)
+			}
+
+			return user
 		},
 	})
 

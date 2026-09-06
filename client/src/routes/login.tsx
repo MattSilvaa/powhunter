@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
 	Alert,
 	Box,
@@ -37,12 +37,19 @@ export default function LoginPage() {
 	const [email, setEmail] = useState('')
 	const [emailError, setEmailError] = useState('')
 
+	// A sign-in link works exactly once, so it must be redeemed exactly once. In
+	// development React mounts effects twice, and any remount would otherwise
+	// spend the token a second time and report it as already used.
+	const redeemedToken = useRef<string | null>(null)
+
 	// Arriving with a token in the URL means the user clicked the emailed link,
 	// so redeem it and send them on to their subscriptions.
 	useEffect(() => {
-		if (!token) {
+		if (!token || redeemedToken.current === token) {
 			return
 		}
+
+		redeemedToken.current = token
 
 		completeLogin(token, {
 			onSuccess: () => {

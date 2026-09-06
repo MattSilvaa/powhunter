@@ -1,5 +1,9 @@
 import { test, expect, describe, afterEach } from 'bun:test'
+import React from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { renderHook, waitFor } from '@testing-library/react'
 import { ApiError, apiRequest, retryOnlyTransport } from './apiClient.ts'
+import { useCompleteLogin } from './useAuth.ts'
 
 const fetchStub = globalThis as unknown as { fetch: unknown }
 const originalFetch = globalThis.fetch
@@ -82,5 +86,64 @@ describe('authenticated requests', () => {
 
 		expect(calls[0].init.method).toBe('POST')
 		expect(calls[0].init.body).toBe(JSON.stringify({ token: 'abc123' }))
+	})
+})
+
+describe('completing a sign-in link', () => {
+	const renderCompleteLogin = () => {
+		const client = new QueryClient({
+			defaultOptions: { queries: { retry: false } },
+		})
+
+		return renderHook(() => useCompleteLogin(), {
+			wrapper: ({ children }) =>
+				React.createElement(QueryClientProvider, { client }, children),
+		})
+	}
+
+	// The callback returning 200 does not mean the browser kept the session
+	// cookie. Navigating on that alone lands on a page that reads "signed out"
+	// and bounces straight back to the sign-in form, with nothing explaining why.
+	test('resolves only once the session reads back as signed in', async () => {
+		const calls = captureRequests('', 200)
+		fetchStub.fetch = (url: string, init: RequestInit) => {
+			calls.push({ url, init })
+
+			if (url.endsWith('/api/auth/me')) {
+				return Promise.resolve(
+					new Response(JSON.stringify({ email: 'a@b.com' }), { status: 200 })
+				)
+			}
+
+			return Promise.resolve(new Response('', { status: 200 }))
+		}
+
+		const { result } = renderCompleteLogin()
+		result.current.completeLogin('token-123')
+
+		await waitFor(() => expect(result.current.loading).toBe(false))
+
+		expect(result.current.error).toBeNull()
+		expect(calls.map((call) => new URL(call.url).pathname)).toEqual([
+			'/api/auth/callback',
+			'/api/auth/me',
+		])
+	})
+
+	test('reports a session the browser did not keep', async () => {
+		fetchStub.fetch = (url: string) =>
+			Promise.resolve(
+				url.endsWith('/api/auth/me')
+					? new Response(JSON.stringify({ error: 'UNAUTHENTICATED' }), {
+							status: 401,
+						})
+					: new Response('', { status: 200 })
+			)
+
+		const { result } = renderCompleteLogin()
+		result.current.completeLogin('token-123')
+
+		await waitFor(() => expect(result.current.error).not.toBeNull())
+		expect(result.current.error).toContain('did not keep the session')
 	})
 })

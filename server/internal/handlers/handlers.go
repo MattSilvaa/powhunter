@@ -147,7 +147,7 @@ func NewHandlers(cfg config.Config, logger *slog.Logger) (*Handlers, error) {
 		return nil, err
 	}
 
-	authService := auth.NewService(store.Queries(), cfg.IsProduction())
+	authService := auth.NewService(store.Queries(), cfg.IsProduction(), cfg.CookieCrossSite)
 
 	return &Handlers{
 		Resort:  resortHandler,

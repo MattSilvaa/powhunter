@@ -74,6 +74,7 @@ type Config struct {
 	LoginRatePerSec   float64
 	LoginRateBurst    int
 	AppBaseURL        string
+	CookieCrossSite   bool
 	MailFrom          string
 	SupportEmail      string
 	ResendAPIKey      string
@@ -118,10 +119,14 @@ func Load() (Config, error) {
 		LoginRatePerSec:   envFloat("LOGIN_RATE_LIMIT_PER_SECOND", defaultLoginRatePerSec),
 		LoginRateBurst:    envInt("LOGIN_RATE_LIMIT_BURST", defaultLoginRateBurst),
 		AppBaseURL:        strings.TrimRight(envOrDefault("APP_BASE_URL", defaultAppBaseURL), "/"),
-		MailFrom:          envOrDefault("MAIL_FROM", defaultMailFrom),
-		SupportEmail:      envOrDefault("SUPPORT_EMAIL", defaultSupportEmail),
-		ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
-		MetricsToken:      os.Getenv("METRICS_TOKEN"),
+		// The deployed web app and this API are served from different sites, so
+		// the session cookie has to be issued for cross-site use. A same-origin
+		// deployment can turn this off and get the stricter default back.
+		CookieCrossSite: envBool("COOKIE_CROSS_SITE", isProduction),
+		MailFrom:        envOrDefault("MAIL_FROM", defaultMailFrom),
+		SupportEmail:    envOrDefault("SUPPORT_EMAIL", defaultSupportEmail),
+		ResendAPIKey:    os.Getenv("RESEND_API_KEY"),
+		MetricsToken:    os.Getenv("METRICS_TOKEN"),
 		Database: Database{
 			Host:     envOrDefault("DB_HOST", defaultDBHost),
 			Port:     envOrDefault("DB_PORT", defaultDBPort),
