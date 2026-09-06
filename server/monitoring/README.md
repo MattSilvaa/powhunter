@@ -61,7 +61,14 @@ them at start-up:
 | `PUSHGATEWAY_TARGET` | prometheus | `pushgateway:9091` locally; on Render supplied by `fromService` |
 | `ALERTMANAGER_TARGET` | prometheus | `alertmanager:9093` locally; on Render supplied by `fromService` |
 | `ALERT_WEBHOOK_URL` | alertmanager | Where alerts are delivered |
-| `PUSHGATEWAY_URL` | forecaster cron | The Pushgateway's **internal address from its Render dashboard**, e.g. `http://pushgateway-cyuc:10000`; unset, run metrics go nowhere |
+| `PUSHGATEWAY_URL` | forecaster cron | The Pushgateway's **internal address from its Render dashboard**, e.g. `http://pushgateway-cyuc:9091`; unset, run metrics go nowhere |
+
+The cron is not in `render.yaml`, so it cannot use `fromService` and the address
+has to be copied by hand. Take the port from Prometheus's start-up line
+(`scraping … pushgateway=…`) rather than from the service page: Render shows
+`:10000` there while the service actually listens on 9091, which is the port
+`fromService` reports and the one Prometheus is scraping. Push to a different
+port than Prometheus scrapes and the metrics land nowhere anything reads.
 
 ## Checking it actually works
 
