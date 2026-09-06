@@ -75,15 +75,19 @@ type User struct {
 
 // Service issues and validates login tokens and sessions.
 type Service struct {
-	queries Queries
-	secure  bool
-	now     func() time.Time
+	queries   Queries
+	secure    bool
+	crossSite bool
+	now       func() time.Time
 }
 
 // NewService builds a Service. Pass secure=true in production so the session
-// cookie is only ever sent over TLS.
-func NewService(queries Queries, secure bool) *Service {
-	return &Service{queries: queries, secure: secure, now: time.Now}
+// cookie is only ever sent over TLS, and crossSite=true when the browser app is
+// served from a different site than this API: a browser silently discards a
+// SameSite=Lax cookie that arrives on a cross-site request, so the login would
+// appear to succeed and leave the caller signed out.
+func NewService(queries Queries, secure, crossSite bool) *Service {
+	return &Service{queries: queries, secure: secure, crossSite: crossSite, now: time.Now}
 }
 
 // newToken returns a URL-safe bearer token and its storage hash.
@@ -232,23 +236,42 @@ func (s *Service) SetCookie(w http.ResponseWriter, token string, expiresAt time.
 		// The cookie must be unreadable to scripts: an XSS bug should not also
 		// be a session theft.
 		HttpOnly: true,
-		Secure:   s.secure,
-		SameSite: http.SameSiteLaxMode,
+		Secure:   s.cookieSecure(),
+		SameSite: s.cookieSameSite(),
 		Expires:  expiresAt,
 	})
 }
 
-// ClearCookie expires the session cookie.
+// ClearCookie expires the session cookie. Its attributes must match those
+// SetCookie wrote, or the browser treats it as a different cookie and keeps the
+// original.
 func (s *Service) ClearCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   s.secure,
-		SameSite: http.SameSiteLaxMode,
+		Secure:   s.cookieSecure(),
+		SameSite: s.cookieSameSite(),
 		MaxAge:   -1,
 	})
+}
+
+// cookieSameSite picks the strictest policy the deployment can actually use. A
+// browser app on another site only receives the cookie under SameSite=None.
+func (s *Service) cookieSameSite() http.SameSite {
+	if s.crossSite {
+		return http.SameSiteNoneMode
+	}
+
+	return http.SameSiteLaxMode
+}
+
+// cookieSecure reports whether to mark the cookie Secure. SameSite=None forces
+// it: browsers reject that combination without Secure, which would leave the
+// cookie unset rather than merely less strict.
+func (s *Service) cookieSecure() bool {
+	return s.secure || s.crossSite
 }
 
 // TokenFromRequest reads the session token from the request cookie.

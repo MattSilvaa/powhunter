@@ -3,6 +3,8 @@ package auth_test
 import (
 	"context"
 	"database/sql"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -119,7 +121,7 @@ func (f *fakeQueries) MarkEmailVerified(_ context.Context, userUUID uuid.UUID) e
 // otherwise a leak of the tables is a leak of working credentials.
 func TestStoredTokenIsOnlyAHash(t *testing.T) {
 	queries := newFakeQueries()
-	service := auth.NewService(queries, true)
+	service := auth.NewService(queries, true, false)
 
 	token, err := service.IssueLoginToken(t.Context(), "rider@example.com")
 
@@ -131,7 +133,7 @@ func TestStoredTokenIsOnlyAHash(t *testing.T) {
 
 func TestALoginLinkWorksExactlyOnce(t *testing.T) {
 	queries := newFakeQueries()
-	service := auth.NewService(queries, true)
+	service := auth.NewService(queries, true, false)
 
 	token, err := service.IssueLoginToken(t.Context(), "rider@example.com")
 	require.NoError(t, err)
@@ -149,7 +151,7 @@ func TestALoginLinkWorksExactlyOnce(t *testing.T) {
 }
 
 func TestRedeemRejectsAnUnknownToken(t *testing.T) {
-	service := auth.NewService(newFakeQueries(), true)
+	service := auth.NewService(newFakeQueries(), true, false)
 
 	_, _, err := service.Redeem(t.Context(), "not-a-real-token")
 
@@ -158,7 +160,7 @@ func TestRedeemRejectsAnUnknownToken(t *testing.T) {
 
 func TestAuthenticateResolvesTheSessionUser(t *testing.T) {
 	queries := newFakeQueries()
-	service := auth.NewService(queries, true)
+	service := auth.NewService(queries, true, false)
 
 	token, err := service.IssueLoginToken(t.Context(), "rider@example.com")
 	require.NoError(t, err)
@@ -174,7 +176,7 @@ func TestAuthenticateResolvesTheSessionUser(t *testing.T) {
 }
 
 func TestAuthenticateRejectsAbsentAndUnknownTokens(t *testing.T) {
-	service := auth.NewService(newFakeQueries(), true)
+	service := auth.NewService(newFakeQueries(), true, false)
 
 	_, err := service.Authenticate(t.Context(), "")
 	require.ErrorIs(t, err, auth.ErrNoSession)
@@ -186,7 +188,7 @@ func TestAuthenticateRejectsAbsentAndUnknownTokens(t *testing.T) {
 // Signing out must revoke the session server-side, not just drop the cookie.
 func TestLogoutRevokesTheSession(t *testing.T) {
 	queries := newFakeQueries()
-	service := auth.NewService(queries, true)
+	service := auth.NewService(queries, true, false)
 
 	token, err := service.IssueLoginToken(t.Context(), "rider@example.com")
 	require.NoError(t, err)
@@ -198,4 +200,64 @@ func TestLogoutRevokesTheSession(t *testing.T) {
 
 	_, err = service.Authenticate(t.Context(), sessionToken)
 	require.ErrorIs(t, err, auth.ErrNoSession)
+}
+
+// The deployed web app and the API sit on different sites, so a SameSite=Lax
+// session cookie is discarded by the browser on arrival: the callback returns
+// 200, no cookie is kept, and the user lands back on the sign-in page.
+func TestSetCookieIsUsableCrossSite(t *testing.T) {
+	service := auth.NewService(newFakeQueries(), true, true)
+
+	rec := httptest.NewRecorder()
+	service.SetCookie(rec, "session-token", time.Now().Add(time.Hour))
+
+	cookie := sessionCookie(t, rec.Result().Cookies())
+	assert.Equal(t, http.SameSiteNoneMode, cookie.SameSite)
+	assert.True(t, cookie.Secure, "SameSite=None is rejected without Secure")
+	assert.True(t, cookie.HttpOnly)
+}
+
+// A same-origin deployment keeps the stricter policy.
+func TestSetCookieStaysLaxSameSite(t *testing.T) {
+	service := auth.NewService(newFakeQueries(), true, false)
+
+	rec := httptest.NewRecorder()
+	service.SetCookie(rec, "session-token", time.Now().Add(time.Hour))
+
+	assert.Equal(t, http.SameSiteLaxMode, sessionCookie(t, rec.Result().Cookies()).SameSite)
+}
+
+// A browser matches the cookie to clear on its attributes, so a ClearCookie
+// that disagrees with SetCookie leaves the session cookie in place.
+func TestClearCookieMatchesSetCookieAttributes(t *testing.T) {
+	for _, crossSite := range []bool{true, false} {
+		service := auth.NewService(newFakeQueries(), true, crossSite)
+
+		setRec := httptest.NewRecorder()
+		service.SetCookie(setRec, "session-token", time.Now().Add(time.Hour))
+		set := sessionCookie(t, setRec.Result().Cookies())
+
+		clearRec := httptest.NewRecorder()
+		service.ClearCookie(clearRec)
+		cleared := sessionCookie(t, clearRec.Result().Cookies())
+
+		assert.Equal(t, set.SameSite, cleared.SameSite)
+		assert.Equal(t, set.Secure, cleared.Secure)
+		assert.Equal(t, set.Path, cleared.Path)
+		assert.Equal(t, -1, cleared.MaxAge)
+	}
+}
+
+func sessionCookie(t *testing.T, cookies []*http.Cookie) *http.Cookie {
+	t.Helper()
+
+	for _, cookie := range cookies {
+		if cookie.Name == auth.CookieName {
+			return cookie
+		}
+	}
+
+	require.FailNow(t, "no session cookie was written")
+
+	return nil
 }

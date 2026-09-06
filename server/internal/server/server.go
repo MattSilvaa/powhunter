@@ -90,9 +90,12 @@ func New(deps Deps) (http.Handler, func()) {
 	mux.Handle("POST /api/auth/request-link",
 		deps.Metrics.Instrument("auth_request_link",
 			loginLimiter.Middleware(middleware.NoStore(http.HandlerFunc(deps.Handlers.Auth.RequestLink)))))
+	// Redeeming a link gets the ordinary write bucket, not the login one: that
+	// bucket is sized to throttle sending mail to an address the caller names,
+	// and applying it here rate-limits people who are just signing in.
 	mux.Handle("POST /api/auth/callback",
 		deps.Metrics.Instrument("auth_callback",
-			loginLimiter.Middleware(middleware.NoStore(http.HandlerFunc(deps.Handlers.Auth.Callback)))))
+			writeLimiter.Middleware(middleware.NoStore(http.HandlerFunc(deps.Handlers.Auth.Callback)))))
 	mux.Handle("POST /api/auth/logout",
 		deps.Metrics.Instrument("auth_logout", middleware.NoStore(http.HandlerFunc(deps.Handlers.Auth.Logout))))
 	mux.Handle("GET /api/auth/me",
