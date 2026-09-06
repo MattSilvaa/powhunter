@@ -3,6 +3,12 @@ apiVersion: 1
 datasources:
   - name: Prometheus
     type: prometheus
+    # Fixed, not generated. Every panel in dashboards/overview.json refers to
+    # this datasource as uid "prometheus"; without the uid pinned here Grafana
+    # assigns a random one at start-up, nothing resolves, and each panel reads
+    # "Datasource prometheus was not found" while the datasource page shows a
+    # perfectly healthy connection.
+    uid: prometheus
     access: proxy
     url: ${PROMETHEUS_URL}
     isDefault: true
