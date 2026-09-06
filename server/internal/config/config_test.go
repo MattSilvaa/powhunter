@@ -111,6 +111,19 @@ func setProductionEnv(t *testing.T) {
 	t.Setenv("ALLOWED_ORIGINS", "https://powhunter.app")
 	t.Setenv("APP_BASE_URL", "https://powhunter.app")
 	t.Setenv("RESEND_API_KEY", "re_test")
+	t.Setenv("METRICS_TOKEN", "scrape-token")
+}
+
+// /metrics exposes an operational map of the service; it must not be public.
+func TestProductionRequiresAMetricsToken(t *testing.T) {
+	setProductionEnv(t)
+	t.Setenv("METRICS_TOKEN", "")
+
+	cfg, err := config.Load()
+	require.NoError(t, err)
+
+	require.ErrorIs(t, cfg.ValidateWeb(), config.ErrMissingConfig)
+	assert.Contains(t, cfg.ValidateWeb().Error(), "METRICS_TOKEN")
 }
 
 func TestDevelopmentKeepsConvenientDefaults(t *testing.T) {

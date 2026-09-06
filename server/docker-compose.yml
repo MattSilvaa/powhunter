@@ -21,14 +21,14 @@ services:
     restart: unless-stopped
 
   prometheus:
-    image: prom/prometheus:v3.1.0
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.retention.time=15d
-      - --web.enable-lifecycle
+    # Built rather than pulled so local runs exactly what Render builds: the
+    # entrypoint resolves the scrape token and the API address, which the stock
+    # image cannot do.
+    build: ./monitoring/prometheus
+    environment:
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      API_TARGET: ${API_TARGET:-host.docker.internal:8080}
     volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     ports:
       - "127.0.0.1:9090:9090"
@@ -38,27 +38,28 @@ services:
     restart: unless-stopped
 
   alertmanager:
-    image: prom/alertmanager:v0.28.0
-    command:
-      - --config.file=/etc/alertmanager/alertmanager.yml
-    volumes:
-      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    build: ./monitoring/alertmanager
+    environment:
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
     ports:
       - "127.0.0.1:9093:9093"
     restart: unless-stopped
 
   pushgateway:
-    image: prom/pushgateway:v1.11.0
+    image: prom/pushgateway:v1
     ports:
       - "127.0.0.1:9091:9091"
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:11.5.1
+    image: grafana/grafana:13.0-slim
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      # Points at the compose Prometheus by default; override to a tunnelled
+      # production Prometheus. See monitoring/README.md.
+      PROMETHEUS_URL: ${PROMETHEUS_URL:-http://prometheus:9090}
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro

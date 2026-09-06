@@ -1,0 +1,74 @@
+# Render Blueprint for the monitoring stack.
+#
+# This file deliberately defines ONLY the three monitoring services. The API,
+# the forecaster cron and the static site are managed in the dashboard and are
+# not described here, so applying this Blueprint should create these three and
+# leave the existing three untouched. Read Render's plan output before
+# confirming, and stop if it proposes changing anything else.
+#
+# All three are private services: none is reachable from the internet. Grafana
+# is not deployed at all — it runs locally from server/docker-compose.yml
+# against a tunnel to Prometheus. See server/monitoring/README.md.
+#
+# Service names are load-bearing. Render resolves a service by name on the
+# internal network, and prometheus.yml and the Grafana datasource already refer
+# to prometheus:9090, alertmanager:9093 and pushgateway:9091.
+services:
+  - type: pserv
+    name: prometheus
+    runtime: docker
+    plan: starter
+    region: oregon
+    repo: https://github.com/MattSilvaa/powhunter
+    branch: main
+    rootDir: server/monitoring/prometheus
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    disk:
+      # The time series database. Without a disk, every restart discards the
+      # history that makes a dashboard worth opening.
+      name: prometheus-data
+      mountPath: /prometheus
+      sizeGB: 10
+    envVars:
+      # The API's address on Render's internal network. Its public URL would
+      # work but would leave the cluster and come back, and the service listens
+      # on 10000.
+      - key: API_TARGET
+        value: powhunter-public-api:10000
+      # Must match METRICS_TOKEN on powhunter-public-api, or the scrape is
+      # rejected with 401 and the api target shows DOWN.
+      - key: METRICS_TOKEN
+        sync: false
+      - key: PROMETHEUS_RETENTION
+        value: 15d
+
+  - type: pserv
+    name: alertmanager
+    runtime: docker
+    plan: starter
+    region: oregon
+    repo: https://github.com/MattSilvaa/powhunter
+    branch: main
+    rootDir: server/monitoring/alertmanager
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    envVars:
+      # Where alerts actually go: a Slack incoming webhook, an email relay or a
+      # paging integration. Unset, alerts fire and reach nobody, which is the
+      # failure this whole stack exists to prevent.
+      - key: ALERT_WEBHOOK_URL
+        sync: false
+
+  - type: pserv
+    name: pushgateway
+    runtime: image
+    plan: starter
+    region: oregon
+    image:
+      # No configuration, so no custom image is needed.
+      url: docker.io/prom/pushgateway:v1
+    # Deliberately no disk. Pushgateway holds metrics in memory; a restart loses
+    # the last forecaster summary and the next run twelve hours later restores
+    # it. ForecasterNotRunning fires after thirteen, so a restart cannot cause a
+    # false page on its own.

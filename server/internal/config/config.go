@@ -77,6 +77,7 @@ type Config struct {
 	MailFrom          string
 	SupportEmail      string
 	ResendAPIKey      string
+	MetricsToken      string
 	Database          Database
 }
 
@@ -120,6 +121,7 @@ func Load() (Config, error) {
 		MailFrom:          envOrDefault("MAIL_FROM", defaultMailFrom),
 		SupportEmail:      envOrDefault("SUPPORT_EMAIL", defaultSupportEmail),
 		ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
+		MetricsToken:      os.Getenv("METRICS_TOKEN"),
 		Database: Database{
 			Host:     envOrDefault("DB_HOST", defaultDBHost),
 			Port:     envOrDefault("DB_PORT", defaultDBPort),
@@ -193,6 +195,12 @@ func (c Config) ValidateWeb() error {
 	// so nobody could sign in.
 	if c.ResendAPIKey == "" {
 		missing = append(missing, "RESEND_API_KEY (required to deliver login links)")
+	}
+
+	// /metrics exposes request counts, route names and database pool statistics.
+	// Unset, the endpoint is open to anyone who finds it.
+	if c.MetricsToken == "" {
+		missing = append(missing, "METRICS_TOKEN (required to keep /metrics from being public)")
 	}
 
 	if len(missing) > 0 {
