@@ -22,9 +22,22 @@ route:
 
 receivers:
   - name: default
-    webhook_configs:
-      - url: '__ALERT_WEBHOOK_URL__'
+    # slack_configs rather than webhook_configs: a Slack incoming webhook
+    # rejects Alertmanager's own JSON with invalid_payload, so a generic webhook
+    # would fire and silently fail to deliver. This formats the message the way
+    # Slack expects.
+    slack_configs:
+      - api_url: '__ALERT_WEBHOOK_URL__'
+        # The incoming webhook already targets a channel; this is the label
+        # Alertmanager requires and what Slack shows if the hook allows an
+        # override.
+        channel: '#alerts'
         send_resolved: true
+        title: '{{ .Status | toUpper }}: {{ .CommonLabels.alertname }}'
+        text: >-
+          {{ range .Alerts }}{{ .Annotations.summary }}{{ if .Annotations.description }}
+          {{ .Annotations.description }}{{ end }}
+          {{ end }}
 
 inhibit_rules:
   # While the API is completely down, its latency and error-rate alerts are noise.
