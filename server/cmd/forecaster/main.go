@@ -108,13 +108,22 @@ func run(logger *slog.Logger) error {
 }
 
 // publishMetrics reports the run to a Pushgateway when one is configured.
+//
+// Every outcome is logged, including the do-nothing one. An unset gateway is
+// indistinguishable from a working one in the job's output otherwise, and a
+// silent no-op here means ForecasterNotRunning — the alert that catches a dead
+// alert pipeline — can never fire, with nothing anywhere saying why.
 func publishMetrics(logger *slog.Logger, summary metrics.ForecastRun) {
 	gateway := os.Getenv("PUSHGATEWAY_URL")
 	if gateway == "" {
+		logger.Warn("PUSHGATEWAY_URL is not set; run metrics were not published")
 		return
 	}
 
 	if err := metrics.PushForecastRun(gateway, summary); err != nil {
-		logger.Warn("failed to publish forecaster metrics", "error", err)
+		logger.Warn("failed to publish forecaster metrics", "gateway", gateway, "error", err)
+		return
 	}
+
+	logger.Info("published forecaster metrics", "gateway", gateway)
 }

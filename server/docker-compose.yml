@@ -66,8 +66,16 @@ services:
       - grafana_data:/var/lib/grafana
     ports:
       - "127.0.0.1:3001:3000"
-    depends_on:
-      - prometheus
+    extra_hosts:
+      # Needed to read a production Prometheus through an SSH tunnel on the
+      # host. Docker Desktop resolves host.docker.internal on its own, so this
+      # only matters on Linux — where, without it, the datasource fails to
+      # resolve and the dashboard is empty with no clue as to why.
+      - "host.docker.internal:host-gateway"
+    # Deliberately no depends_on. Grafana resolves its datasource lazily, and
+    # the common case is pointing it at a tunnelled production Prometheus, where
+    # starting a second empty local one alongside it is pure confusion. The
+    # all-local flow names prometheus explicitly in the up command instead.
     restart: unless-stopped
 
 volumes:
