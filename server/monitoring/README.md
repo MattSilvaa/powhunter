@@ -57,9 +57,11 @@ them at start-up:
 | Variable | Service | Purpose |
 |---|---|---|
 | `METRICS_TOKEN` | prometheus | Bearer token for the API scrape; must match the API's |
-| `API_TARGET` | prometheus | `host.docker.internal:8080` locally, `powhunter-public-api:10000` on Render |
+| `API_TARGET` | prometheus | `host.docker.internal:8080` locally; on Render supplied by `fromService` |
+| `PUSHGATEWAY_TARGET` | prometheus | `pushgateway:9091` locally; on Render supplied by `fromService` |
+| `ALERTMANAGER_TARGET` | prometheus | `alertmanager:9093` locally; on Render supplied by `fromService` |
 | `ALERT_WEBHOOK_URL` | alertmanager | Where alerts are delivered |
-| `PUSHGATEWAY_URL` | forecaster cron | `http://pushgateway:9091`; unset, run metrics go nowhere |
+| `PUSHGATEWAY_URL` | forecaster cron | The Pushgateway's **internal address from its Render dashboard**, e.g. `http://pushgateway-cyuc:10000`; unset, run metrics go nowhere |
 
 ## Checking it actually works
 
@@ -72,3 +74,11 @@ An alerting stack that has never fired is not known to work.
 - Force an alert and confirm it reaches the webhook. `ForecasterNotRunning`
   fires thirteen hours after the last success, so it is the slowest to test and
   the most important: it is the alert that catches a silent alert pipeline.
+
+## A note on Render addressing
+
+Render does not address services by the name you give them: it appends a
+generated suffix and exposes the service on port 10000, so `pushgateway:9091`
+resolves to nothing there. That is why the first deploy of this stack scraped
+nothing at all. `render.yaml` asks Render for each address with `fromService`
+rather than hardcoding one, which also survives a service being recreated.

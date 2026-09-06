@@ -31,11 +31,26 @@ services:
       mountPath: /prometheus
       sizeGB: 10
     envVars:
-      # The API's address on Render's internal network. Its public URL would
-      # work but would leave the cluster and come back, and the service listens
-      # on 10000.
+      # Asked of Render rather than guessed. The first deploy hardcoded
+      # "powhunter-public-api:10000" and collected nothing: Render appends a
+      # generated suffix to a service's internal hostname, so the addresses are
+      # not predictable from the service name and change if a service is
+      # recreated.
       - key: API_TARGET
-        value: powhunter-public-api:10000
+        fromService:
+          name: powhunter-public-api
+          type: web
+          property: hostport
+      - key: PUSHGATEWAY_TARGET
+        fromService:
+          name: pushgateway
+          type: pserv
+          property: hostport
+      - key: ALERTMANAGER_TARGET
+        fromService:
+          name: alertmanager
+          type: pserv
+          property: hostport
       # Must match METRICS_TOKEN on powhunter-public-api, or the scrape is
       # rejected with 401 and the api target shows DOWN.
       - key: METRICS_TOKEN

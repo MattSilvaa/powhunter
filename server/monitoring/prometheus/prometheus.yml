@@ -8,16 +8,19 @@ rule_files:
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: ['alertmanager:9093']
+        - targets: ['__ALERTMANAGER_TARGET__']
 
 scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ['localhost:9090']
 
-  # __API_TARGET__ is replaced at start-up by entrypoint.sh: the API runs on the
-  # host under compose and as a neighbouring service on Render, and Prometheus
-  # expands no environment variables of its own.
+  # Each placeholder below is replaced at start-up by entrypoint.sh, because
+  # Prometheus expands no environment variables of its own. The addresses differ
+  # per environment and cannot be hardcoded: Render appends a generated suffix to
+  # a service's internal hostname and exposes it on port 10000, so the obvious
+  # "pushgateway:9091" resolves to nothing. render.yaml asks Render for each
+  # address with fromService rather than guessing.
   - job_name: powhunter-api
     metrics_path: /metrics
     # /metrics is no longer public. The token is written to this file from the
@@ -34,6 +37,6 @@ scrape_configs:
   - job_name: powhunter-forecaster
     honor_labels: true
     static_configs:
-      - targets: ['pushgateway:9091']
+      - targets: ['__PUSHGATEWAY_TARGET__']
         labels:
           service: forecaster
