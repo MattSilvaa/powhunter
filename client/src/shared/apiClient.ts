@@ -46,6 +46,8 @@ const ERROR_MESSAGES: Record<string, string> = {
 	REQUEST_TOO_LARGE: 'That message is too long. Please shorten it.',
 	RATE_LIMITED: 'Too many requests. Please wait a moment and try again.',
 	UNAUTHENTICATED: 'Please sign in to continue.',
+	ALERT_NOT_FOUND:
+		'That subscription no longer exists. Refresh the page to see your current subscriptions.',
 	INVALID_TOKEN:
 		'That sign-in link has expired or has already been used. Request a new one.',
 	INTERNAL_ERROR:

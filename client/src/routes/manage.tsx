@@ -14,8 +14,8 @@ import {
 	Paper,
 	Typography,
 } from '@mui/material'
-import { AcUnit, Add, DeleteOutline } from '@mui/icons-material'
-import { Link, useNavigate } from 'react-router'
+import { AcUnit, Add, DeleteOutline, EditOutlined } from '@mui/icons-material'
+import { useNavigate } from 'react-router'
 import {
 	useUserAlerts,
 	useDeleteAlert,
@@ -25,6 +25,9 @@ import { useCurrentUser, useLogout } from '../shared/useAuth.ts'
 import { UserAlert } from '../shared/types.ts'
 import PageHeader from '../components/pageHeader.tsx'
 import { tabularNums } from '../theme.ts'
+import AddAlertsDialog from '../components/addAlertsDialog.tsx'
+import EditAlertDialog from '../components/editAlertDialog.tsx'
+import PhoneDialog from '../components/phoneDialog.tsx'
 
 // created_at arrives from Go as a nullable timestamp, so guard both the null
 // case and an unparseable value rather than rendering "Invalid Date".
@@ -52,6 +55,9 @@ export default function ManageSubscriptionsPage() {
 		resortUuid: string
 		resortName: string
 	} | null>(null)
+	const [alertToEdit, setAlertToEdit] = useState<UserAlert | null>(null)
+	const [addOpen, setAddOpen] = useState(false)
+	const [phoneOpen, setPhoneOpen] = useState(false)
 
 	// This page only ever shows the signed-in user's own subscriptions, so a
 	// signed-out visitor goes to the sign-in screen rather than a blank list.
@@ -155,7 +161,7 @@ export default function ManageSubscriptionsPage() {
 					<Typography color="text.secondary" sx={{ mt: 0.5, mb: 3 }}>
 						Create one and we&apos;ll text you when it&apos;s about to dump.
 					</Typography>
-					<Button component={Link} to="/signup" variant="contained">
+					<Button variant="contained" onClick={() => setAddOpen(true)}>
 						Create an alert
 					</Button>
 				</Paper>
@@ -233,35 +239,101 @@ export default function ManageSubscriptionsPage() {
 										Added {formatCreatedAt(alert.created_at)}
 									</Typography>
 								</Box>
-								<IconButton
-									aria-label={`Delete subscription for ${alert.resort_name}`}
-									onClick={() =>
-										handleDeleteClick(alert.resort_uuid, alert.resort_name)
-									}
-									disabled={deleteAlertMutation.isPending}
-									sx={{
-										color: 'text.secondary',
-										'&:hover': {
-											color: 'error.main',
-											bgcolor: 'rgb(211 47 47 / 0.06)',
-										},
-									}}
-								>
-									<DeleteOutline fontSize="small" />
-								</IconButton>
+								<Box sx={{ display: 'flex', flexShrink: 0 }}>
+									<IconButton
+										aria-label={`Edit alert for ${alert.resort_name}`}
+										onClick={() => setAlertToEdit(alert)}
+										sx={{
+											color: 'text.secondary',
+											'&:hover': {
+												color: 'primary.main',
+												bgcolor: 'primary.light',
+											},
+										}}
+									>
+										<EditOutlined fontSize="small" />
+									</IconButton>
+									<IconButton
+										aria-label={`Delete subscription for ${alert.resort_name}`}
+										onClick={() =>
+											handleDeleteClick(alert.resort_uuid, alert.resort_name)
+										}
+										disabled={deleteAlertMutation.isPending}
+										sx={{
+											color: 'text.secondary',
+											'&:hover': {
+												color: 'error.main',
+												bgcolor: 'rgb(211 47 47 / 0.06)',
+											},
+										}}
+									>
+										<DeleteOutline fontSize="small" />
+									</IconButton>
+								</Box>
 							</Box>
 						))}
 					</Paper>
 
 					<Button
-						component={Link}
-						to="/signup"
 						startIcon={<Add />}
+						onClick={() => setAddOpen(true)}
 						sx={{ mt: 2 }}
 					>
 						Add another resort
 					</Button>
 				</>
+			)}
+
+			<Typography
+				variant="overline"
+				component="h2"
+				color="text.secondary"
+				sx={{ display: 'block', mt: 5, mb: 1.5 }}
+			>
+				Text alerts go to
+			</Typography>
+			<Paper
+				variant="outlined"
+				sx={{
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'space-between',
+					gap: 2,
+					px: { xs: 2, sm: 3 },
+					py: 2,
+				}}
+			>
+				{user.phone ? (
+					<Typography sx={{ ...tabularNums, fontWeight: 600 }}>
+						{user.phone}
+					</Typography>
+				) : (
+					<Typography color="text.secondary">No phone number yet</Typography>
+				)}
+				<Button size="small" onClick={() => setPhoneOpen(true)}>
+					{user.phone ? 'Change' : 'Add'}
+				</Button>
+			</Paper>
+
+			{alertToEdit && (
+				<EditAlertDialog
+					alert={alertToEdit}
+					onClose={() => setAlertToEdit(null)}
+				/>
+			)}
+
+			{addOpen && (
+				<AddAlertsDialog
+					existingResortUuids={alerts.map((alert) => alert.resort_uuid)}
+					onClose={() => setAddOpen(false)}
+				/>
+			)}
+
+			{phoneOpen && (
+				<PhoneDialog
+					currentPhone={user.phone}
+					onClose={() => setPhoneOpen(false)}
+				/>
 			)}
 
 			<Dialog

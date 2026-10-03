@@ -57,6 +57,28 @@ type StoreService interface {
 
 	// DeleteAllAlertsForUser deletes every alert belonging to the given user.
 	DeleteAllAlertsForUser(ctx context.Context, userUUID uuid.UUID) error
+
+	// CreateAlertsForUser adds alerts to an existing account.
+	CreateAlertsForUser(
+		ctx context.Context,
+		userUUID uuid.UUID,
+		minSnowAmount float64,
+		notificationDays int32,
+		resortUUIDs []string,
+	) error
+
+	// UpdateAlertForUser changes the thresholds on one of the given user's
+	// alerts. It returns sql.ErrNoRows when the user has no such alert.
+	UpdateAlertForUser(
+		ctx context.Context,
+		userUUID uuid.UUID,
+		resortUUID string,
+		minSnowAmount float64,
+		notificationDays int32,
+	) (dbgen.UserAlert, error)
+
+	// UpdateUserPhone replaces the phone number SMS alerts are sent to.
+	UpdateUserPhone(ctx context.Context, userUUID uuid.UUID, phone string) error
 }
 
 type Store struct {
@@ -126,31 +148,39 @@ func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
 			return fmt.Errorf("error creating user: %w", err)
 		}
 
-		for _, resortUUID := range resortUUIDs {
-			var ruuid uuid.NullUUID
-			if resortUUID != "" {
-				parsedUUID, err := uuid.Parse(resortUUID)
-				if err != nil {
-					return fmt.Errorf("error parsing resort UUID %s: %w", resortUUID, err)
-				}
-				ruuid = uuid.NullUUID{UUID: parsedUUID, Valid: true}
-			} else {
-				ruuid = uuid.NullUUID{Valid: false}
-			}
+		return createAlerts(ctx, q, user.Uuid, minSnowAmount, notificationDays, resortUUIDs)
+	})
+}
 
-			_, err = q.CreateUserAlert(ctx, dbgen.CreateUserAlertParams{
-				UserUuid:         uuid.NullUUID{UUID: user.Uuid, Valid: true},
-				ResortUuid:       ruuid,
-				MinSnowAmount:    minSnowAmount,
-				NotificationDays: notificationDays,
-			})
-			if err != nil {
-				return fmt.Errorf("error creating alert for resort %s: %w", resortUUID, err)
-			}
+// CreateAlertsForUser adds alerts to an existing account, all or nothing.
+func (s *Store) CreateAlertsForUser(ctx context.Context, userUUID uuid.UUID,
+	minSnowAmount float64, notificationDays int32, resortUUIDs []string) error {
+	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
+		return createAlerts(ctx, q, userUUID, minSnowAmount, notificationDays, resortUUIDs)
+	})
+}
+
+// createAlerts inserts one alert per resort with the same thresholds.
+func createAlerts(ctx context.Context, q *dbgen.Queries, userUUID uuid.UUID,
+	minSnowAmount float64, notificationDays int32, resortUUIDs []string) error {
+	for _, resortUUID := range resortUUIDs {
+		parsedUUID, err := uuid.Parse(resortUUID)
+		if err != nil {
+			return fmt.Errorf("error parsing resort UUID %s: %w", resortUUID, err)
 		}
 
-		return nil
-	})
+		_, err = q.CreateUserAlert(ctx, dbgen.CreateUserAlertParams{
+			UserUuid:         uuid.NullUUID{UUID: userUUID, Valid: true},
+			ResortUuid:       uuid.NullUUID{UUID: parsedUUID, Valid: true},
+			MinSnowAmount:    minSnowAmount,
+			NotificationDays: notificationDays,
+		})
+		if err != nil {
+			return fmt.Errorf("error creating alert for resort %s: %w", resortUUID, err)
+		}
+	}
+
+	return nil
 }
 
 type AlertToSend struct {
@@ -365,6 +395,45 @@ func (s *Store) DeleteAllAlertsForUser(ctx context.Context, userUUID uuid.UUID) 
 	err := s.queries.DeleteAllUserAlertsByUserUUID(ctx, uuid.NullUUID{UUID: userUUID, Valid: true})
 	if err != nil {
 		return fmt.Errorf("error deleting all alerts for user: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateAlertForUser changes the thresholds on one of the given user's alerts.
+func (s *Store) UpdateAlertForUser(
+	ctx context.Context,
+	userUUID uuid.UUID,
+	resortUUID string,
+	minSnowAmount float64,
+	notificationDays int32,
+) (dbgen.UserAlert, error) {
+	parsed, err := uuid.Parse(resortUUID)
+	if err != nil {
+		return dbgen.UserAlert{}, fmt.Errorf("error parsing resort UUID: %w", err)
+	}
+
+	alert, err := s.queries.UpdateUserAlertSettingsByUserUUID(ctx, dbgen.UpdateUserAlertSettingsByUserUUIDParams{
+		UserUuid:         uuid.NullUUID{UUID: userUUID, Valid: true},
+		ResortUuid:       uuid.NullUUID{UUID: parsed, Valid: true},
+		MinSnowAmount:    minSnowAmount,
+		NotificationDays: notificationDays,
+	})
+	if err != nil {
+		return dbgen.UserAlert{}, fmt.Errorf("error updating alert for user: %w", err)
+	}
+
+	return alert, nil
+}
+
+// UpdateUserPhone replaces the phone number SMS alerts are sent to.
+func (s *Store) UpdateUserPhone(ctx context.Context, userUUID uuid.UUID, phone string) error {
+	_, err := s.queries.UpdateUserPhone(ctx, dbgen.UpdateUserPhoneParams{
+		Uuid:  userUUID,
+		Phone: sql.NullString{String: phone, Valid: phone != ""},
+	})
+	if err != nil {
+		return fmt.Errorf("error updating user phone: %w", err)
 	}
 
 	return nil

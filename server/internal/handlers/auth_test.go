@@ -183,7 +183,14 @@ func TestMeReportsSignedOutWithoutASession(t *testing.T) {
 func requestAsUser(t *testing.T, method, target string, user auth.User) *http.Request {
 	t.Helper()
 
-	req := httptest.NewRequest(method, target, nil)
+	return requestAsUserWithBody(t, method, target, nil, user)
+}
+
+// requestAsUserWithBody is requestAsUser for endpoints that read a JSON body.
+func requestAsUserWithBody(t *testing.T, method, target string, body io.Reader, user auth.User) *http.Request {
+	t.Helper()
+
+	req := httptest.NewRequest(method, target, body)
 
 	var authenticated *http.Request
 

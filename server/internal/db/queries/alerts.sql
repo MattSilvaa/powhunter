@@ -84,3 +84,13 @@ WHERE user_uuid = $1
 -- name: DeleteAllUserAlertsByUserUUID :exec
 DELETE FROM user_alerts
 WHERE user_uuid = $1;
+
+-- name: UpdateUserAlertSettingsByUserUUID :one
+-- Changes only the thresholds. Unlike UpdateUserAlert it leaves active alone,
+-- and it keys off the session's user so one account cannot edit another's.
+UPDATE user_alerts
+SET min_snow_amount   = $3,
+    notification_days = $4
+WHERE user_uuid = $1
+  AND resort_uuid = $2
+  AND active = true RETURNING *;

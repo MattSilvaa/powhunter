@@ -28,8 +28,20 @@ RETURNING *;
 -- Get-or-create in a single statement. A read-then-write race meant two
 -- concurrent signups with the same email both attempted an insert, and one
 -- failed on the unique constraint as a 500.
+--
+-- Signup is anonymous, so the phone supplied here only fills in an account
+-- that has none. Replacing an existing number would let anyone who knows an
+-- address redirect that person's SMS alerts to themselves; changing the
+-- number is done signed in, through UpdateUserPhone.
 INSERT INTO users (email, phone)
 VALUES ($1, $2)
 ON CONFLICT (email) DO UPDATE
-    SET phone = COALESCE(EXCLUDED.phone, users.phone)
+    SET phone = COALESCE(users.phone, EXCLUDED.phone)
+RETURNING *;
+
+-- name: UpdateUserPhone :one
+UPDATE users
+SET phone      = $2,
+    updated_at = NOW()
+WHERE uuid = $1
 RETURNING *;
