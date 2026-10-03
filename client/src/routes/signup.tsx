@@ -3,12 +3,15 @@ import {
 	Alert,
 	Box,
 	Button,
-	CircularProgress,
+	Checkbox,
+	Chip,
 	Container,
 	FormControl,
+	FormHelperText,
 	Grid,
 	InputLabel,
 	LinearProgress,
+	ListItemText,
 	MenuItem,
 	Paper,
 	Select,
@@ -17,10 +20,12 @@ import {
 	TextField,
 	Typography,
 } from '@mui/material'
-import { useNavigate, Link } from 'react-router'
+import { useNavigate } from 'react-router'
 import { useResorts } from '../shared/useResorts.ts'
 import { Resort } from '../shared/types.ts'
 import { useCreateAlert } from '../shared/useCreateAlert.ts'
+import PageHeader from '../components/pageHeader.tsx'
+import { tabularNums } from '../theme.ts'
 
 export default function SignUpPage() {
 	const navigate = useNavigate()
@@ -151,42 +156,17 @@ export default function SignUpPage() {
 	}
 
 	return (
-		<Container maxWidth="md" sx={{ py: 4 }}>
-			<Paper elevation={3} sx={{ p: 4 }}>
+		<Container maxWidth="sm" sx={{ py: { xs: 5, md: 8 } }}>
+			<PageHeader
+				title="Create an alert"
+				subtitle="Tell us where you ride and what counts as a powder day. We'll text you when the forecast delivers."
+			/>
+
+			<Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 4 } }}>
 				{loading ? (
 					<LinearProgress />
 				) : (
 					<>
-						<Box sx={{ mb: 2 }}>
-							<Button
-								component={Link}
-								to="/"
-								variant="text"
-								sx={{
-									color: 'text.secondary',
-									pl: 0,
-									'&:hover': {
-										backgroundColor: 'transparent',
-										color: 'primary.main',
-									},
-								}}
-							>
-								← Back to Home
-							</Button>
-						</Box>
-
-						<Typography variant="h2" component="h1" gutterBottom align="center">
-							Start Hunting Powder
-						</Typography>
-						<Typography
-							variant="body1"
-							color="text.secondary"
-							align="center"
-							sx={{ mb: 4 }}
-						>
-							Sign up to start receiving powder alerts for your favorite resorts
-						</Typography>
-
 						{createAlertError && !dismissedError && (
 							<Alert
 								severity="error"
@@ -199,160 +179,211 @@ export default function SignUpPage() {
 						)}
 
 						<Box component="form" onSubmit={handleSubmit} noValidate>
-						<Grid container spacing={3}>
-							<Grid container spacing={3} size={12}>
-								<Grid size={6}>
+							<Grid container spacing={3}>
+								<Grid size={{ xs: 12, sm: 6 }}>
 									<TextField
 										required
 										fullWidth
 										label="Email"
 										name="email"
 										type="email"
+										autoComplete="email"
 										value={formData.email}
 										onChange={handleChange}
 										error={!!fieldErrors.email}
 										helperText={
-											fieldErrors.email ||
-											"We'll use this to send you powder alerts"
+											fieldErrors.email || 'Used to sign in and manage alerts'
 										}
 									/>
 								</Grid>
-								<Grid size={6}>
+								<Grid size={{ xs: 12, sm: 6 }}>
 									<TextField
 										required
 										fullWidth
 										label="Phone Number"
 										name="phone"
 										type="tel"
+										autoComplete="tel"
 										value={formData.phone}
 										onChange={handleChange}
 										error={!!fieldErrors.phone}
 										helperText={
-											fieldErrors.phone ||
-											"We'll send SMS alerts to this number"
+											fieldErrors.phone || 'Where we text your alerts'
 										}
 									/>
 								</Grid>
-							</Grid>
 
-							<Grid size={12}>
-								<Typography gutterBottom>
-									How many days in advance would you like to receive alerts?
-								</Typography>
-								<Slider
-									aria-label="Days of advance notice"
-									value={formData.notificationDays}
-									onChange={(_, value) =>
-										setFormData((prev) => ({
-											...prev,
-											notificationDays: value as number,
-										}))
-									}
-									min={1}
-									max={10}
-									marks
-									valueLabelDisplay="auto"
-								/>
-								<Typography
-									variant="body2"
-									color="text.secondary"
-									align="center"
-								>
-									{formData.notificationDays} days
-								</Typography>
-							</Grid>
+								<Grid size={12}>
+									<FormControl fullWidth error={!!fieldErrors.resorts}>
+										<InputLabel id="resorts-label">Resorts</InputLabel>
+										{error && (
+											<Alert severity="error" sx={{ mb: 1 }}>
+												{error}
+											</Alert>
+										)}
 
-							<Grid size={12}>
-								<Typography gutterBottom>
-									Minimum snow amount for alerts (inches)?
-								</Typography>
-								<Slider
-									aria-label="Minimum snow amount in inches"
-									value={formData.minSnowAmount}
-									onChange={(_, value) =>
-										setFormData((prev) => ({
-											...prev,
-											minSnowAmount: value as number,
-										}))
-									}
-									min={1}
-									max={24}
-									marks
-									valueLabelDisplay="auto"
-								/>
-								<Typography
-									variant="body2"
-									color="text.secondary"
-									align="center"
-								>
-									{formData.minSnowAmount} inches
-								</Typography>
-							</Grid>
-
-							<Grid size={{ xs: 12 }}>
-								<FormControl fullWidth error={!!fieldErrors.resorts}>
-									<InputLabel id="resorts-label">Select Resorts</InputLabel>
-									{loading && (
-										<Box display="flex" justifyContent="center" p={2}>
-											<CircularProgress />
-										</Box>
-									)}
-									{error && <Alert severity="error">{error}</Alert>}
-
-									<Select
-										required
-										multiple
-										labelId="resorts-label"
-										name="resorts"
-										value={formData.resorts}
-										onChange={handleSelectChange}
-										label="Select Resorts"
-										// Values are uuids so resorts sharing a name cannot
-										// collide, but the field must still read as names.
-										renderValue={(selected) =>
-											selected
-												.map(
-													(uuid) =>
-														resorts.find((r) => r.uuid === uuid)?.name ?? uuid
-												)
-												.join(', ')
-										}
-									>
-										{resorts.map((resort: Resort) => (
-											<MenuItem key={resort.uuid} value={resort.uuid}>
-												{resort.name}
-											</MenuItem>
-										))}
-									</Select>
-									{fieldErrors.resorts && (
-										<Typography
-											variant="caption"
-											color="error"
-											sx={{ mt: 0.5, ml: 1.5 }}
+										<Select
+											required
+											multiple
+											labelId="resorts-label"
+											name="resorts"
+											value={formData.resorts}
+											onChange={handleSelectChange}
+											label="Resorts"
+											MenuProps={{
+												slotProps: { paper: { sx: { maxHeight: 320 } } },
+											}}
+											// Values are uuids so resorts sharing a name cannot
+											// collide, but the field must still read as names.
+											renderValue={(selected) => (
+												<Box
+													sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}
+												>
+													{selected.map((uuid) => (
+														<Chip
+															key={uuid}
+															size="small"
+															label={
+																resorts.find((r) => r.uuid === uuid)?.name ??
+																uuid
+															}
+															sx={{
+																bgcolor: 'primary.light',
+																color: 'primary.dark',
+															}}
+														/>
+													))}
+												</Box>
+											)}
 										>
-											{fieldErrors.resorts}
-										</Typography>
-									)}
-								</FormControl>
-							</Grid>
+											{resorts.map((resort: Resort) => (
+												<MenuItem key={resort.uuid} value={resort.uuid} dense>
+													<Checkbox
+														size="small"
+														checked={formData.resorts.includes(resort.uuid)}
+														sx={{ py: 0.5, pl: 0 }}
+													/>
+													<ListItemText primary={resort.name} />
+												</MenuItem>
+											))}
+										</Select>
+										<FormHelperText>
+											{fieldErrors.resorts || 'Pick as many as you like'}
+										</FormHelperText>
+									</FormControl>
+								</Grid>
 
-							<Grid size={{ xs: 12 }}>
-								<Button
-									type="submit"
-									variant="contained"
-									size="large"
-									fullWidth
-									sx={{ mt: 2 }}
-									disabled={isCreateAlertLoading}
-								>
-									{isCreateAlertLoading ? 'Creating Alert...' : 'Create Alert'}
-								</Button>
+								<Grid size={12}>
+									<SliderField
+										label="Minimum snowfall"
+										hint="Only alert me when at least this much is forecast"
+										value={`${formData.minSnowAmount}″`}
+									>
+										<Slider
+											aria-label="Minimum snow amount in inches"
+											value={formData.minSnowAmount}
+											onChange={(_, value) =>
+												setFormData((prev) => ({
+													...prev,
+													minSnowAmount: value as number,
+												}))
+											}
+											min={1}
+											max={24}
+											valueLabelDisplay="off"
+										/>
+									</SliderField>
+								</Grid>
+
+								<Grid size={12}>
+									<SliderField
+										label="Advance notice"
+										hint="How far ahead of the snow you want to hear about it"
+										value={`${formData.notificationDays} ${formData.notificationDays === 1 ? 'day' : 'days'}`}
+									>
+										<Slider
+											aria-label="Days of advance notice"
+											value={formData.notificationDays}
+											onChange={(_, value) =>
+												setFormData((prev) => ({
+													...prev,
+													notificationDays: value as number,
+												}))
+											}
+											min={1}
+											max={10}
+											valueLabelDisplay="off"
+										/>
+									</SliderField>
+								</Grid>
+
+								<Grid size={12}>
+									<Button
+										type="submit"
+										variant="contained"
+										size="large"
+										fullWidth
+										disabled={isCreateAlertLoading}
+									>
+										{isCreateAlertLoading
+											? 'Creating Alert...'
+											: 'Create Alert'}
+									</Button>
+								</Grid>
 							</Grid>
-						</Grid>
 						</Box>
 					</>
 				)}
 			</Paper>
 		</Container>
+	)
+}
+
+type SliderFieldProps = {
+	label: string
+	hint: string
+	value: string
+	children: React.ReactNode
+}
+
+// Shows a slider's current value beside its label, like a forecast readout,
+// instead of hiding it in a tooltip.
+function SliderField({
+	label,
+	hint,
+	value,
+	children,
+}: SliderFieldProps): React.ReactElement {
+	return (
+		<Box>
+			<Box
+				sx={{
+					display: 'flex',
+					justifyContent: 'space-between',
+					alignItems: 'flex-start',
+					gap: 2,
+				}}
+			>
+				<Box>
+					<Typography sx={{ fontWeight: 500 }}>{label}</Typography>
+					<Typography variant="body2" color="text.secondary">
+						{hint}
+					</Typography>
+				</Box>
+				<Typography
+					aria-hidden
+					sx={{
+						...tabularNums,
+						fontSize: '1.5rem',
+						fontWeight: 600,
+						letterSpacing: '-0.02em',
+						whiteSpace: 'nowrap',
+					}}
+				>
+					{value}
+				</Typography>
+			</Box>
+			<Box sx={{ px: 1, mt: 1 }}>{children}</Box>
+		</Box>
 	)
 }
