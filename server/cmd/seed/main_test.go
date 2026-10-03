@@ -45,6 +45,6 @@ func TestUpsertParams(t *testing.T) {
 	assert.Equal(t, "Alta", p.Name)
 	assert.True(t, p.UrlHost.Valid)
 	assert.False(t, p.UrlPathname.Valid, "empty pathname should be NULL")
-	assert.Equal(t, 40.5884, p.Latitude.Float64)
-	assert.Equal(t, -111.6386, p.Longitude.Float64)
+	assert.InDelta(t, 40.5884, p.Latitude.Float64, 1e-9)
+	assert.InDelta(t, -111.6386, p.Longitude.Float64, 1e-9)
 }

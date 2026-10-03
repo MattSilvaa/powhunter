@@ -264,7 +264,7 @@ func TestStoreIntegration_UpsertResortKeepsUUIDAndAlerts(t *testing.T) {
 	testDB, store, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	queries := dbgen.New(testDB)
 
 	original := testutil.SeedTestResort(t, queries, "Alta", 40.0, -111.0)
@@ -275,8 +275,8 @@ func TestStoreIntegration_UpsertResortKeepsUUIDAndAlerts(t *testing.T) {
 	updated := testutil.SeedTestResort(t, queries, "Alta", 40.5884, -111.6386)
 
 	assert.Equal(t, original.Uuid, updated.Uuid)
-	assert.Equal(t, 40.5884, updated.Latitude.Float64)
-	assert.Equal(t, -111.6386, updated.Longitude.Float64)
+	assert.InDelta(t, 40.5884, updated.Latitude.Float64, 1e-9)
+	assert.InDelta(t, -111.6386, updated.Longitude.Float64, 1e-9)
 
 	resorts, err := store.ListAllResorts(ctx)
 	require.NoError(t, err)

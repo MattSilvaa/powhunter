@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -69,14 +69,23 @@ func upsertParams(r Resort) dbgen.UpsertResortParams {
 }
 
 func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	if err := run(logger); err != nil {
+		logger.Error("resort seeding failed", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run(logger *slog.Logger) error {
 	resorts, err := loadResorts(resortsPath)
 	if err != nil {
-		log.Fatalf("Failed to load resorts: %v", err)
+		return err
 	}
 
 	dbConn, err := db.New()
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		return fmt.Errorf("connecting to database: %w", err)
 	}
 	defer dbConn.Close()
 
@@ -88,11 +97,13 @@ func main() {
 	// Upsert rather than clear-and-insert: deleting resorts cascades to
 	// user_alerts, so re-seeding would wipe every user's alerts.
 	for _, r := range resorts {
-		if _, err := queries.UpsertResort(ctx, upsertParams(r)); err != nil {
-			log.Fatalf("Failed to upsert resort %s: %v", r.Name, err)
+		if _, upsertErr := queries.UpsertResort(ctx, upsertParams(r)); upsertErr != nil {
+			return fmt.Errorf("upserting resort %s: %w", r.Name, upsertErr)
 		}
-		fmt.Printf("Upserted resort: %s\n", r.Name)
+		logger.Info("upserted resort", "name", r.Name)
 	}
 
-	fmt.Println("Resort seeding completed successfully")
+	logger.Info("resort seeding completed", "count", len(resorts))
+
+	return nil
 }

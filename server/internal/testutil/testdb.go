@@ -130,7 +130,7 @@ func cleanupDB(t *testing.T, db *sql.DB) {
 func SeedTestResort(t *testing.T, queries *dbgen.Queries, name string, lat, lon float64) dbgen.Resort {
 	t.Helper()
 
-	resort, err := queries.UpsertResort(context.Background(), dbgen.UpsertResortParams{
+	resort, err := queries.UpsertResort(t.Context(), dbgen.UpsertResortParams{
 		Uuid:        uuid.New(),
 		Name:        name,
 		UrlHost:     sql.NullString{String: "example.com", Valid: true},
