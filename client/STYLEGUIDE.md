@@ -42,7 +42,7 @@ Use theme tokens (`'text.secondary'`, `'divider'`, `'primary.main'`). Don't hard
 
 - **Buttons:** use `variant="contained"` for the one primary action, and `outlined` or text for everything else. Use `color="error"` only for destructive actions.
 - **Numbers:** spread the shared style into `sx`, as in `sx={{ ...tabularNums, fontWeight: 600 }}`. Use the prime mark `″` for inches, not `"`.
-- **Icons:** use small, outlined MUI icons (`DeleteOutline`, `Check`, `AcUnit`) in a muted or accent color. Never put an icon on a colored tile.
+- **Icons:** use small, outlined MUI icons (`DeleteOutline`, `Check`, `AcUnit`) in a muted or accent color. No solid colored icon tiles; a small check in a `primary.light` circle is fine for confirmations (see `routes/success.tsx`).
 - **Sliders:** wrap them in a label row that shows the live value on the right (`SliderField` in `routes/signup.tsx`).
 - **Copy:** short, plain, and sentence case. Talk about snow and resorts, not features.
 
