@@ -19,6 +19,7 @@ This is a web app that allows users to select mountain resorts which they would 
   - Use React hooks for state management
   - Material UI for components
   - Use bun as a package manager
+  - Follow `client/STYLEGUIDE.md` for all UI work (theme tokens, page patterns, components)
 
 - **Backend (Go)**:
   - Standard Go code formatting (gofmt)
