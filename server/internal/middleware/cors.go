@@ -82,7 +82,7 @@ func CORS(config CORSConfig) func(http.Handler) http.Handler {
 			}
 
 			if r.Method == http.MethodOptions {
-				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 				w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, "+RequestIDHeader)
 				w.Header().Set("Access-Control-Max-Age", strconv.Itoa(int(corsMaxAge.Seconds())))
 				w.WriteHeader(http.StatusNoContent)

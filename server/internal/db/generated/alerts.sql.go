@@ -375,3 +375,41 @@ func (q *Queries) UpdateUserAlert(ctx context.Context, arg UpdateUserAlertParams
 	)
 	return i, err
 }
+
+const updateUserAlertSettingsByUserUUID = `-- name: UpdateUserAlertSettingsByUserUUID :one
+UPDATE user_alerts
+SET min_snow_amount   = $3,
+    notification_days = $4
+WHERE user_uuid = $1
+  AND resort_uuid = $2
+  AND active = true RETURNING id, user_uuid, resort_uuid, min_snow_amount, notification_days, active, created_at
+`
+
+type UpdateUserAlertSettingsByUserUUIDParams struct {
+	UserUuid         uuid.NullUUID `json:"user_uuid"`
+	ResortUuid       uuid.NullUUID `json:"resort_uuid"`
+	MinSnowAmount    float64       `json:"min_snow_amount"`
+	NotificationDays int32         `json:"notification_days"`
+}
+
+// Changes only the thresholds. Unlike UpdateUserAlert it leaves active alone,
+// and it keys off the session's user so one account cannot edit another's.
+func (q *Queries) UpdateUserAlertSettingsByUserUUID(ctx context.Context, arg UpdateUserAlertSettingsByUserUUIDParams) (UserAlert, error) {
+	row := q.queryRow(ctx, q.updateUserAlertSettingsByUserUUIDStmt, updateUserAlertSettingsByUserUUID,
+		arg.UserUuid,
+		arg.ResortUuid,
+		arg.MinSnowAmount,
+		arg.NotificationDays,
+	)
+	var i UserAlert
+	err := row.Scan(
+		&i.ID,
+		&i.UserUuid,
+		&i.ResortUuid,
+		&i.MinSnowAmount,
+		&i.NotificationDays,
+		&i.Active,
+		&i.CreatedAt,
+	)
+	return i, err
+}

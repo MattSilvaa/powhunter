@@ -5,6 +5,7 @@ package db_test
 
 import (
 	"context"
+	"database/sql"
 	"sync"
 	"testing"
 	"time"
@@ -74,6 +75,57 @@ func TestStoreIntegration_CreateUserWithAlerts(t *testing.T) {
 		)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "user_alerts_user_uuid_resort_uuid_key")
+	})
+}
+
+// Signup is anonymous, so it must not be able to change where an existing
+// account's SMS alerts go. Only the signed-in profile update may do that.
+func TestStoreIntegration_SignupDoesNotReplaceAnExistingPhone(t *testing.T) {
+	testDB, store, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+
+	ctx := t.Context()
+	queries := dbgen.New(testDB)
+	resort := testutil.SeedTestResort(t, queries, "Test Resort", 39.6403, -106.3742)
+	user := testutil.SeedTestUser(t, queries, "victim@example.com", "+15551234567")
+
+	err := store.CreateUserWithAlerts(ctx, "victim@example.com", "+15559999999", 6.0, 3,
+		[]string{resort.Uuid.String()})
+	require.NoError(t, err)
+
+	stored, err := queries.GetUserByUUID(ctx, user.Uuid)
+	require.NoError(t, err)
+	assert.Equal(t, "+15551234567", stored.Phone.String)
+
+	require.NoError(t, store.UpdateUserPhone(ctx, user.Uuid, "+15550000000"))
+
+	stored, err = queries.GetUserByUUID(ctx, user.Uuid)
+	require.NoError(t, err)
+	assert.Equal(t, "+15550000000", stored.Phone.String)
+}
+
+func TestStoreIntegration_AccountAlerts(t *testing.T) {
+	testDB, store, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+
+	ctx := t.Context()
+	queries := dbgen.New(testDB)
+	resort := testutil.SeedTestResort(t, queries, "Test Resort", 39.6403, -106.3742)
+	owner := testutil.SeedTestUser(t, queries, "owner@example.com", "+15551234567")
+	other := testutil.SeedTestUser(t, queries, "other@example.com", "+15557654321")
+
+	require.NoError(t, store.CreateAlertsForUser(ctx, owner.Uuid, 6.0, 3, []string{resort.Uuid.String()}))
+
+	t.Run("updates the owner's thresholds", func(t *testing.T) {
+		alert, err := store.UpdateAlertForUser(ctx, owner.Uuid, resort.Uuid.String(), 10.0, 7)
+		require.NoError(t, err)
+		assert.InDelta(t, 10.0, alert.MinSnowAmount, 0.001)
+		assert.Equal(t, int32(7), alert.NotificationDays)
+	})
+
+	t.Run("cannot update another account's alert", func(t *testing.T) {
+		_, err := store.UpdateAlertForUser(ctx, other.Uuid, resort.Uuid.String(), 1.0, 1)
+		assert.ErrorIs(t, err, sql.ErrNoRows)
 	})
 }
 

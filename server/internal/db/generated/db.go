@@ -111,6 +111,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.updateUserAlertStmt, err = db.PrepareContext(ctx, updateUserAlert); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateUserAlert: %w", err)
 	}
+	if q.updateUserAlertSettingsByUserUUIDStmt, err = db.PrepareContext(ctx, updateUserAlertSettingsByUserUUID); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateUserAlertSettingsByUserUUID: %w", err)
+	}
+	if q.updateUserPhoneStmt, err = db.PrepareContext(ctx, updateUserPhone); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateUserPhone: %w", err)
+	}
 	if q.upsertResortStmt, err = db.PrepareContext(ctx, upsertResort); err != nil {
 		return nil, fmt.Errorf("error preparing query UpsertResort: %w", err)
 	}
@@ -267,6 +273,16 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing updateUserAlertStmt: %w", cerr)
 		}
 	}
+	if q.updateUserAlertSettingsByUserUUIDStmt != nil {
+		if cerr := q.updateUserAlertSettingsByUserUUIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateUserAlertSettingsByUserUUIDStmt: %w", cerr)
+		}
+	}
+	if q.updateUserPhoneStmt != nil {
+		if cerr := q.updateUserPhoneStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateUserPhoneStmt: %w", cerr)
+		}
+	}
 	if q.upsertResortStmt != nil {
 		if cerr := q.upsertResortStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing upsertResortStmt: %w", cerr)
@@ -314,75 +330,79 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                                DBTX
-	tx                                *sql.Tx
-	checkAlertSentStmt                *sql.Stmt
-	consumeLoginTokenStmt             *sql.Stmt
-	createLoginTokenStmt              *sql.Stmt
-	createSessionStmt                 *sql.Stmt
-	createUserStmt                    *sql.Stmt
-	createUserAlertStmt               *sql.Stmt
-	deleteAllUserAlertsStmt           *sql.Stmt
-	deleteAllUserAlertsByUserUUIDStmt *sql.Stmt
-	deleteExpiredLoginTokensStmt      *sql.Stmt
-	deleteExpiredSessionsStmt         *sql.Stmt
-	deleteSessionStmt                 *sql.Stmt
-	deleteUserAlertStmt               *sql.Stmt
-	deleteUserAlertByUserUUIDStmt     *sql.Stmt
-	getLastAlertSnowAmountStmt        *sql.Stmt
-	getOrCreateUserByEmailStmt        *sql.Stmt
-	getResortAlertsStmt               *sql.Stmt
-	getResortByUUIDStmt               *sql.Stmt
-	getSessionByTokenHashStmt         *sql.Stmt
-	getUserAlertStmt                  *sql.Stmt
-	getUserAlertsByEmailStmt          *sql.Stmt
-	getUserAlertsByUserUUIDStmt       *sql.Stmt
-	getUserByEmailStmt                *sql.Stmt
-	getUserByUUIDStmt                 *sql.Stmt
-	insertAlertHistoryStmt            *sql.Stmt
-	listActiveAlertsStmt              *sql.Stmt
-	listResortsStmt                   *sql.Stmt
-	markEmailVerifiedStmt             *sql.Stmt
-	touchSessionStmt                  *sql.Stmt
-	updateUserAlertStmt               *sql.Stmt
-	upsertResortStmt                  *sql.Stmt
-	upsertUserStmt                    *sql.Stmt
+	db                                    DBTX
+	tx                                    *sql.Tx
+	checkAlertSentStmt                    *sql.Stmt
+	consumeLoginTokenStmt                 *sql.Stmt
+	createLoginTokenStmt                  *sql.Stmt
+	createSessionStmt                     *sql.Stmt
+	createUserStmt                        *sql.Stmt
+	createUserAlertStmt                   *sql.Stmt
+	deleteAllUserAlertsStmt               *sql.Stmt
+	deleteAllUserAlertsByUserUUIDStmt     *sql.Stmt
+	deleteExpiredLoginTokensStmt          *sql.Stmt
+	deleteExpiredSessionsStmt             *sql.Stmt
+	deleteSessionStmt                     *sql.Stmt
+	deleteUserAlertStmt                   *sql.Stmt
+	deleteUserAlertByUserUUIDStmt         *sql.Stmt
+	getLastAlertSnowAmountStmt            *sql.Stmt
+	getOrCreateUserByEmailStmt            *sql.Stmt
+	getResortAlertsStmt                   *sql.Stmt
+	getResortByUUIDStmt                   *sql.Stmt
+	getSessionByTokenHashStmt             *sql.Stmt
+	getUserAlertStmt                      *sql.Stmt
+	getUserAlertsByEmailStmt              *sql.Stmt
+	getUserAlertsByUserUUIDStmt           *sql.Stmt
+	getUserByEmailStmt                    *sql.Stmt
+	getUserByUUIDStmt                     *sql.Stmt
+	insertAlertHistoryStmt                *sql.Stmt
+	listActiveAlertsStmt                  *sql.Stmt
+	listResortsStmt                       *sql.Stmt
+	markEmailVerifiedStmt                 *sql.Stmt
+	touchSessionStmt                      *sql.Stmt
+	updateUserAlertStmt                   *sql.Stmt
+	updateUserAlertSettingsByUserUUIDStmt *sql.Stmt
+	updateUserPhoneStmt                   *sql.Stmt
+	upsertResortStmt                      *sql.Stmt
+	upsertUserStmt                        *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                                tx,
-		tx:                                tx,
-		checkAlertSentStmt:                q.checkAlertSentStmt,
-		consumeLoginTokenStmt:             q.consumeLoginTokenStmt,
-		createLoginTokenStmt:              q.createLoginTokenStmt,
-		createSessionStmt:                 q.createSessionStmt,
-		createUserStmt:                    q.createUserStmt,
-		createUserAlertStmt:               q.createUserAlertStmt,
-		deleteAllUserAlertsStmt:           q.deleteAllUserAlertsStmt,
-		deleteAllUserAlertsByUserUUIDStmt: q.deleteAllUserAlertsByUserUUIDStmt,
-		deleteExpiredLoginTokensStmt:      q.deleteExpiredLoginTokensStmt,
-		deleteExpiredSessionsStmt:         q.deleteExpiredSessionsStmt,
-		deleteSessionStmt:                 q.deleteSessionStmt,
-		deleteUserAlertStmt:               q.deleteUserAlertStmt,
-		deleteUserAlertByUserUUIDStmt:     q.deleteUserAlertByUserUUIDStmt,
-		getLastAlertSnowAmountStmt:        q.getLastAlertSnowAmountStmt,
-		getOrCreateUserByEmailStmt:        q.getOrCreateUserByEmailStmt,
-		getResortAlertsStmt:               q.getResortAlertsStmt,
-		getResortByUUIDStmt:               q.getResortByUUIDStmt,
-		getSessionByTokenHashStmt:         q.getSessionByTokenHashStmt,
-		getUserAlertStmt:                  q.getUserAlertStmt,
-		getUserAlertsByEmailStmt:          q.getUserAlertsByEmailStmt,
-		getUserAlertsByUserUUIDStmt:       q.getUserAlertsByUserUUIDStmt,
-		getUserByEmailStmt:                q.getUserByEmailStmt,
-		getUserByUUIDStmt:                 q.getUserByUUIDStmt,
-		insertAlertHistoryStmt:            q.insertAlertHistoryStmt,
-		listActiveAlertsStmt:              q.listActiveAlertsStmt,
-		listResortsStmt:                   q.listResortsStmt,
-		markEmailVerifiedStmt:             q.markEmailVerifiedStmt,
-		touchSessionStmt:                  q.touchSessionStmt,
-		updateUserAlertStmt:               q.updateUserAlertStmt,
-		upsertResortStmt:                  q.upsertResortStmt,
-		upsertUserStmt:                    q.upsertUserStmt,
+		db:                                    tx,
+		tx:                                    tx,
+		checkAlertSentStmt:                    q.checkAlertSentStmt,
+		consumeLoginTokenStmt:                 q.consumeLoginTokenStmt,
+		createLoginTokenStmt:                  q.createLoginTokenStmt,
+		createSessionStmt:                     q.createSessionStmt,
+		createUserStmt:                        q.createUserStmt,
+		createUserAlertStmt:                   q.createUserAlertStmt,
+		deleteAllUserAlertsStmt:               q.deleteAllUserAlertsStmt,
+		deleteAllUserAlertsByUserUUIDStmt:     q.deleteAllUserAlertsByUserUUIDStmt,
+		deleteExpiredLoginTokensStmt:          q.deleteExpiredLoginTokensStmt,
+		deleteExpiredSessionsStmt:             q.deleteExpiredSessionsStmt,
+		deleteSessionStmt:                     q.deleteSessionStmt,
+		deleteUserAlertStmt:                   q.deleteUserAlertStmt,
+		deleteUserAlertByUserUUIDStmt:         q.deleteUserAlertByUserUUIDStmt,
+		getLastAlertSnowAmountStmt:            q.getLastAlertSnowAmountStmt,
+		getOrCreateUserByEmailStmt:            q.getOrCreateUserByEmailStmt,
+		getResortAlertsStmt:                   q.getResortAlertsStmt,
+		getResortByUUIDStmt:                   q.getResortByUUIDStmt,
+		getSessionByTokenHashStmt:             q.getSessionByTokenHashStmt,
+		getUserAlertStmt:                      q.getUserAlertStmt,
+		getUserAlertsByEmailStmt:              q.getUserAlertsByEmailStmt,
+		getUserAlertsByUserUUIDStmt:           q.getUserAlertsByUserUUIDStmt,
+		getUserByEmailStmt:                    q.getUserByEmailStmt,
+		getUserByUUIDStmt:                     q.getUserByUUIDStmt,
+		insertAlertHistoryStmt:                q.insertAlertHistoryStmt,
+		listActiveAlertsStmt:                  q.listActiveAlertsStmt,
+		listResortsStmt:                       q.listResortsStmt,
+		markEmailVerifiedStmt:                 q.markEmailVerifiedStmt,
+		touchSessionStmt:                      q.touchSessionStmt,
+		updateUserAlertStmt:                   q.updateUserAlertStmt,
+		updateUserAlertSettingsByUserUUIDStmt: q.updateUserAlertSettingsByUserUUIDStmt,
+		updateUserPhoneStmt:                   q.updateUserPhoneStmt,
+		upsertResortStmt:                      q.upsertResortStmt,
+		upsertUserStmt:                        q.upsertUserStmt,
 	}
 }

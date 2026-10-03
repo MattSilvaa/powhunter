@@ -52,12 +52,21 @@ type Querier interface {
 	MarkEmailVerified(ctx context.Context, argUuid uuid.UUID) error
 	TouchSession(ctx context.Context, arg TouchSessionParams) error
 	UpdateUserAlert(ctx context.Context, arg UpdateUserAlertParams) (UserAlert, error)
+	// Changes only the thresholds. Unlike UpdateUserAlert it leaves active alone,
+	// and it keys off the session's user so one account cannot edit another's.
+	UpdateUserAlertSettingsByUserUUID(ctx context.Context, arg UpdateUserAlertSettingsByUserUUIDParams) (UserAlert, error)
+	UpdateUserPhone(ctx context.Context, arg UpdateUserPhoneParams) (User, error)
 	// Keyed on name so re-seeding keeps existing UUIDs and the alerts that
 	// reference them, rather than deleting and recreating every resort.
 	UpsertResort(ctx context.Context, arg UpsertResortParams) (Resort, error)
 	// Get-or-create in a single statement. A read-then-write race meant two
 	// concurrent signups with the same email both attempted an insert, and one
 	// failed on the unique constraint as a 500.
+	//
+	// Signup is anonymous, so the phone supplied here only fills in an account
+	// that has none. Replacing an existing number would let anyone who knows an
+	// address redirect that person's SMS alerts to themselves; changing the
+	// number is done signed in, through UpdateUserPhone.
 	UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error)
 }
 

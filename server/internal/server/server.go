@@ -84,6 +84,15 @@ func New(deps Deps) (http.Handler, func()) {
 	mux.Handle("DELETE /api/user/alerts/delete-all",
 		deps.Metrics.Instrument("user_alerts_delete_all",
 			writeLimiter.Middleware(private(deps.Handlers.Alert.DeleteAllUserAlerts))))
+	mux.Handle("POST /api/user/alerts",
+		deps.Metrics.Instrument("user_alerts_create",
+			writeLimiter.Middleware(private(deps.Handlers.Account.CreateUserAlerts))))
+	mux.Handle("PATCH /api/user/alerts",
+		deps.Metrics.Instrument("user_alerts_update",
+			writeLimiter.Middleware(private(deps.Handlers.Account.UpdateUserAlert))))
+	mux.Handle("PATCH /api/user/profile",
+		deps.Metrics.Instrument("user_profile_update",
+			writeLimiter.Middleware(private(deps.Handlers.Account.UpdateProfile))))
 	mux.Handle("POST /api/contact",
 		deps.Metrics.Instrument("contact", write(deps.Handlers.Contact.HandleContact)))
 

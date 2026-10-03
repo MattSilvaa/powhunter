@@ -44,3 +44,8 @@ export type UserAlert = {
 		Valid: boolean
 	}
 }
+
+export type AlertSettings = {
+	notificationDays: number
+	minSnowAmount: number
+}

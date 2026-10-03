@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, apiRequest } from './apiClient.ts'
 
@@ -63,48 +64,66 @@ export function useRequestLoginLink() {
 	}
 }
 
+// useCompleteLogin redeems an emailed sign-in token. It resolves to the
+// signed-in user, or null with error set.
+//
+// This is deliberately not a useMutation. The redeem runs from a mount effect,
+// and in development React Router renders under StrictMode, which mounts,
+// unmounts and remounts the page. The simulated unmount detaches a mutation
+// observer from the in-flight mutation and the remount never reattaches it, so
+// the request succeeded while the page sat on "Signing you in…" forever and
+// its onSuccess navigation never ran. A plain promise has no observer to lose.
 export function useCompleteLogin() {
 	const queryClient = useQueryClient()
+	const [loading, setLoading] = useState(false)
+	const [error, setError] = useState<string | null>(null)
 
-	const { mutate, isPending, isError, error } = useMutation<
-		AuthUser,
-		Error,
-		string
-	>({
-		// Redeeming the token is only half the job: the session lives in a cookie
-		// the browser may decline to keep, and a 200 here says nothing about that.
-		// Reading the session back proves the sign-in actually took, and leaves
-		// the user in the cache so the page we navigate to sees them immediately
-		// rather than reading a stale null and bouncing back to sign-in.
-		mutationFn: async (token: string) => {
-			await apiRequest<void>('/api/auth/callback', {
-				method: 'POST',
-				body: { token },
-			})
+	const completeLogin = useCallback(
+		async (token: string): Promise<AuthUser | null> => {
+			setLoading(true)
+			setError(null)
 
-			const user = await queryClient.fetchQuery({
-				queryKey: AUTH_QUERY_KEY,
-				queryFn: fetchCurrentUser,
-				staleTime: 0,
-			})
+			try {
+				await apiRequest<void>('/api/auth/callback', {
+					method: 'POST',
+					body: { token },
+				})
 
-			if (!user) {
-				throw new ApiError(
-					'Signed in, but your browser did not keep the session. Check that cookies are enabled and try the link again.',
-					0,
-					'SESSION_NOT_STORED'
+				// Redeeming the token is only half the job: the session lives in a
+				// cookie the browser may decline to keep, and a 200 here says nothing
+				// about that. Reading the session back proves the sign-in actually
+				// took, and leaves the user in the cache so the page we navigate to
+				// sees them immediately rather than reading a stale null and bouncing
+				// back to sign-in.
+				const user = await queryClient.fetchQuery({
+					queryKey: AUTH_QUERY_KEY,
+					queryFn: fetchCurrentUser,
+					staleTime: 0,
+				})
+
+				if (!user) {
+					setError(
+						'Signed in, but your browser did not keep the session. Check that cookies are enabled and try the link again.'
+					)
+					return null
+				}
+
+				return user
+			} catch (err) {
+				setError(
+					err instanceof Error && err.message
+						? err.message
+						: 'An error occurred'
 				)
+				return null
+			} finally {
+				setLoading(false)
 			}
-
-			return user
 		},
-	})
+		[queryClient]
+	)
 
-	return {
-		completeLogin: mutate,
-		loading: isPending,
-		error: isError ? error?.message || 'An error occurred' : null,
-	}
+	return { completeLogin, loading, error }
 }
 
 export function useLogout() {
@@ -121,5 +140,33 @@ export function useLogout() {
 	return {
 		logout: mutate,
 		loading: isPending,
+	}
+}
+
+// useUpdateProfile changes the phone number alerts are sent to. The server
+// answers with the updated account, which replaces the cached one directly.
+export function useUpdateProfile() {
+	const queryClient = useQueryClient()
+
+	const { mutate, isPending, isError, error, reset } = useMutation<
+		AuthUser,
+		Error,
+		string
+	>({
+		mutationFn: (phone: string) =>
+			apiRequest<AuthUser>('/api/user/profile', {
+				method: 'PATCH',
+				body: { phone },
+			}),
+		onSuccess: (user) => {
+			queryClient.setQueryData(AUTH_QUERY_KEY, user)
+		},
+	})
+
+	return {
+		updateProfile: mutate,
+		loading: isPending,
+		error: isError ? error?.message || 'An error occurred' : null,
+		reset,
 	}
 }

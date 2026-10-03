@@ -59,6 +59,9 @@ func TestCORSOnlyEchoesAllowedOrigins(t *testing.T) {
 
 		assert.Equal(t, http.StatusNoContent, rr.Code)
 		assert.NotEmpty(t, rr.Header().Get("Access-Control-Max-Age"))
+		// Editing an alert or the profile is a PATCH; a preflight that omits it
+		// blocks those requests from the cross-site web app.
+		assert.Contains(t, rr.Header().Get("Access-Control-Allow-Methods"), "PATCH")
 	})
 }
 

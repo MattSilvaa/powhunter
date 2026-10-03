@@ -53,10 +53,10 @@ export default function LoginPage() {
 
 		redeemedToken.current = token
 
-		completeLogin(token, {
-			onSuccess: () => {
+		void completeLogin(token).then((signedIn) => {
+			if (signedIn) {
 				navigate('/manage', { replace: true })
-			},
+			}
 		})
 	}, [token, completeLogin, navigate])
 
