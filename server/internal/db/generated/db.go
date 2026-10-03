@@ -27,9 +27,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.checkAlertSentStmt, err = db.PrepareContext(ctx, checkAlertSent); err != nil {
 		return nil, fmt.Errorf("error preparing query CheckAlertSent: %w", err)
 	}
-	if q.clearResortsStmt, err = db.PrepareContext(ctx, clearResorts); err != nil {
-		return nil, fmt.Errorf("error preparing query ClearResorts: %w", err)
-	}
 	if q.consumeLoginTokenStmt, err = db.PrepareContext(ctx, consumeLoginToken); err != nil {
 		return nil, fmt.Errorf("error preparing query ConsumeLoginToken: %w", err)
 	}
@@ -99,9 +96,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.insertAlertHistoryStmt, err = db.PrepareContext(ctx, insertAlertHistory); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertAlertHistory: %w", err)
 	}
-	if q.insertResortStmt, err = db.PrepareContext(ctx, insertResort); err != nil {
-		return nil, fmt.Errorf("error preparing query InsertResort: %w", err)
-	}
 	if q.listActiveAlertsStmt, err = db.PrepareContext(ctx, listActiveAlerts); err != nil {
 		return nil, fmt.Errorf("error preparing query ListActiveAlerts: %w", err)
 	}
@@ -117,6 +111,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.updateUserAlertStmt, err = db.PrepareContext(ctx, updateUserAlert); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateUserAlert: %w", err)
 	}
+	if q.upsertResortStmt, err = db.PrepareContext(ctx, upsertResort); err != nil {
+		return nil, fmt.Errorf("error preparing query UpsertResort: %w", err)
+	}
 	if q.upsertUserStmt, err = db.PrepareContext(ctx, upsertUser); err != nil {
 		return nil, fmt.Errorf("error preparing query UpsertUser: %w", err)
 	}
@@ -128,11 +125,6 @@ func (q *Queries) Close() error {
 	if q.checkAlertSentStmt != nil {
 		if cerr := q.checkAlertSentStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing checkAlertSentStmt: %w", cerr)
-		}
-	}
-	if q.clearResortsStmt != nil {
-		if cerr := q.clearResortsStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing clearResortsStmt: %w", cerr)
 		}
 	}
 	if q.consumeLoginTokenStmt != nil {
@@ -250,11 +242,6 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing insertAlertHistoryStmt: %w", cerr)
 		}
 	}
-	if q.insertResortStmt != nil {
-		if cerr := q.insertResortStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing insertResortStmt: %w", cerr)
-		}
-	}
 	if q.listActiveAlertsStmt != nil {
 		if cerr := q.listActiveAlertsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing listActiveAlertsStmt: %w", cerr)
@@ -278,6 +265,11 @@ func (q *Queries) Close() error {
 	if q.updateUserAlertStmt != nil {
 		if cerr := q.updateUserAlertStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateUserAlertStmt: %w", cerr)
+		}
+	}
+	if q.upsertResortStmt != nil {
+		if cerr := q.upsertResortStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing upsertResortStmt: %w", cerr)
 		}
 	}
 	if q.upsertUserStmt != nil {
@@ -325,7 +317,6 @@ type Queries struct {
 	db                                DBTX
 	tx                                *sql.Tx
 	checkAlertSentStmt                *sql.Stmt
-	clearResortsStmt                  *sql.Stmt
 	consumeLoginTokenStmt             *sql.Stmt
 	createLoginTokenStmt              *sql.Stmt
 	createSessionStmt                 *sql.Stmt
@@ -349,12 +340,12 @@ type Queries struct {
 	getUserByEmailStmt                *sql.Stmt
 	getUserByUUIDStmt                 *sql.Stmt
 	insertAlertHistoryStmt            *sql.Stmt
-	insertResortStmt                  *sql.Stmt
 	listActiveAlertsStmt              *sql.Stmt
 	listResortsStmt                   *sql.Stmt
 	markEmailVerifiedStmt             *sql.Stmt
 	touchSessionStmt                  *sql.Stmt
 	updateUserAlertStmt               *sql.Stmt
+	upsertResortStmt                  *sql.Stmt
 	upsertUserStmt                    *sql.Stmt
 }
 
@@ -363,7 +354,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		db:                                tx,
 		tx:                                tx,
 		checkAlertSentStmt:                q.checkAlertSentStmt,
-		clearResortsStmt:                  q.clearResortsStmt,
 		consumeLoginTokenStmt:             q.consumeLoginTokenStmt,
 		createLoginTokenStmt:              q.createLoginTokenStmt,
 		createSessionStmt:                 q.createSessionStmt,
@@ -387,12 +377,12 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getUserByEmailStmt:                q.getUserByEmailStmt,
 		getUserByUUIDStmt:                 q.getUserByUUIDStmt,
 		insertAlertHistoryStmt:            q.insertAlertHistoryStmt,
-		insertResortStmt:                  q.insertResortStmt,
 		listActiveAlertsStmt:              q.listActiveAlertsStmt,
 		listResortsStmt:                   q.listResortsStmt,
 		markEmailVerifiedStmt:             q.markEmailVerifiedStmt,
 		touchSessionStmt:                  q.touchSessionStmt,
 		updateUserAlertStmt:               q.updateUserAlertStmt,
+		upsertResortStmt:                  q.upsertResortStmt,
 		upsertUserStmt:                    q.upsertUserStmt,
 	}
 }

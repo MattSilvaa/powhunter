@@ -12,7 +12,6 @@ import (
 
 type Querier interface {
 	CheckAlertSent(ctx context.Context, arg CheckAlertSentParams) (bool, error)
-	ClearResorts(ctx context.Context) error
 	// Redeeming a token is a conditional UPDATE rather than a SELECT followed by an
 	// UPDATE: only one caller can win the race, so a link forwarded to someone else
 	// cannot be redeemed twice.
@@ -48,12 +47,14 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUUID(ctx context.Context, argUuid uuid.UUID) (User, error)
 	InsertAlertHistory(ctx context.Context, arg InsertAlertHistoryParams) error
-	InsertResort(ctx context.Context, arg InsertResortParams) (Resort, error)
 	ListActiveAlerts(ctx context.Context) ([]ListActiveAlertsRow, error)
 	ListResorts(ctx context.Context) ([]Resort, error)
 	MarkEmailVerified(ctx context.Context, argUuid uuid.UUID) error
 	TouchSession(ctx context.Context, arg TouchSessionParams) error
 	UpdateUserAlert(ctx context.Context, arg UpdateUserAlertParams) (UserAlert, error)
+	// Keyed on name so re-seeding keeps existing UUIDs and the alerts that
+	// reference them, rather than deleting and recreating every resort.
+	UpsertResort(ctx context.Context, arg UpsertResortParams) (Resort, error)
 	// Get-or-create in a single statement. A read-then-write race meant two
 	// concurrent signups with the same email both attempted an insert, and one
 	// failed on the unique constraint as a 500.

@@ -12,25 +12,21 @@ import (
 	"github.com/google/uuid"
 )
 
-const clearResorts = `-- name: ClearResorts :exec
-DELETE FROM resorts
-`
-
-func (q *Queries) ClearResorts(ctx context.Context) error {
-	_, err := q.exec(ctx, q.clearResortsStmt, clearResorts)
-	return err
-}
-
-const insertResort = `-- name: InsertResort :one
+const upsertResort = `-- name: UpsertResort :one
 INSERT INTO resorts (
   uuid, name, url_host, url_pathname, latitude, longitude
 ) VALUES (
   $1, $2, $3, $4, $5, $6
 )
+ON CONFLICT (name) DO UPDATE SET
+  url_host = EXCLUDED.url_host,
+  url_pathname = EXCLUDED.url_pathname,
+  latitude = EXCLUDED.latitude,
+  longitude = EXCLUDED.longitude
 RETURNING id, uuid, name, url_host, url_pathname, latitude, longitude
 `
 
-type InsertResortParams struct {
+type UpsertResortParams struct {
 	Uuid        uuid.UUID       `json:"uuid"`
 	Name        string          `json:"name"`
 	UrlHost     sql.NullString  `json:"url_host"`
@@ -39,8 +35,10 @@ type InsertResortParams struct {
 	Longitude   sql.NullFloat64 `json:"longitude"`
 }
 
-func (q *Queries) InsertResort(ctx context.Context, arg InsertResortParams) (Resort, error) {
-	row := q.queryRow(ctx, q.insertResortStmt, insertResort,
+// Keyed on name so re-seeding keeps existing UUIDs and the alerts that
+// reference them, rather than deleting and recreating every resort.
+func (q *Queries) UpsertResort(ctx context.Context, arg UpsertResortParams) (Resort, error) {
+	row := q.queryRow(ctx, q.upsertResortStmt, upsertResort,
 		arg.Uuid,
 		arg.Name,
 		arg.UrlHost,

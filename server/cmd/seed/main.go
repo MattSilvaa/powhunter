@@ -15,6 +15,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const resortsPath = "cmd/seed/data/resorts.json"
+
 // Resort represents a ski resort from the JSON file.
 type Resort struct {
 	Name string `json:"name"`
@@ -26,15 +28,50 @@ type Resort struct {
 	Lon float64 `json:"lon"`
 }
 
-func main() {
-	data, err := os.ReadFile("cmd/seed/data/resorts.json")
+// loadResorts reads and parses the resort seed file.
+func loadResorts(path string) ([]Resort, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		log.Fatalf("Failed to read resorts data: %v", err)
+		return nil, fmt.Errorf("reading resorts data: %w", err)
 	}
 
 	var resorts []Resort
 	if err := json.Unmarshal(data, &resorts); err != nil {
-		log.Fatalf("Failed to parse resorts data: %v", err)
+		return nil, fmt.Errorf("parsing resorts data: %w", err)
+	}
+
+	return resorts, nil
+}
+
+// upsertParams maps a seed resort onto the upsert query. The UUID is only
+// used when the resort is new; an existing resort keeps its UUID.
+func upsertParams(r Resort) dbgen.UpsertResortParams {
+	return dbgen.UpsertResortParams{
+		Uuid: uuid.New(),
+		Name: r.Name,
+		UrlHost: sql.NullString{
+			String: r.URL.Host,
+			Valid:  r.URL.Host != "",
+		},
+		UrlPathname: sql.NullString{
+			String: r.URL.PathName,
+			Valid:  r.URL.PathName != "",
+		},
+		Latitude: sql.NullFloat64{
+			Float64: r.Lat,
+			Valid:   true,
+		},
+		Longitude: sql.NullFloat64{
+			Float64: r.Lon,
+			Valid:   true,
+		},
+	}
+}
+
+func main() {
+	resorts, err := loadResorts(resortsPath)
+	if err != nil {
+		log.Fatalf("Failed to load resorts: %v", err)
 	}
 
 	dbConn, err := db.New()
@@ -48,36 +85,13 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	err = queries.ClearResorts(ctx)
-	if err != nil {
-		log.Fatalf("Failed to clear resorts: %v", err)
-	}
-
+	// Upsert rather than clear-and-insert: deleting resorts cascades to
+	// user_alerts, so re-seeding would wipe every user's alerts.
 	for _, r := range resorts {
-		_, err := queries.InsertResort(ctx, dbgen.InsertResortParams{
-			Uuid: uuid.New(),
-			Name: r.Name,
-			UrlHost: sql.NullString{
-				String: r.URL.Host,
-				Valid:  r.URL.Host != "",
-			},
-			UrlPathname: sql.NullString{
-				String: r.URL.PathName,
-				Valid:  r.URL.PathName != "",
-			},
-			Latitude: sql.NullFloat64{
-				Float64: r.Lat,
-				Valid:   true,
-			},
-			Longitude: sql.NullFloat64{
-				Float64: r.Lon,
-				Valid:   true,
-			},
-		})
-		if err != nil {
-			log.Fatalf("Failed to insert resort %s: %v", r.Name, err)
+		if _, err := queries.UpsertResort(ctx, upsertParams(r)); err != nil {
+			log.Fatalf("Failed to upsert resort %s: %v", r.Name, err)
 		}
-		fmt.Printf("Inserted resort: %s\n", r.Name)
+		fmt.Printf("Upserted resort: %s\n", r.Name)
 	}
 
 	fmt.Println("Resort seeding completed successfully")
