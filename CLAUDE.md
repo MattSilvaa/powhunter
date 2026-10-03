@@ -34,3 +34,5 @@ This is a web app that allows users to select mountain resorts which they would 
   - Get as much context about the problem by searching through the code base
   - Always run tests after changes to ensure no regressions are caused by your changes. If you write any new code, write new unit tests. 
   - When writing unit tests, make sure they are easy to understand and maintain. Only write the minimum amount of test to achieve a nice level of coverage.
+# Attribution
+  - Never add AI attribution anywhere: no `Co-Authored-By` or `Claude-Session` trailers in commits, no "Generated with Claude Code" lines or session links in PR descriptions, comments or reviews.
