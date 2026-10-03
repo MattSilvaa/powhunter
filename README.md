@@ -1,93 +1,88 @@
-# Pow Hunter
+<div align="center">
 
-> Never miss fresh powder at your favorite mountain resorts
+# ❄ Pow Hunter
 
-Pow Hunter is a web application that sends you SMS alerts when fresh snow is forecasted at your favorite ski resorts. Set your notification preferences, choose your resorts, and get ready to shred!
+**Never miss a powder day.**
+Pick your resorts and the snowfall worth chasing. Pow Hunter texts you when the forecast delivers.
 
-## Features
+[![Test](https://github.com/MattSilvaa/powhunter/actions/workflows/test.yml/badge.svg)](https://github.com/MattSilvaa/powhunter/actions/workflows/test.yml)
+[![CodeQL](https://github.com/MattSilvaa/powhunter/actions/workflows/codeql.yml/badge.svg)](https://github.com/MattSilvaa/powhunter/actions/workflows/codeql.yml)
+![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+[![License: MIT](https://img.shields.io/badge/License-MIT-1d6fe0.svg)](LICENSE)
 
-- 🏔️ Track snow forecasts at multiple mountain resorts
-- 📱 Receive SMS notifications when fresh powder is coming
-- ⏱️ Customize notification timing (1-5 days in advance)
-- ❄️ Set minimum snow thresholds for alerts
-- 🗺️ View detailed resort information and forecasts
-- 🌤️ Real-time weather data from Weather.gov API
-- 📧 Contact form with email notifications to support team
+<img src=".github/assets/home.png" alt="Pow Hunter home page" width="820" />
 
-## Technical Stack
+</div>
 
-- **Frontend**: TypeScript, React, Material UI
-- **Backend**: Go, PostgreSQL
-- **APIs**: Weather.gov for forecasts, Twilio for SMS
+## How it works
 
-## Weather.gov Integration
+1. **Pick your resorts.** Follow as many mountains as you like.
+2. **Set your number.** Choose a minimum snowfall from 1″ to 24″, and up to 10 days of notice.
+3. **Get a text.** A scheduled forecaster checks [Weather.gov](https://www.weather.gov/documentation/services-web-api) for every resort and sends an SMS through Twilio when a forecast meets your number. Each alert is sent once.
 
-Pow Hunter uses the National Weather Service (NWS) API to get accurate snow forecasts for ski resorts. The application:
+Sign-in is passwordless: request a link by email, click it, and manage your alerts.
 
-1. Retrieves grid coordinates based on resort latitude/longitude
-2. Fetches detailed snowfall predictions for each resort
-3. Checks forecasts against user alert criteria
-4. Delivers timely SMS notifications through Twilio
-
-## Getting Started
-
-### Prerequisites
-
-- Go 1.24+
-- PostgreSQL
-- Node.js 18+
-- Twilio account (for SMS notifications)
-
-### Environment Variables
-
-See `server/.env.example` for a complete list of configuration options.
+## Architecture
 
 ```
-# Database
-DATABASE_URL=postgres://user:password@localhost:5432/powhunter
-
-# Twilio (for SMS notifications)
-TWILIO_ACCOUNT_SID=your_account_sid
-TWILIO_AUTH_TOKEN=your_auth_token
-TWILIO_FROM_NUMBER=your_twilio_phone_number
-
-# SMTP (for contact form emails)
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=your-email@example.com
-SMTP_PASSWORD=your-password
-SMTP_FROM_EMAIL=noreply@powhunter.app
+client/  React SPA ──▶ server/cmd/api        Go HTTP API ──▶ PostgreSQL
+                       server/cmd/forecaster  scheduled job: Weather.gov ─▶ Twilio SMS
 ```
 
-For detailed email configuration, see [server/EMAIL_CONFIGURATION.md](server/EMAIL_CONFIGURATION.md).
+| Layer | Stack |
+| --- | --- |
+| **Web** | React 19, React Router 7, MUI 7, TanStack Query, Bun |
+| **API** | Go 1.24, `net/http`, sqlc, goose migrations |
+| **Data** | PostgreSQL 17 |
+| **Services** | Weather.gov (forecasts), Twilio (SMS), Resend (email) |
+| **Ops** | Render, Caddy, Prometheus, Grafana, Alertmanager |
 
-### Setup
+## Quick start
+
+You need **Go 1.24+**, **Bun**, and **Docker** (for the local Postgres).
 
 ```bash
-# Install dependencies
-make install
-
-# Run development environment
-make dev
-
-# Build for production
-make build
+make install      # Go modules, client packages, sqlc and goose
+make db-setup     # start Postgres in Docker and create the database
+make db-migrate   # apply migrations
+make db-seed      # load the resort list
+make dev          # API on :8080, web app on :5173
 ```
 
-## How It Works
+Local development needs no extra configuration. Without `RESEND_API_KEY`, emails (including sign-in links) are printed to the server log instead of being sent. The forecaster needs Twilio credentials to run.
 
-1. Users sign up and set alert preferences:
-   - Email and phone number
-   - Minimum snow amount (in inches)
-   - Notification days in advance (1-5)
-   - Selected ski resorts
+Every setting is documented in [`server/.env.example`](server/.env.example).
 
-2. Every 12 hours, the system:
-   - Fetches the latest snow forecasts from Weather.gov
-   - Identifies matching user alerts
-   - Sends SMS notifications for new forecasts
-   - Records sent alerts to prevent duplicates
+## Commands
 
-## Contributing
+| Command | What it does |
+| --- | --- |
+| `make dev` | Run the API and the web app with live reload |
+| `make test` | Server and client unit tests |
+| `make test-integration` | Server integration tests (needs the test database) |
+| `make lint` / `make typecheck` | golangci-lint, ESLint and TypeScript checks |
+| `make build` | Production client build and server binaries |
+| `make start-forecaster` | Run one forecast check |
+| `make generate-db-code` | Regenerate the sqlc query code |
+| `make monitoring-up` | Start Prometheus, Grafana and Alertmanager locally |
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+## Project layout
+
+```
+client/            React app (see client/STYLEGUIDE.md for UI conventions)
+server/cmd/        api, forecaster, migrate and seed entrypoints
+server/internal/   handlers, auth, forecast, weather, notify, db, metrics
+server/monitoring/ Prometheus, Alertmanager and Grafana config
+```
+
+## Docs
+
+- [Forecast pipeline](server/FORECAST.md)
+- [Testing](server/TESTING.md)
+- [Monitoring](server/monitoring/README.md)
+- [Frontend style guide](client/STYLEGUIDE.md)
+
+## License
+
+[MIT](LICENSE)
