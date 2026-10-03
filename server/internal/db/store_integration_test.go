@@ -310,6 +310,36 @@ func TestStoreIntegration_ListAllResorts(t *testing.T) {
 	})
 }
 
+// Re-seeding must update an existing resort in place: deleting it would cascade
+// to user_alerts and a new UUID would orphan anything still referencing the old one.
+func TestStoreIntegration_UpsertResortKeepsUUIDAndAlerts(t *testing.T) {
+	testDB, store, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+
+	ctx := t.Context()
+	queries := dbgen.New(testDB)
+
+	original := testutil.SeedTestResort(t, queries, "Alta", 40.0, -111.0)
+	require.NoError(t, store.CreateUserWithAlerts(
+		ctx, "upsert@example.com", "", 6.0, 2, []string{original.Uuid.String()},
+	))
+
+	updated := testutil.SeedTestResort(t, queries, "Alta", 40.5884, -111.6386)
+
+	assert.Equal(t, original.Uuid, updated.Uuid)
+	assert.InDelta(t, 40.5884, updated.Latitude.Float64, 1e-9)
+	assert.InDelta(t, -111.6386, updated.Longitude.Float64, 1e-9)
+
+	resorts, err := store.ListAllResorts(ctx)
+	require.NoError(t, err)
+	assert.Len(t, resorts, 1)
+
+	alerts, err := queries.ListActiveAlerts(ctx)
+	require.NoError(t, err)
+	require.Len(t, alerts, 1)
+	assert.Equal(t, original.Uuid, alerts[0].ResortUuid.UUID)
+}
+
 // Two people signing up at the same moment with the same email previously both
 // saw no existing row, both inserted, and one failed on the unique constraint.
 func TestStoreIntegration_ConcurrentSignupsShareOneUser(t *testing.T) {

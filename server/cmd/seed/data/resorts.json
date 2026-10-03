@@ -15,7 +15,7 @@
       "pathname": "/mountain-report"
     },
     "lat": 47.424653,
-    "lon": -121.415540
+    "lon": -121.41554
   },
   {
     "name": "Palisades Tahoe",
@@ -25,5 +25,230 @@
     },
     "lat": 39.196045,
     "lon": -120.233299
+  },
+  {
+    "name": "Vail",
+    "url": {
+      "host": "https://www.vail.com",
+      "pathname": "/the-mountain/mountain-conditions/snow-and-weather-report.aspx"
+    },
+    "lat": 39.6403,
+    "lon": -106.3742
+  },
+  {
+    "name": "Breckenridge",
+    "url": {
+      "host": "https://www.breckenridge.com",
+      "pathname": "/the-mountain/mountain-conditions/snow-and-weather-report.aspx"
+    },
+    "lat": 39.4817,
+    "lon": -106.0384
+  },
+  {
+    "name": "Whistler Blackcomb",
+    "url": {
+      "host": "https://www.whistlerblackcomb.com",
+      "pathname": "/the-mountain/mountain-conditions/snow-and-weather-report.aspx"
+    },
+    "lat": 50.1163,
+    "lon": -122.9574
+  },
+  {
+    "name": "Park City Mountain",
+    "url": {
+      "host": "https://www.parkcitymountain.com",
+      "pathname": "/the-mountain/mountain-conditions/snow-and-weather-report.aspx"
+    },
+    "lat": 40.6514,
+    "lon": -111.508
+  },
+  {
+    "name": "Keystone",
+    "url": {
+      "host": "https://www.keystoneresort.com",
+      "pathname": "/the-mountain/mountain-conditions/snow-and-weather-report.aspx"
+    },
+    "lat": 39.6045,
+    "lon": -105.9539
+  },
+  {
+    "name": "Copper Mountain",
+    "url": {
+      "host": "https://www.coppercolorado.com",
+      "pathname": "/the-mountain/conditions-weather/snow-report"
+    },
+    "lat": 39.5022,
+    "lon": -106.1511
+  },
+  {
+    "name": "Mammoth Mountain",
+    "url": {
+      "host": "https://www.mammothmountain.com",
+      "pathname": "/on-the-mountain/mountain-report"
+    },
+    "lat": 37.6308,
+    "lon": -119.0326
+  },
+  {
+    "name": "Steamboat",
+    "url": {
+      "host": "https://www.steamboat.com",
+      "pathname": "/the-mountain/mountain-report"
+    },
+    "lat": 40.4572,
+    "lon": -106.8045
+  },
+  {
+    "name": "Winter Park",
+    "url": {
+      "host": "https://www.winterparkresort.com",
+      "pathname": "/the-mountain/mountain-report"
+    },
+    "lat": 39.8868,
+    "lon": -105.7625
+  },
+  {
+    "name": "Jackson Hole",
+    "url": {
+      "host": "https://www.jacksonhole.com",
+      "pathname": "/conditions"
+    },
+    "lat": 43.5875,
+    "lon": -110.8279
+  },
+  {
+    "name": "Big Sky",
+    "url": {
+      "host": "https://www.bigskyresort.com",
+      "pathname": "/the-mountain/mountain-report"
+    },
+    "lat": 45.2857,
+    "lon": -111.4012
+  },
+  {
+    "name": "Aspen Snowmass",
+    "url": {
+      "host": "https://www.aspensnowmass.com",
+      "pathname": "/four-mountains/snow-report"
+    },
+    "lat": 39.2084,
+    "lon": -106.949
+  },
+  {
+    "name": "Heavenly",
+    "url": {
+      "host": "https://www.skiheavenly.com",
+      "pathname": "/the-mountain/mountain-conditions/snow-and-weather-report.aspx"
+    },
+    "lat": 38.9353,
+    "lon": -119.94
+  },
+  {
+    "name": "Killington",
+    "url": {
+      "host": "https://www.killington.com",
+      "pathname": "/the-mountain/conditions-weather/current-conditions-weather"
+    },
+    "lat": 43.6262,
+    "lon": -72.7968
+  },
+  {
+    "name": "Stowe",
+    "url": {
+      "host": "https://www.stowe.com",
+      "pathname": "/the-mountain/mountain-conditions/snow-and-weather-report.aspx"
+    },
+    "lat": 44.5303,
+    "lon": -72.7814
+  },
+  {
+    "name": "Telluride",
+    "url": {
+      "host": "https://tellurideskiresort.com",
+      "pathname": "/snow-report"
+    },
+    "lat": 37.9364,
+    "lon": -107.8466
+  },
+  {
+    "name": "Alta",
+    "url": {
+      "host": "https://www.alta.com",
+      "pathname": "/conditions"
+    },
+    "lat": 40.5884,
+    "lon": -111.6386
+  },
+  {
+    "name": "Snowbird",
+    "url": {
+      "host": "https://www.snowbird.com",
+      "pathname": "/mountain-report"
+    },
+    "lat": 40.581,
+    "lon": -111.6566
+  },
+  {
+    "name": "Deer Valley",
+    "url": {
+      "host": "https://www.deervalley.com",
+      "pathname": "/mountain-report"
+    },
+    "lat": 40.6374,
+    "lon": -111.4783
+  },
+  {
+    "name": "Sun Valley",
+    "url": {
+      "host": "https://www.sunvalley.com",
+      "pathname": "/mountain-report"
+    },
+    "lat": 43.6765,
+    "lon": -114.365
+  },
+  {
+    "name": "Mt. Bachelor",
+    "url": {
+      "host": "https://www.mtbachelor.com",
+      "pathname": "/conditions-report"
+    },
+    "lat": 43.9792,
+    "lon": -121.6886
+  },
+  {
+    "name": "Arapahoe Basin",
+    "url": {
+      "host": "https://www.arapahoebasin.com",
+      "pathname": "/snow-report"
+    },
+    "lat": 39.6425,
+    "lon": -105.8719
+  },
+  {
+    "name": "Northstar",
+    "url": {
+      "host": "https://www.northstarcalifornia.com",
+      "pathname": "/the-mountain/mountain-conditions/snow-and-weather-report.aspx"
+    },
+    "lat": 39.2746,
+    "lon": -120.121
+  },
+  {
+    "name": "Mont Tremblant",
+    "url": {
+      "host": "https://www.tremblant.ca",
+      "pathname": "/mountain-report"
+    },
+    "lat": 46.2094,
+    "lon": -74.585
+  },
+  {
+    "name": "Lake Louise",
+    "url": {
+      "host": "https://www.skilouise.com",
+      "pathname": "/snow-conditions"
+    },
+    "lat": 51.4419,
+    "lon": -116.1622
   }
 ]
