@@ -3,9 +3,6 @@ import {
 	Alert,
 	Box,
 	Button,
-	Card,
-	CardContent,
-	Chip,
 	CircularProgress,
 	Container,
 	Dialog,
@@ -17,7 +14,7 @@ import {
 	Paper,
 	Typography,
 } from '@mui/material'
-import { Delete, DeleteSweep } from '@mui/icons-material'
+import { AcUnit, Add, DeleteOutline } from '@mui/icons-material'
 import { Link, useNavigate } from 'react-router'
 import {
 	useUserAlerts,
@@ -26,6 +23,8 @@ import {
 } from '../shared/useManageAlerts.ts'
 import { useCurrentUser, useLogout } from '../shared/useAuth.ts'
 import { UserAlert } from '../shared/types.ts'
+import PageHeader from '../components/pageHeader.tsx'
+import { tabularNums } from '../theme.ts'
 
 // created_at arrives from Go as a nullable timestamp, so guard both the null
 // case and an unparseable value rather than rendering "Invalid Date".
@@ -102,158 +101,174 @@ export default function ManageSubscriptionsPage() {
 	}
 
 	return (
-		<Container maxWidth="md" sx={{ py: 4 }}>
-			<Paper elevation={3} sx={{ p: 4 }}>
-				<Box
-					sx={{
-						display: 'flex',
-						justifyContent: 'space-between',
-						alignItems: 'flex-start',
-						gap: 2,
-						mb: 2,
-					}}
-				>
-					<Box>
-						<Typography variant="h2" component="h1" gutterBottom>
-							Manage Your Subscriptions
-						</Typography>
-						<Typography variant="body1" color="text.secondary">
-							Signed in as {user.email}
-						</Typography>
-					</Box>
+		<Container maxWidth="sm" sx={{ py: { xs: 5, md: 8 } }}>
+			<PageHeader
+				title="Your alerts"
+				subtitle={`Signed in as ${user.email}`}
+				action={
 					<Button
-						variant="text"
+						variant="outlined"
+						size="small"
 						onClick={() =>
 							logout(undefined, {
 								onSuccess: () => navigate('/login', { replace: true }),
 							})
 						}
 						disabled={loggingOut}
+						sx={{ flexShrink: 0, mt: 0.5 }}
 					>
 						Sign out
 					</Button>
+				}
+			/>
+
+			{error && (
+				<Alert severity="error" sx={{ mb: 3 }}>
+					Failed to load subscriptions. Please try again.
+				</Alert>
+			)}
+
+			{deleteAlertMutation.error && (
+				<Alert severity="error" sx={{ mb: 3 }}>
+					Failed to delete subscription. Please try again.
+				</Alert>
+			)}
+
+			{deleteAllMutation.error && (
+				<Alert severity="error" sx={{ mb: 3 }}>
+					Failed to delete all subscriptions. Please try again.
+				</Alert>
+			)}
+
+			{isLoading && (
+				<Box sx={{ textAlign: 'center', py: 6 }}>
+					<CircularProgress size={28} />
 				</Box>
+			)}
 
-				{error && (
-					<Alert severity="error" sx={{ mb: 3 }}>
-						Failed to load subscriptions. Please try again.
-					</Alert>
-				)}
-
-				{deleteAlertMutation.error && (
-					<Alert severity="error" sx={{ mb: 3 }}>
-						Failed to delete subscription. Please try again.
-					</Alert>
-				)}
-
-				{deleteAllMutation.error && (
-					<Alert severity="error" sx={{ mb: 3 }}>
-						Failed to delete all subscriptions. Please try again.
-					</Alert>
-				)}
-
-				{isLoading && (
-					<Box sx={{ textAlign: 'center', py: 4 }}>
-						<CircularProgress />
-					</Box>
-				)}
-
-				{!isLoading && alerts.length === 0 && !error && (
-					<Alert severity="info" sx={{ mb: 3 }}>
-						No active subscriptions yet.
-						<Button component={Link} to="/signup" sx={{ ml: 1 }}>
-							Create one?
-						</Button>
-					</Alert>
-				)}
-
-				{alerts.length > 0 && (
-					<>
-						<Box
-							sx={{
-								display: 'flex',
-								justifyContent: 'space-between',
-								alignItems: 'center',
-								mb: 2,
-							}}
-						>
-							<Typography variant="h5" component="h2">
-								Active Subscriptions ({alerts.length})
-							</Typography>
-							<Button
-								variant="outlined"
-								color="error"
-								startIcon={<DeleteSweep />}
-								onClick={() => setDeleteAllConfirmOpen(true)}
-								disabled={deleteAllMutation.isPending}
-							>
-								Delete All
-							</Button>
-						</Box>
-
-						<Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-							{alerts.map((alert) => (
-								<Card key={alert.id} variant="outlined">
-									<CardContent>
-										<Box
-											sx={{
-												display: 'flex',
-												justifyContent: 'space-between',
-												alignItems: 'flex-start',
-											}}
-										>
-											<Box sx={{ flex: 1 }}>
-												<Typography variant="h6" component="h3">
-													{alert.resort_name}
-												</Typography>
-												<Box sx={{ mt: 1, mb: 1 }}>
-													<Chip
-														label={`${alert.min_snow_amount}" minimum snow`}
-														size="small"
-														sx={{ mr: 1 }}
-													/>
-													<Chip
-														label={`${alert.notification_days} days notice`}
-														size="small"
-													/>
-												</Box>
-												<Typography variant="body2" color="text.secondary">
-													Created: {formatCreatedAt(alert.created_at)}
-												</Typography>
-											</Box>
-											<IconButton
-												color="error"
-												aria-label={`Delete subscription for ${alert.resort_name}`}
-												onClick={() =>
-													handleDeleteClick(
-														alert.resort_uuid,
-														alert.resort_name
-													)
-												}
-												disabled={deleteAlertMutation.isPending}
-											>
-												<Delete />
-											</IconButton>
-										</Box>
-									</CardContent>
-								</Card>
-							))}
-						</Box>
-					</>
-				)}
-
-				<Box sx={{ mt: 4, textAlign: 'center' }}>
-					<Button component={Link} to="/" variant="text">
-						← Back to Home
+			{!isLoading && alerts.length === 0 && !error && (
+				<Paper variant="outlined" sx={{ py: 6, px: 3, textAlign: 'center' }}>
+					<AcUnit sx={{ fontSize: 28, color: 'text.disabled', mb: 1.5 }} />
+					<Typography variant="h6" component="h2">
+						No alerts yet
+					</Typography>
+					<Typography color="text.secondary" sx={{ mt: 0.5, mb: 3 }}>
+						Create one and we&apos;ll text you when it&apos;s about to dump.
+					</Typography>
+					<Button component={Link} to="/signup" variant="contained">
+						Create an alert
 					</Button>
-				</Box>
-			</Paper>
+				</Paper>
+			)}
+
+			{alerts.length > 0 && (
+				<>
+					<Box
+						sx={{
+							display: 'flex',
+							justifyContent: 'space-between',
+							alignItems: 'center',
+							mb: 1.5,
+						}}
+					>
+						<Typography
+							variant="overline"
+							component="h2"
+							color="text.secondary"
+							sx={tabularNums}
+						>
+							{alerts.length} active
+						</Typography>
+						<Button
+							size="small"
+							color="error"
+							onClick={() => setDeleteAllConfirmOpen(true)}
+							disabled={deleteAllMutation.isPending}
+						>
+							Delete all
+						</Button>
+					</Box>
+
+					<Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+						{alerts.map((alert, i) => (
+							<Box
+								key={alert.id}
+								sx={{
+									display: 'flex',
+									alignItems: 'center',
+									gap: { xs: 2, sm: 2.5 },
+									px: { xs: 2, sm: 3 },
+									py: 2.25,
+									borderTop: i === 0 ? 0 : 1,
+									borderColor: 'divider',
+								}}
+							>
+								<Typography
+									aria-hidden
+									sx={{
+										...tabularNums,
+										minWidth: 56,
+										fontSize: '1.75rem',
+										fontWeight: 600,
+										letterSpacing: '-0.03em',
+										lineHeight: 1,
+									}}
+								>
+									{alert.min_snow_amount}&Prime;
+								</Typography>
+								<Box sx={{ flex: 1, minWidth: 0 }}>
+									<Typography variant="h6" component="h3" noWrap>
+										{alert.resort_name}
+									</Typography>
+									<Typography
+										variant="body2"
+										color="text.secondary"
+										sx={tabularNums}
+									>
+										<span className="sr-only">
+											{alert.min_snow_amount} inch minimum,{' '}
+										</span>
+										{alert.notification_days}{' '}
+										{alert.notification_days === 1 ? 'day' : 'days'} notice ·
+										Added {formatCreatedAt(alert.created_at)}
+									</Typography>
+								</Box>
+								<IconButton
+									aria-label={`Delete subscription for ${alert.resort_name}`}
+									onClick={() =>
+										handleDeleteClick(alert.resort_uuid, alert.resort_name)
+									}
+									disabled={deleteAlertMutation.isPending}
+									sx={{
+										color: 'text.secondary',
+										'&:hover': {
+											color: 'error.main',
+											bgcolor: 'rgb(211 47 47 / 0.06)',
+										},
+									}}
+								>
+									<DeleteOutline fontSize="small" />
+								</IconButton>
+							</Box>
+						))}
+					</Paper>
+
+					<Button
+						component={Link}
+						to="/signup"
+						startIcon={<Add />}
+						sx={{ mt: 2 }}
+					>
+						Add another resort
+					</Button>
+				</>
+			)}
 
 			<Dialog
 				open={deleteConfirmOpen}
 				onClose={() => setDeleteConfirmOpen(false)}
 			>
-				<DialogTitle>Delete Subscription</DialogTitle>
+				<DialogTitle>Delete this alert?</DialogTitle>
 				<DialogContent>
 					<DialogContentText>
 						Are you sure you want to delete your subscription for{' '}
@@ -261,8 +276,13 @@ export default function ManageSubscriptionsPage() {
 						receive powder alerts for this resort.
 					</DialogContentText>
 				</DialogContent>
-				<DialogActions>
-					<Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+				<DialogActions sx={{ px: 3, pb: 2.5 }}>
+					<Button
+						onClick={() => setDeleteConfirmOpen(false)}
+						sx={{ color: 'text.secondary' }}
+					>
+						Cancel
+					</Button>
 					<Button
 						onClick={handleDeleteConfirm}
 						color="error"
@@ -278,7 +298,7 @@ export default function ManageSubscriptionsPage() {
 				open={deleteAllConfirmOpen}
 				onClose={() => setDeleteAllConfirmOpen(false)}
 			>
-				<DialogTitle>Delete All Subscriptions</DialogTitle>
+				<DialogTitle>Delete all alerts?</DialogTitle>
 				<DialogContent>
 					<DialogContentText>
 						Are you sure you want to delete ALL your powder alert subscriptions?
@@ -286,8 +306,13 @@ export default function ManageSubscriptionsPage() {
 						powder alerts.
 					</DialogContentText>
 				</DialogContent>
-				<DialogActions>
-					<Button onClick={() => setDeleteAllConfirmOpen(false)}>Cancel</Button>
+				<DialogActions sx={{ px: 3, pb: 2.5 }}>
+					<Button
+						onClick={() => setDeleteAllConfirmOpen(false)}
+						sx={{ color: 'text.secondary' }}
+					>
+						Cancel
+					</Button>
 					<Button
 						onClick={handleDeleteAllConfirm}
 						color="error"

@@ -5,6 +5,7 @@ import {
 	Button,
 	CircularProgress,
 	Container,
+	Link as MuiLink,
 	Paper,
 	TextField,
 	Typography,
@@ -15,6 +16,7 @@ import {
 	useCurrentUser,
 	useRequestLoginLink,
 } from '../shared/useAuth.ts'
+import PageHeader from '../components/pageHeader.tsx'
 
 export default function LoginPage() {
 	const [searchParams] = useSearchParams()
@@ -85,12 +87,12 @@ export default function LoginPage() {
 
 	if (token) {
 		return (
-			<Container maxWidth="sm" sx={{ py: 8 }}>
-				<Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
+			<Container maxWidth="xs" sx={{ py: { xs: 6, md: 10 } }}>
+				<Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
 					{completing && (
 						<>
-							<CircularProgress />
-							<Typography variant="body1" sx={{ mt: 2 }}>
+							<CircularProgress size={28} />
+							<Typography color="text.secondary" sx={{ mt: 2 }}>
 								Signing you in…
 							</Typography>
 						</>
@@ -111,20 +113,12 @@ export default function LoginPage() {
 	}
 
 	return (
-		<Container maxWidth="sm" sx={{ py: 8 }}>
-			<Paper elevation={3} sx={{ p: 4 }}>
-				<Typography variant="h2" component="h1" gutterBottom align="center">
-					Sign in
-				</Typography>
-				<Typography
-					variant="body1"
-					color="text.secondary"
-					align="center"
-					sx={{ mb: 4 }}
-				>
-					We'll email you a link to sign in. No password required.
-				</Typography>
-
+		<Container maxWidth="xs" sx={{ py: { xs: 6, md: 10 } }}>
+			<PageHeader
+				title="Sign in"
+				subtitle="We'll email you a link to sign in. No password required."
+			/>
+			<Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3.5 } }}>
 				{sent ? (
 					<Alert severity="success">
 						If that address has an account, a sign-in link is on its way. The
@@ -143,6 +137,7 @@ export default function LoginPage() {
 							label="Email Address"
 							type="email"
 							name="email"
+							autoComplete="email"
 							value={email}
 							onChange={(e) => {
 								setEmail(e.target.value)
@@ -150,7 +145,7 @@ export default function LoginPage() {
 							}}
 							error={!!emailError}
 							helperText={emailError}
-							sx={{ mb: 3 }}
+							sx={{ mb: 2.5 }}
 						/>
 
 						<Button
@@ -164,13 +159,14 @@ export default function LoginPage() {
 						</Button>
 					</Box>
 				)}
-
-				<Box sx={{ mt: 4, textAlign: 'center' }}>
-					<Button component={Link} to="/" variant="text">
-						← Back to Home
-					</Button>
-				</Box>
 			</Paper>
+			<Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
+				New here?{' '}
+				<MuiLink component={Link} to="/signup" underline="hover">
+					Create an alert
+				</MuiLink>{' '}
+				and you&apos;ll get an account with it.
+			</Typography>
 		</Container>
 	)
 }

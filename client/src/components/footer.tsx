@@ -1,6 +1,13 @@
 import { Link } from 'react-router'
 import { Box, Container, Typography, Link as MuiLink } from '@mui/material'
 
+const linkSx = {
+	color: 'text.secondary',
+	fontSize: '0.875rem',
+	textDecoration: 'none',
+	'&:hover': { color: 'text.primary' },
+}
+
 export default function Footer() {
 	const currentYear = new Date().getFullYear()
 
@@ -8,62 +15,33 @@ export default function Footer() {
 		<Box
 			component="footer"
 			sx={{
-				bgcolor: 'primary.main',
-				color: 'white',
-				py: 2,
+				borderTop: 1,
+				borderColor: 'divider',
+				bgcolor: 'background.paper',
+				py: 3,
 				mt: 'auto',
 			}}
 		>
-			<Container maxWidth="lg">
-				<Box
-					sx={{
-						display: 'flex',
-						flexDirection: { xs: 'column', sm: 'row' },
-						justifyContent: 'space-between',
-						alignItems: 'center',
-						gap: { xs: 1, sm: 2 },
-					}}
-				>
-					<Typography
-						variant="body2"
-						sx={{ opacity: 0.8, fontSize: '0.875rem' }}
-					>
-						© {currentYear} Pow Hunter
-					</Typography>
-					<Box sx={{ display: 'flex', gap: 2 }}>
-						<MuiLink
-							component={Link}
-							to="/"
-							sx={{
-								color: 'white',
-								fontSize: '0.875rem',
-								textDecoration: 'none',
-								opacity: 0.8,
-								'&:hover': {
-									opacity: 1,
-									textDecoration: 'underline',
-								},
-							}}
-						>
-							Home
-						</MuiLink>
-						<MuiLink
-							component={Link}
-							to="/contact"
-							sx={{
-								color: 'white',
-								fontSize: '0.875rem',
-								textDecoration: 'none',
-								opacity: 0.8,
-								'&:hover': {
-									opacity: 1,
-									textDecoration: 'underline',
-								},
-							}}
-						>
-							Contact
-						</MuiLink>
-					</Box>
+			<Container
+				maxWidth="lg"
+				sx={{
+					display: 'flex',
+					flexDirection: { xs: 'column', sm: 'row' },
+					justifyContent: 'space-between',
+					alignItems: 'center',
+					gap: 1,
+				}}
+			>
+				<Typography variant="body2" color="text.secondary">
+					© {currentYear} Pow Hunter
+				</Typography>
+				<Box component="nav" sx={{ display: 'flex', gap: 3 }}>
+					<MuiLink component={Link} to="/" sx={linkSx}>
+						Home
+					</MuiLink>
+					<MuiLink component={Link} to="/contact" sx={linkSx}>
+						Contact
+					</MuiLink>
 				</Box>
 			</Container>
 		</Box>

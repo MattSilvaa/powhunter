@@ -1,4 +1,5 @@
 import React from 'react'
+import '@fontsource-variable/inter'
 import appStylesHref from './app.css?url'
 import {
 	isRouteErrorResponse,
@@ -6,179 +7,24 @@ import {
 	Scripts,
 	ScrollRestoration,
 } from 'react-router'
-import { createTheme, ThemeProvider } from '@mui/material/styles'
-import { CssBaseline } from '@mui/material'
+import { ThemeProvider } from '@mui/material/styles'
+import { Box, Button, Container, CssBaseline, Typography } from '@mui/material'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Footer from './components/footer'
+import Header from './components/header'
+import theme from './theme'
 
 const queryClient = new QueryClient()
 
-const theme = createTheme({
-	palette: {
-		primary: {
-			main: '#0f172a',
-			light: '#1e293b',
-			dark: '#020617',
-		},
-		secondary: {
-			main: '#3b82f6',
-			light: '#60a5fa',
-			dark: '#1d4ed8',
-		},
-		background: {
-			default: '#f8fafc',
-			paper: '#ffffff',
-		},
-		text: {
-			primary: '#0f172a',
-			secondary: '#475569',
-		},
-	},
-	typography: {
-		fontFamily: [
-			'Inter',
-			'-apple-system',
-			'BlinkMacSystemFont',
-			'"Segoe UI"',
-			'Roboto',
-			'"Helvetica Neue"',
-			'Arial',
-			'sans-serif',
-		].join(','),
-		h1: {
-			fontSize: '3.5rem',
-			fontWeight: 800,
-			lineHeight: 1.1,
-			letterSpacing: '-0.025em',
-		},
-		h2: {
-			fontSize: '2.5rem',
-			fontWeight: 700,
-			lineHeight: 1.2,
-			letterSpacing: '-0.025em',
-		},
-		h3: {
-			fontSize: '1.875rem',
-			fontWeight: 600,
-			lineHeight: 1.3,
-		},
-		h5: {
-			fontSize: '1.25rem',
-			fontWeight: 600,
-			lineHeight: 1.4,
-		},
-		body1: {
-			fontSize: '1rem',
-			lineHeight: 1.6,
-		},
-		button: {
-			textTransform: 'none',
-			fontWeight: 600,
-		},
-	},
-	shape: {
-		borderRadius: 12,
-	},
-	shadows: [
-		'none',
-		'0 1px 2px 0 rgb(0 0 0 / 0.05)',
-		'0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
-		'0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
-		'0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-		'0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-		'0 25px 50px -12px rgb(0 0 0 / 0.25)',
-	],
-	components: {
-		MuiButton: {
-			styleOverrides: {
-				root: {
-					borderRadius: 12,
-					padding: '12px 24px',
-					fontSize: '1rem',
-					boxShadow: 'none',
-					transition: 'all 0.2s ease-in-out',
-					'&:hover': {
-						transform: 'translateY(-1px)',
-						boxShadow:
-							'0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-					},
-				},
-				contained: {
-					'&:hover': {
-						boxShadow:
-							'0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-					},
-				},
-			},
-		},
-		MuiCard: {
-			styleOverrides: {
-				root: {
-					borderRadius: 16,
-					border: '1px solid rgb(226 232 240)',
-					boxShadow:
-						'0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
-					transition: 'all 0.2s ease-in-out',
-					'&:hover': {
-						transform: 'translateY(-2px)',
-						boxShadow:
-							'0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-					},
-				},
-			},
-		},
-		MuiPaper: {
-			styleOverrides: {
-				root: {
-					borderRadius: 16,
-					border: '1px solid rgb(226 232 240)',
-				},
-			},
-		},
-		MuiTextField: {
-			styleOverrides: {
-				root: {
-					'& .MuiOutlinedInput-root': {
-						borderRadius: 12,
-					},
-				},
-			},
-		},
-	},
-})
-
 export default function Root() {
 	return (
-		<div
-			style={{
-				minHeight: '100vh',
-				display: 'flex',
-				flexDirection: 'column',
-			}}
-		>
-			<div style={{ flex: 1 }}>
+		<Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+			<Header />
+			<Box component="main" sx={{ flex: 1 }}>
 				<Outlet />
-			</div>
+			</Box>
 			<Footer />
-		</div>
+		</Box>
 	)
 }
 
@@ -188,6 +34,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 			<head>
 				<meta charSet="utf-8" />
 				<meta name="viewport" content="width=device-width, initial-scale=1" />
+				<meta name="theme-color" content="#ffffff" />
 				<link rel="stylesheet" href={appStylesHref} />
 				<title>Pow Hunter</title>
 			</head>
@@ -233,14 +80,31 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 	}
 
 	return (
-		<main id="error-page">
-			<h1>{message}</h1>
-			<p>{details}</p>
+		<Container component="main" maxWidth="sm" sx={{ py: { xs: 8, md: 12 } }}>
+			<Typography variant="h3" component="h1" gutterBottom>
+				{message}
+			</Typography>
+			<Typography color="text.secondary" sx={{ mb: 4 }}>
+				{details}
+			</Typography>
+			<Button href="/" variant="contained">
+				Back to home
+			</Button>
 			{stack && (
-				<pre>
+				<Box
+					component="pre"
+					sx={{
+						mt: 4,
+						p: 2,
+						overflow: 'auto',
+						fontSize: '0.8125rem',
+						bgcolor: 'secondary.light',
+						borderRadius: 2,
+					}}
+				>
 					<code>{stack}</code>
-				</pre>
+				</Box>
 			)}
-		</main>
+		</Container>
 	)
 }

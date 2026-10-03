@@ -1,16 +1,15 @@
 import React, { useState } from 'react'
 import {
+	Alert,
 	Box,
 	Button,
-	Container,
-	TextField,
-	Typography,
-	Alert,
 	CircularProgress,
+	Container,
+	Paper,
+	TextField,
 } from '@mui/material'
-import { Email as EmailIcon } from '@mui/icons-material'
 import { apiRequest } from '../shared/apiClient.ts'
-
+import PageHeader from '../components/pageHeader.tsx'
 
 interface ContactFormData {
 	name: string
@@ -61,46 +60,17 @@ export default function ContactUs() {
 	}
 
 	return (
-		<Box
-			sx={{
-				minHeight: '100vh',
-				display: 'flex',
-				flexDirection: 'column',
-				justifyContent: 'center',
-				bgcolor: 'background.default',
-				py: { xs: 4, sm: 6, md: 8 },
-			}}
-		>
-			<Container maxWidth="sm">
-				<Box sx={{ textAlign: 'center', mb: { xs: 4, sm: 5 } }}>
-					<EmailIcon
-						sx={{
-							fontSize: { xs: 40, sm: 48 },
-							color: 'primary.main',
-							mb: 2,
-						}}
-					/>
-					<Typography
-						variant="h2"
-						component="h1"
-						gutterBottom
-						sx={{ fontSize: { xs: '2rem', sm: '2.5rem' } }}
-					>
-						Contact Us
-					</Typography>
-					<Typography variant="body1" color="text.secondary">
-						Have questions or feedback? We'd love to hear from you!
-					</Typography>
-				</Box>
+		<Container maxWidth="sm" sx={{ py: { xs: 5, md: 8 } }}>
+			<PageHeader
+				title="Contact Us"
+				subtitle="Have questions or feedback? We'd love to hear from you!"
+			/>
 
+			<Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 4 } }}>
 				<Box
 					component="form"
 					onSubmit={handleSubmit}
-					sx={{
-						display: 'flex',
-						flexDirection: 'column',
-						gap: { xs: 2.5, sm: 3 },
-					}}
+					sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}
 				>
 					{success && (
 						<Alert severity="success" onClose={() => setSuccess(false)}>
@@ -118,6 +88,7 @@ export default function ContactUs() {
 						fullWidth
 						label="Name"
 						name="name"
+						autoComplete="name"
 						value={formData.name}
 						onChange={handleChange}
 						required
@@ -129,6 +100,7 @@ export default function ContactUs() {
 						label="Email"
 						name="email"
 						type="email"
+						autoComplete="email"
 						value={formData.email}
 						onChange={handleChange}
 						required
@@ -152,14 +124,10 @@ export default function ContactUs() {
 						variant="contained"
 						size="large"
 						disabled={loading}
-						sx={{
-							py: 1.5,
-							position: 'relative',
-						}}
 					>
 						{loading ? (
 							<>
-								<CircularProgress size={24} sx={{ mr: 1 }} />
+								<CircularProgress size={18} color="inherit" sx={{ mr: 1 }} />
 								Sending...
 							</>
 						) : (
@@ -167,7 +135,7 @@ export default function ContactUs() {
 						)}
 					</Button>
 				</Box>
-			</Container>
-		</Box>
+			</Paper>
+		</Container>
 	)
 }

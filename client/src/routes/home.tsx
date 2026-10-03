@@ -2,229 +2,253 @@ import { Link } from 'react-router'
 import {
 	Box,
 	Button,
-	Card,
-	CardContent,
+	Chip,
 	Container,
 	Grid,
+	Paper,
 	Typography,
-	useTheme,
 } from '@mui/material'
-import {
-	Favorite as FavoriteIcon,
-	Notifications as NotificationsIcon,
-	Rocket as RocketIcon,
-} from '@mui/icons-material'
+import { ArrowForward, Check } from '@mui/icons-material'
+import { tabularNums } from '../theme.ts'
 
-export default function Home() {
-	const theme = useTheme()
+// Illustrative forecast for the hero card. It is labelled as an example so it
+// never reads as a live report.
+const EXAMPLE_FORECAST = [
+	{ day: 'Thu', inches: 2, inWindow: true },
+	{ day: 'Fri', inches: 9, inWindow: true },
+	{ day: 'Sat', inches: 3, inWindow: true },
+	{ day: 'Sun', inches: 0, inWindow: false },
+	{ day: 'Mon', inches: 1, inWindow: false },
+]
+const EXAMPLE_TOTAL = EXAMPLE_FORECAST.filter((d) => d.inWindow).reduce(
+	(sum, d) => sum + d.inches,
+	0
+)
+const EXAMPLE_THRESHOLD = 12
+const MAX_DAILY = Math.max(...EXAMPLE_FORECAST.map((d) => d.inches))
 
+const STEPS = [
+	{
+		title: 'Pick your resorts',
+		body: 'Follow as many mountains as you like. Each alert is managed on its own, so you can tune them per resort.',
+	},
+	{
+		title: 'Set your number',
+		body: 'Choose the minimum snowfall worth chasing, from 1″ to 24″, and how many days of notice you want.',
+	},
+	{
+		title: 'Get a text',
+		body: 'When the forecast meets your number, we send an SMS up to 10 days ahead, so you can plan the trip.',
+	},
+]
+
+function ExampleForecast() {
 	return (
-		<Box sx={{ minHeight: '100vh' }}>
+		<Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3 } }}>
 			<Box
 				sx={{
-					background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 50%, ${theme.palette.secondary.main} 100%)`,
-					color: 'white',
-					py: 12,
-					textAlign: 'center',
-					position: 'relative',
-					overflow: 'hidden',
-					'&::before': {
-						content: '""',
-						position: 'absolute',
-						top: 0,
-						left: 0,
-						right: 0,
-						bottom: 0,
-						background:
-							'radial-gradient(circle at 30% 20%, rgba(255,255,255,0.1) 0%, transparent 50%)',
-					},
+					display: 'flex',
+					justifyContent: 'space-between',
+					alignItems: 'center',
+					mb: 2,
 				}}
 			>
-				<Container maxWidth="md" sx={{ position: 'relative', zIndex: 1 }}>
-					<Typography
-						variant="h1"
-						component="h1"
-						sx={{
-							fontSize: { xs: '2.5rem', md: '4rem' },
-							fontWeight: 800,
-							mb: 3,
-							background:
-								'linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.8) 100%)',
-							WebkitBackgroundClip: 'text',
-							WebkitTextFillColor: 'transparent',
-							backgroundClip: 'text',
-						}}
-					>
-						Pow Hunter
-					</Typography>
-					<Typography
-						variant="h5"
-						sx={{
-							mb: 6,
-							opacity: 0.95,
-							fontSize: { xs: '1.25rem', md: '1.5rem' },
-							fontWeight: 400,
-							maxWidth: '600px',
-							mx: 'auto',
-						}}
-					>
-						Never miss a powder day at your favorite resort
-					</Typography>
-					<Box
-						sx={{
-							display: 'flex',
-							gap: 3,
-							justifyContent: 'center',
-							flexWrap: 'wrap',
-						}}
-					>
-						<Button
-							component={Link}
-							to="/signup"
-							variant="contained"
-							size="large"
-							sx={{
-								bgcolor: 'rgba(255,255,255,0.15)',
-								color: 'white',
-								border: '1px solid rgba(255,255,255,0.2)',
-								backdropFilter: 'blur(10px)',
-								px: 4,
-								py: 1.5,
-								fontSize: '1.1rem',
-								'&:hover': {
-									bgcolor: 'rgba(255,255,255,0.25)',
-									transform: 'translateY(-2px)',
-								},
-							}}
-						>
-							Sign Up for Alerts
-						</Button>
-						<Button
-							component={Link}
-							to="/manage"
-							variant="outlined"
-							size="large"
-							sx={{
-								borderColor: 'rgba(255,255,255,0.4)',
-								color: 'white',
-								px: 4,
-								py: 1.5,
-								fontSize: '1.1rem',
-								'&:hover': {
-									borderColor: 'rgba(255,255,255,0.6)',
-									bgcolor: 'rgba(255,255,255,0.1)',
-									transform: 'translateY(-2px)',
-								},
-							}}
-						>
-							Manage Subscriptions
-						</Button>
-					</Box>
-				</Container>
+				<Typography variant="h6" component="p">
+					Alta, UT
+				</Typography>
+				<Chip label="Example" size="small" variant="outlined" />
 			</Box>
 
-			<Container maxWidth="lg" sx={{ py: 12 }}>
+			<Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5 }}>
 				<Typography
-					variant="h2"
-					component="h2"
-					align="center"
+					component="p"
 					sx={{
-						mb: 8,
-						fontSize: { xs: '2rem', md: '2.5rem' },
-						fontWeight: 700,
-						color: 'text.primary',
+						...tabularNums,
+						fontSize: { xs: '3.5rem', sm: '4rem' },
+						fontWeight: 600,
+						lineHeight: 1,
+						letterSpacing: '-0.04em',
 					}}
 				>
-					Why Choose Pow Hunter?
+					{EXAMPLE_TOTAL}&Prime;
 				</Typography>
-				<Grid container spacing={6}>
-					<Grid size={{ xs: 12, md: 4 }}>
-						<Card sx={{ height: '100%', textAlign: 'center', p: 1 }}>
-							<CardContent sx={{ p: 4 }}>
-								<NotificationsIcon
-									sx={{
-										fontSize: 56,
-										mb: 3,
-										p: 1.5,
-										borderRadius: 2,
-										bgcolor: 'secondary.light',
-										color: 'white',
-									}}
-								/>
-								<Typography
-									variant="h5"
-									component="h3"
-									gutterBottom
-									sx={{ mb: 2 }}
-								>
-									Smart SMS Alerts
-								</Typography>
-								<Typography color="text.secondary" sx={{ lineHeight: 1.7 }}>
-									Set your minimum snow amount and get SMS alerts 1-10 days in
-									advance when powder is coming to your resorts
-								</Typography>
-							</CardContent>
-						</Card>
+				<Typography color="text.secondary">in the next 3 days</Typography>
+			</Box>
+
+			<Box
+				aria-hidden
+				sx={{
+					display: 'grid',
+					gridTemplateColumns: `repeat(${EXAMPLE_FORECAST.length}, 1fr)`,
+					gap: 1.5,
+					alignItems: 'end',
+					height: 120,
+					mt: 3,
+				}}
+			>
+				{EXAMPLE_FORECAST.map(({ day, inches, inWindow }) => (
+					<Box
+						key={day}
+						sx={{
+							display: 'flex',
+							flexDirection: 'column',
+							alignItems: 'center',
+							gap: 0.75,
+							height: '100%',
+							justifyContent: 'flex-end',
+						}}
+					>
+						<Typography
+							variant="caption"
+							sx={{ ...tabularNums, color: 'text.secondary', fontWeight: 500 }}
+						>
+							{inches}&Prime;
+						</Typography>
+						<Box
+							sx={{
+								width: '100%',
+								maxWidth: 36,
+								height: `${Math.max((inches / MAX_DAILY) * 72, 3)}px`,
+								borderRadius: '4px 4px 2px 2px',
+								bgcolor: inWindow ? 'primary.main' : 'divider',
+							}}
+						/>
+						<Typography variant="caption" color="text.secondary">
+							{day}
+						</Typography>
+					</Box>
+				))}
+			</Box>
+
+			<Box
+				sx={{
+					display: 'flex',
+					alignItems: 'center',
+					gap: 1.25,
+					mt: 3,
+					pt: 2,
+					borderTop: 1,
+					borderColor: 'divider',
+				}}
+			>
+				<Box
+					sx={{
+						display: 'grid',
+						placeItems: 'center',
+						width: 24,
+						height: 24,
+						borderRadius: '50%',
+						bgcolor: 'primary.light',
+						color: 'primary.main',
+						flexShrink: 0,
+					}}
+				>
+					<Check sx={{ fontSize: 16 }} />
+				</Box>
+				<Typography variant="body2" color="text.secondary">
+					Over your{' '}
+					<Box
+						component="span"
+						sx={{ ...tabularNums, color: 'text.primary', fontWeight: 600 }}
+					>
+						{EXAMPLE_THRESHOLD}&Prime;
+					</Box>{' '}
+					threshold. Text sent.
+				</Typography>
+			</Box>
+		</Paper>
+	)
+}
+
+export default function Home() {
+	return (
+		<Box>
+			<Container maxWidth="lg" sx={{ py: { xs: 7, md: 12 } }}>
+				<Grid
+					container
+					spacing={{ xs: 6, md: 8 }}
+					sx={{ alignItems: 'center' }}
+				>
+					<Grid size={{ xs: 12, md: 7 }}>
+						<Typography variant="overline" component="p" color="primary">
+							Snow alerts by text
+						</Typography>
+						<Typography variant="h1" sx={{ mt: 1.5, mb: 2.5 }}>
+							Never miss a powder day.
+						</Typography>
+						<Typography
+							variant="subtitle1"
+							color="text.secondary"
+							sx={{ maxWidth: 480, mb: 4 }}
+						>
+							Pick your resorts and how much fresh snow it takes to get you out
+							the door. Pow Hunter texts you when the forecast says it&apos;s
+							coming.
+						</Typography>
+						<Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+							<Button
+								component={Link}
+								to="/signup"
+								variant="contained"
+								size="large"
+							>
+								Sign up for alerts
+							</Button>
+							<Button
+								component={Link}
+								to="/manage"
+								size="large"
+								endIcon={<ArrowForward sx={{ fontSize: 18 }} />}
+								sx={{ color: 'text.primary' }}
+							>
+								Manage subscriptions
+							</Button>
+						</Box>
 					</Grid>
-					<Grid size={{ xs: 12, md: 4 }}>
-						<Card sx={{ height: '100%', textAlign: 'center', p: 1 }}>
-							<CardContent sx={{ p: 4 }}>
-								<FavoriteIcon
-									sx={{
-										fontSize: 56,
-										color: 'white',
-										mb: 3,
-										p: 1.5,
-										borderRadius: 2,
-										bgcolor: 'primary.main',
-									}}
-								/>
-								<Typography
-									variant="h5"
-									component="h3"
-									gutterBottom
-									sx={{ mb: 2 }}
-								>
-									Multiple Resort Tracking
-								</Typography>
-								<Typography color="text.secondary" sx={{ lineHeight: 1.7 }}>
-									Subscribe to alerts for multiple resorts and manage each
-									subscription independently with custom settings
-								</Typography>
-							</CardContent>
-						</Card>
-					</Grid>
-					<Grid size={{ xs: 12, md: 4 }}>
-						<Card sx={{ height: '100%', textAlign: 'center', p: 1 }}>
-							<CardContent sx={{ p: 4 }}>
-								<RocketIcon
-									sx={{
-										fontSize: 56,
-										color: 'white',
-										mb: 3,
-										p: 1.5,
-										borderRadius: 2,
-										bgcolor: '#7c3aed',
-									}}
-								/>
-								<Typography
-									variant="h5"
-									component="h3"
-									gutterBottom
-									sx={{ mb: 2 }}
-								>
-									More Features Coming
-								</Typography>
-								<Typography color="text.secondary" sx={{ lineHeight: 1.7 }}>
-									Account management, email alerts, detailed weather data,
-									historical snow reports, and advanced filtering options coming
-									soon
-								</Typography>
-							</CardContent>
-						</Card>
+					<Grid size={{ xs: 12, md: 5 }}>
+						<Box sx={{ maxWidth: 440, ml: { md: 'auto' } }}>
+							<ExampleForecast />
+						</Box>
 					</Grid>
 				</Grid>
 			</Container>
+
+			<Box
+				sx={{
+					borderTop: 1,
+					borderColor: 'divider',
+					bgcolor: 'background.paper',
+				}}
+			>
+				<Container maxWidth="lg" sx={{ py: { xs: 7, md: 10 } }}>
+					<Typography variant="h2" sx={{ mb: { xs: 4, md: 6 } }}>
+						How it works
+					</Typography>
+					<Grid container spacing={{ xs: 4, md: 6 }}>
+						{STEPS.map((step, i) => (
+							<Grid key={step.title} size={{ xs: 12, md: 4 }}>
+								<Box sx={{ borderTop: 1, borderColor: 'divider', pt: 2.5 }}>
+									<Typography
+										variant="body2"
+										sx={{
+											...tabularNums,
+											color: 'primary.main',
+											fontWeight: 600,
+											mb: 1,
+										}}
+									>
+										{String(i + 1).padStart(2, '0')}
+									</Typography>
+									<Typography variant="h6" component="h3" sx={{ mb: 1 }}>
+										{step.title}
+									</Typography>
+									<Typography color="text.secondary">{step.body}</Typography>
+								</Box>
+							</Grid>
+						))}
+					</Grid>
+				</Container>
+			</Box>
 		</Box>
 	)
 }
