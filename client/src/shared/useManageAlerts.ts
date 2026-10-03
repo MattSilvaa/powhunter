@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, apiRequest, retryOnlyTransport } from './apiClient.ts'
-import { UserAlert } from './types.ts'
+import { AlertSettings, UserAlert } from './types.ts'
 
 const ALERT_RETRIES = 1
 
@@ -56,6 +56,50 @@ export function useDeleteAllAlerts() {
 
 	return useMutation<void, Error, void>({
 		mutationFn: deleteAllAlerts,
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: USER_ALERTS_QUERY_KEY })
+		},
+	})
+}
+
+export type AddAlertsData = AlertSettings & {
+	resortsUuids: string[]
+}
+
+export type UpdateAlertData = AlertSettings & {
+	resortUuid: string
+}
+
+// Adding alerts while signed in sends no email or phone: the server takes both
+// from the session's account.
+const createUserAlerts = (data: AddAlertsData): Promise<void> =>
+	apiRequest<void>('/api/user/alerts', { method: 'POST', body: data })
+
+const updateAlert = ({
+	resortUuid,
+	...settings
+}: UpdateAlertData): Promise<void> =>
+	apiRequest<void>(
+		`/api/user/alerts?resort_uuid=${encodeURIComponent(resortUuid)}`,
+		{ method: 'PATCH', body: settings }
+	)
+
+export function useCreateUserAlerts() {
+	const queryClient = useQueryClient()
+
+	return useMutation<void, Error, AddAlertsData>({
+		mutationFn: createUserAlerts,
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: USER_ALERTS_QUERY_KEY })
+		},
+	})
+}
+
+export function useUpdateAlert() {
+	const queryClient = useQueryClient()
+
+	return useMutation<void, Error, UpdateAlertData>({
+		mutationFn: updateAlert,
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: USER_ALERTS_QUERY_KEY })
 		},

@@ -19,6 +19,12 @@ import (
 // silently skips reports green while covering nothing.
 const requireDBEnv = "POWHUNTER_TEST_DB"
 
+// testDBLockKey is a Postgres advisory lock that serializes integration tests
+// across packages. `go test ./...` runs each package's binary in parallel, and
+// every test begins and ends by deleting all rows, so without the lock one
+// package wipes the resorts and users another has just seeded.
+const testDBLockKey = 7_401_733
+
 func unavailablef(t *testing.T, format string, args ...any) {
 	t.Helper()
 
@@ -90,6 +96,21 @@ func SetupTestDB(t *testing.T) (*sql.DB, *db.Store, func()) {
 		return nil, nil, func() {}
 	}
 
+	// Held on its own connection for the whole test, since a session lock lives
+	// only as long as the connection that took it.
+	lockConn, err := testDB.Conn(t.Context())
+	if err != nil {
+		_ = testDB.Close()
+		t.Fatalf("failed to reserve a connection for the test lock: %v", err)
+	}
+
+	if _, lockErr := lockConn.ExecContext(t.Context(),
+		"SELECT pg_advisory_lock($1)", testDBLockKey); lockErr != nil {
+		_ = lockConn.Close()
+		_ = testDB.Close()
+		t.Fatalf("failed to take the test database lock: %v", lockErr)
+	}
+
 	// Bring the schema up to date before touching any table. The doc comment has
 	// always claimed this happened; until now it did not.
 	RunMigrations(t, testDB)
@@ -101,7 +122,14 @@ func SetupTestDB(t *testing.T) (*sql.DB, *db.Store, func()) {
 
 	cleanup := func() {
 		cleanupDB(t, testDB)
-		testDB.Close()
+
+		if _, unlockErr := lockConn.ExecContext(t.Context(),
+			"SELECT pg_advisory_unlock($1)", testDBLockKey); unlockErr != nil {
+			t.Logf("Warning: failed to release the test database lock: %v", unlockErr)
+		}
+
+		_ = lockConn.Close()
+		_ = testDB.Close()
 	}
 
 	return testDB, store, cleanup

@@ -48,6 +48,7 @@ type AlertHandler struct {
 type Handlers struct {
 	Resort  *ResortHandler
 	Alert   *AlertHandler
+	Account *AccountHandler
 	Contact *ContactHandler
 	Auth    *AuthHandler
 	auth    *auth.Service
@@ -152,6 +153,7 @@ func NewHandlers(cfg config.Config, logger *slog.Logger) (*Handlers, error) {
 	return &Handlers{
 		Resort:  resortHandler,
 		Alert:   alertHandler,
+		Account: NewAccountHandler(store, logger),
 		Contact: contactHandler,
 		Auth:    NewAuthHandler(authService, mailer, cfg.AppBaseURL, logger),
 		auth:    authService,
@@ -316,31 +318,9 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(req.ResortsUuids) == 0 {
-		sendErrorResponse(w, "MISSING_RESORTS", "At least one resort is required", http.StatusBadRequest)
+	if !validateResorts(w, req.ResortsUuids) ||
+		!validateAlertSettings(w, req.NotificationDays, req.MinSnowAmount) {
 		return
-	}
-
-	if len(req.ResortsUuids) > validate.MaxResortsPerRequest {
-		sendErrorResponse(w, "VALIDATION_ERROR", "Too many resorts selected", http.StatusBadRequest)
-		return
-	}
-
-	if daysErr := validate.NotificationDays(req.NotificationDays); daysErr != nil {
-		sendErrorResponse(w, "VALIDATION_ERROR", "Notification days must be between 1 and 10", http.StatusBadRequest)
-		return
-	}
-
-	if snowErr := validate.SnowAmount(req.MinSnowAmount); snowErr != nil {
-		sendErrorResponse(w, "VALIDATION_ERROR", "Snow amount must be between 0.5 and 24 inches", http.StatusBadRequest)
-		return
-	}
-
-	for _, resortUUID := range req.ResortsUuids {
-		if _, parseErr := uuid.Parse(resortUUID); parseErr != nil {
-			sendErrorResponse(w, "VALIDATION_ERROR", "One of the selected resorts is not valid", http.StatusBadRequest)
-			return
-		}
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), handlerTimeout)
@@ -356,32 +336,8 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		log.Printf("Failed to create alert: %v", err)
+		sendAlertWriteError(w, err)
 
-		pqErr := &pq.Error{}
-		if errors.As(err, &pqErr) {
-			switch pqErr.Code {
-			case "23505": // unique_violation
-				if pqErr.Constraint == "user_alerts_user_uuid_resort_uuid_key" {
-					sendErrorResponse(
-						w,
-						"DUPLICATE_ALERT",
-						"You already have an alert for this resort",
-						http.StatusConflict,
-					)
-					return
-				}
-				sendErrorResponse(w, "DUPLICATE_ENTRY", "This entry already exists", http.StatusConflict)
-				return
-			case "23502": // not_null_violation
-				sendErrorResponse(w, "MISSING_REQUIRED_FIELD", "Required field is missing", http.StatusBadRequest)
-				return
-			case "23514": // check_violation
-				sendErrorResponse(w, "VALIDATION_ERROR", "Data validation failed", http.StatusBadRequest)
-				return
-			}
-		}
-
-		sendErrorResponse(w, "INTERNAL_ERROR", "Failed to create alert", http.StatusInternalServerError)
 		return
 	}
 
@@ -389,4 +345,76 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		"status":  "success",
 		"message": "Alert created successfully",
 	})
+}
+
+// validateResorts reports, and writes the error for, a resort selection that
+// cannot be turned into alerts.
+func validateResorts(w http.ResponseWriter, resortUUIDs []string) bool {
+	if len(resortUUIDs) == 0 {
+		sendErrorResponse(w, "MISSING_RESORTS", "At least one resort is required", http.StatusBadRequest)
+		return false
+	}
+
+	if len(resortUUIDs) > validate.MaxResortsPerRequest {
+		sendErrorResponse(w, "VALIDATION_ERROR", "Too many resorts selected", http.StatusBadRequest)
+		return false
+	}
+
+	for _, resortUUID := range resortUUIDs {
+		if _, parseErr := uuid.Parse(resortUUID); parseErr != nil {
+			sendErrorResponse(w, "VALIDATION_ERROR", "One of the selected resorts is not valid", http.StatusBadRequest)
+			return false
+		}
+	}
+
+	return true
+}
+
+// validateAlertSettings reports, and writes the error for, thresholds outside
+// what the forecaster supports.
+func validateAlertSettings(w http.ResponseWriter, notificationDays int, minSnowAmount float64) bool {
+	if daysErr := validate.NotificationDays(notificationDays); daysErr != nil {
+		sendErrorResponse(w, "VALIDATION_ERROR", "Notification days must be between 1 and 10", http.StatusBadRequest)
+		return false
+	}
+
+	if snowErr := validate.SnowAmount(minSnowAmount); snowErr != nil {
+		sendErrorResponse(w, "VALIDATION_ERROR", "Snow amount must be between 0.5 and 24 inches", http.StatusBadRequest)
+		return false
+	}
+
+	return true
+}
+
+// sendAlertWriteError maps a failed alert insert to a response, turning the
+// constraint violations a caller can cause into 4xx rather than a 500.
+func sendAlertWriteError(w http.ResponseWriter, err error) {
+	pqErr := &pq.Error{}
+	if errors.As(err, &pqErr) {
+		switch pqErr.Code {
+		case "23505": // unique_violation
+			if pqErr.Constraint == "user_alerts_user_uuid_resort_uuid_key" {
+				sendErrorResponse(
+					w,
+					"DUPLICATE_ALERT",
+					"You already have an alert for this resort",
+					http.StatusConflict,
+				)
+
+				return
+			}
+
+			sendErrorResponse(w, "DUPLICATE_ENTRY", "This entry already exists", http.StatusConflict)
+
+			return
+		case "23502": // not_null_violation
+			sendErrorResponse(w, "MISSING_REQUIRED_FIELD", "Required field is missing", http.StatusBadRequest)
+			return
+		case "23514": // check_violation
+			sendErrorResponse(w, "VALIDATION_ERROR", "Data validation failed", http.StatusBadRequest)
+			return
+		}
+	}
+
+	sendErrorResponse(w, "INTERNAL_ERROR", "Failed to create alert", http.StatusInternalServerError)
 }

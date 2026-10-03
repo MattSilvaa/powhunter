@@ -44,6 +44,20 @@ func (m *MockStoreService) EXPECT() *MockStoreServiceMockRecorder {
 	return m.recorder
 }
 
+// CreateAlertsForUser mocks base method.
+func (m *MockStoreService) CreateAlertsForUser(ctx context.Context, userUUID uuid.UUID, minSnowAmount float64, notificationDays int32, resortUUIDs []string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateAlertsForUser", ctx, userUUID, minSnowAmount, notificationDays, resortUUIDs)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateAlertsForUser indicates an expected call of CreateAlertsForUser.
+func (mr *MockStoreServiceMockRecorder) CreateAlertsForUser(ctx, userUUID, minSnowAmount, notificationDays, resortUUIDs any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAlertsForUser", reflect.TypeOf((*MockStoreService)(nil).CreateAlertsForUser), ctx, userUUID, minSnowAmount, notificationDays, resortUUIDs)
+}
+
 // CreateUserWithAlerts mocks base method.
 func (m *MockStoreService) CreateUserWithAlerts(ctx context.Context, email, phone string, minSnowAmount float64, notificationDays int32, resortUUIDs []string) error {
 	m.ctrl.T.Helper()
@@ -186,4 +200,33 @@ func (m *MockStoreService) RecordAlertSent(ctx context.Context, alert db.AlertTo
 func (mr *MockStoreServiceMockRecorder) RecordAlertSent(ctx, alert any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordAlertSent", reflect.TypeOf((*MockStoreService)(nil).RecordAlertSent), ctx, alert)
+}
+
+// UpdateAlertForUser mocks base method.
+func (m *MockStoreService) UpdateAlertForUser(ctx context.Context, userUUID uuid.UUID, resortUUID string, minSnowAmount float64, notificationDays int32) (db0.UserAlert, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateAlertForUser", ctx, userUUID, resortUUID, minSnowAmount, notificationDays)
+	ret0, _ := ret[0].(db0.UserAlert)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateAlertForUser indicates an expected call of UpdateAlertForUser.
+func (mr *MockStoreServiceMockRecorder) UpdateAlertForUser(ctx, userUUID, resortUUID, minSnowAmount, notificationDays any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAlertForUser", reflect.TypeOf((*MockStoreService)(nil).UpdateAlertForUser), ctx, userUUID, resortUUID, minSnowAmount, notificationDays)
+}
+
+// UpdateUserPhone mocks base method.
+func (m *MockStoreService) UpdateUserPhone(ctx context.Context, userUUID uuid.UUID, phone string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateUserPhone", ctx, userUUID, phone)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateUserPhone indicates an expected call of UpdateUserPhone.
+func (mr *MockStoreServiceMockRecorder) UpdateUserPhone(ctx, userUUID, phone any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateUserPhone", reflect.TypeOf((*MockStoreService)(nil).UpdateUserPhone), ctx, userUUID, phone)
 }

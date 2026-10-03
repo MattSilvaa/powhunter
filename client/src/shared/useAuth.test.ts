@@ -1,9 +1,9 @@
 import { test, expect, describe, afterEach } from 'bun:test'
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import { ApiError, apiRequest, retryOnlyTransport } from './apiClient.ts'
-import { useCompleteLogin } from './useAuth.ts'
+import { AuthUser, useCompleteLogin } from './useAuth.ts'
 
 const fetchStub = globalThis as unknown as { fetch: unknown }
 const originalFetch = globalThis.fetch
@@ -145,5 +145,52 @@ describe('completing a sign-in link', () => {
 
 		await waitFor(() => expect(result.current.error).not.toBeNull())
 		expect(result.current.error).toContain('did not keep the session')
+	})
+
+	// The sign-in page redeems from a mount effect, and in development React
+	// Router renders under StrictMode, which remounts the page mid-request.
+	// Built on useMutation, the result was lost in that remount: the request
+	// succeeded and the page stayed on "Signing you in…" forever.
+	test('settles when redeemed from a mount effect under StrictMode', async () => {
+		fetchStub.fetch = (url: string) =>
+			Promise.resolve(
+				url.endsWith('/api/auth/me')
+					? new Response(JSON.stringify({ email: 'a@b.com' }), { status: 200 })
+					: new Response('', { status: 200 })
+			)
+
+		const client = new QueryClient({
+			defaultOptions: { queries: { retry: false } },
+		})
+		const resolved: (AuthUser | null)[] = []
+
+		const { result } = renderHook(
+			() => {
+				const login = useCompleteLogin()
+				const redeemed = useRef(false)
+
+				useEffect(() => {
+					if (redeemed.current) {
+						return
+					}
+
+					redeemed.current = true
+					void login.completeLogin('token-123').then((user) => {
+						resolved.push(user)
+					})
+				}, [login])
+
+				return login
+			},
+			{
+				reactStrictMode: true,
+				wrapper: ({ children }) =>
+					React.createElement(QueryClientProvider, { client }, children),
+			}
+		)
+
+		await waitFor(() => expect(resolved).toHaveLength(1))
+		expect(resolved[0]?.email).toBe('a@b.com')
+		expect(result.current.loading).toBe(false)
 	})
 })

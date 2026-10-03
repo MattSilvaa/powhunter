@@ -111,11 +111,40 @@ func (q *Queries) GetUserByUUID(ctx context.Context, argUuid uuid.UUID) (User, e
 	return i, err
 }
 
+const updateUserPhone = `-- name: UpdateUserPhone :one
+UPDATE users
+SET phone      = $2,
+    updated_at = NOW()
+WHERE uuid = $1
+RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at
+`
+
+type UpdateUserPhoneParams struct {
+	Uuid  uuid.UUID      `json:"uuid"`
+	Phone sql.NullString `json:"phone"`
+}
+
+func (q *Queries) UpdateUserPhone(ctx context.Context, arg UpdateUserPhoneParams) (User, error) {
+	row := q.queryRow(ctx, q.updateUserPhoneStmt, updateUserPhone, arg.Uuid, arg.Phone)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.Email,
+		&i.Phone,
+		&i.CreatedAt,
+		&i.PasswordHash,
+		&i.EmailVerifiedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const upsertUser = `-- name: UpsertUser :one
 INSERT INTO users (email, phone)
 VALUES ($1, $2)
 ON CONFLICT (email) DO UPDATE
-    SET phone = COALESCE(EXCLUDED.phone, users.phone)
+    SET phone = COALESCE(users.phone, EXCLUDED.phone)
 RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at
 `
 
@@ -127,6 +156,11 @@ type UpsertUserParams struct {
 // Get-or-create in a single statement. A read-then-write race meant two
 // concurrent signups with the same email both attempted an insert, and one
 // failed on the unique constraint as a 500.
+//
+// Signup is anonymous, so the phone supplied here only fills in an account
+// that has none. Replacing an existing number would let anyone who knows an
+// address redirect that person's SMS alerts to themselves; changing the
+// number is done signed in, through UpdateUserPhone.
 func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error) {
 	row := q.queryRow(ctx, q.upsertUserStmt, upsertUser, arg.Email, arg.Phone)
 	var i User

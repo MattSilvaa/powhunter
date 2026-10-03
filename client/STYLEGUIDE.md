@@ -12,13 +12,16 @@ Pow Hunter should feel like a clean snow report: quiet, flat, and precise. The n
 
 ## Where things live
 
-| File                            | Purpose                                                                                           |
-| ------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `src/theme.ts`                  | The single source of truth for colors, type, radii and MUI overrides. Also exports `tabularNums`. |
-| `src/app.css`                   | A minimal reset plus `.sr-only`. Don't add component styles here.                                 |
-| `src/components/header.tsx`     | The sticky top nav: wordmark, "Manage alerts" and "Create alert".                                 |
-| `src/components/footer.tsx`     | A quiet footer.                                                                                   |
-| `src/components/pageHeader.tsx` | The page title (`h1`), optional subtitle, and an optional right-side action.                      |
+| File                                     | Purpose                                                                                           |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `src/theme.ts`                           | The single source of truth for colors, type, radii and MUI overrides. Also exports `tabularNums`. |
+| `src/app.css`                            | A minimal reset plus `.sr-only`. Don't add component styles here.                                 |
+| `src/components/header.tsx`              | The sticky top nav: wordmark, "Manage alerts" and "Create alert".                                 |
+| `src/components/footer.tsx`              | A quiet footer.                                                                                   |
+| `src/components/pageHeader.tsx`          | The page title (`h1`), optional subtitle, and an optional right-side action.                      |
+| `src/components/sliderField.tsx`         | A slider with its label, hint and live value shown as a readout.                                  |
+| `src/components/alertSettingsFields.tsx` | The minimum-snowfall and advance-notice sliders every alert carries.                              |
+| `src/components/resortSelect.tsx`        | The checkbox resort picker that shows picks as chips.                                             |
 
 ## Tokens (defined in `theme.ts`)
 
@@ -43,7 +46,7 @@ Use theme tokens (`'text.secondary'`, `'divider'`, `'primary.main'`). Don't hard
 - **Buttons:** use `variant="contained"` for the one primary action, and `outlined` or text for everything else. Use `color="error"` only for destructive actions.
 - **Numbers:** spread the shared style into `sx`, as in `sx={{ ...tabularNums, fontWeight: 600 }}`. Use the prime mark `″` for inches, not `"`.
 - **Icons:** use small, outlined MUI icons (`DeleteOutline`, `Check`, `AcUnit`) in a muted or accent color. No solid colored icon tiles; a small check in a `primary.light` circle is fine for confirmations (see `routes/success.tsx`).
-- **Sliders:** wrap them in a label row that shows the live value on the right (`SliderField` in `routes/signup.tsx`).
+- **Sliders:** wrap them in a label row that shows the live value on the right (`components/sliderField.tsx`).
 - **Copy:** short, plain, and sentence case. Talk about snow and resorts, not features.
 
 ## Accessibility and responsiveness
