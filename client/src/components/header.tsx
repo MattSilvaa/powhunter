@@ -51,18 +51,36 @@ export default function Header() {
 				</Box>
 				<Box
 					component="nav"
-					sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+					sx={{
+						display: 'flex',
+						alignItems: 'center',
+						gap: { xs: 0.5, sm: 1 },
+					}}
 				>
 					<Button
 						component={Link}
 						to="/manage"
+						aria-label="Manage alerts"
 						sx={{
-							display: { xs: 'none', sm: 'inline-flex' },
+							minWidth: 0,
+							px: { xs: 1, sm: 1.5 },
 							color: 'text.secondary',
 							'&:hover': { color: 'text.primary', bgcolor: 'transparent' },
 						}}
 					>
-						Manage alerts
+						{/* Phones show just "Alerts" so the link fits beside the wordmark. */}
+						<Box
+							component="span"
+							sx={{ display: { xs: 'none', sm: 'inline' } }}
+						>
+							Manage&nbsp;
+						</Box>
+						<Box
+							component="span"
+							sx={{ textTransform: { xs: 'capitalize', sm: 'none' } }}
+						>
+							alerts
+						</Box>
 					</Button>
 					<Button
 						component={Link}
