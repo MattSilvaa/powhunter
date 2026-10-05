@@ -45,8 +45,7 @@ You need **Go 1.24+**, **Bun**, and **Docker** (for the local Postgres).
 ```bash
 make install      # Go modules, client packages, sqlc and goose
 make db-setup     # start Postgres in Docker and create the database
-make db-migrate   # apply migrations
-make db-seed      # load the resort list
+make db-migrate   # apply migrations and load the resort list
 make dev          # API on :8080, web app on :5173
 ```
 
