@@ -239,7 +239,7 @@ func (r *Runner) deliver(
 
 	totals.add(func(run *metrics.ForecastRun) { run.AlertsSent++ })
 
-	if err := r.store.RecordAlertSent(ctx, alert); err != nil {
+	if err := r.store.RecordAlertSent(ctx, alert, notify.SMSSegments(message)); err != nil {
 		// The SMS is already delivered, so the next run would send a duplicate.
 		logger.ErrorContext(ctx, "SMS delivered but recording history failed, next run may duplicate",
 			"error", err)

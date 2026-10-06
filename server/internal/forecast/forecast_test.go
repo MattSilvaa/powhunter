@@ -106,7 +106,7 @@ func TestASuccessfulSendIsRecordedExactlyOnce(t *testing.T) {
 
 	h.expectOneMatchingAlert(alert)
 	h.notifier.EXPECT().SendSMS(alert.UserPhone, gomock.Any()).Return(nil).Times(1)
-	h.store.EXPECT().RecordAlertSent(gomock.Any(), alert).Return(nil).Times(1)
+	h.store.EXPECT().RecordAlertSent(gomock.Any(), alert, int32(1)).Return(nil).Times(1)
 
 	run, err := h.runner.Run(t.Context())
 
@@ -124,7 +124,7 @@ func TestAFailedSendIsNotRecorded(t *testing.T) {
 
 	h.expectOneMatchingAlert(alert)
 	h.notifier.EXPECT().SendSMS(alert.UserPhone, gomock.Any()).Return(errors.New("twilio down"))
-	h.store.EXPECT().RecordAlertSent(gomock.Any(), gomock.Any()).Times(0)
+	h.store.EXPECT().RecordAlertSent(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	run, err := h.runner.Run(t.Context())
 
@@ -142,7 +142,7 @@ func TestAUserWithoutAPhoneNumberIsNeitherSentNorRecorded(t *testing.T) {
 
 	h.expectOneMatchingAlert(alert)
 	h.notifier.EXPECT().SendSMS(gomock.Any(), gomock.Any()).Times(0)
-	h.store.EXPECT().RecordAlertSent(gomock.Any(), gomock.Any()).Times(0)
+	h.store.EXPECT().RecordAlertSent(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	run, err := h.runner.Run(t.Context())
 
@@ -156,7 +156,7 @@ func TestADeliveredAlertWithAFailedRecordIsReported(t *testing.T) {
 
 	h.expectOneMatchingAlert(alert)
 	h.notifier.EXPECT().SendSMS(alert.UserPhone, gomock.Any()).Return(nil)
-	h.store.EXPECT().RecordAlertSent(gomock.Any(), alert).Return(errors.New("write failed"))
+	h.store.EXPECT().RecordAlertSent(gomock.Any(), alert, int32(1)).Return(errors.New("write failed"))
 
 	run, err := h.runner.Run(t.Context())
 

@@ -14,5 +14,5 @@ WHERE user_uuid = $1
 ORDER BY sent_at DESC LIMIT 1;
 
 -- name: InsertAlertHistory :exec
-INSERT INTO alert_history (user_uuid, resort_uuid, forecast_date, snow_amount, sent_at)
-VALUES ($1, $2, $3, $4, NOW());
+INSERT INTO alert_history (user_uuid, resort_uuid, forecast_date, snow_amount, sms_segments, sent_at)
+VALUES ($1, $2, $3, $4, $5, NOW());

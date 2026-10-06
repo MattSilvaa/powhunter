@@ -193,7 +193,7 @@ func TestStoreIntegration_GetAlertMatches(t *testing.T) {
 			ForecastDate: forecastDate,
 			IsUpdate:     false,
 		}
-		err := store.RecordAlertSent(ctx, firstMatch)
+		err := store.RecordAlertSent(ctx, firstMatch, 1)
 		require.NoError(t, err)
 
 		// Now check with increased snow amount
@@ -227,7 +227,7 @@ func TestStoreIntegration_GetAlertMatches(t *testing.T) {
 			ForecastDate: forecastDate,
 			IsUpdate:     false,
 		}
-		err := store.RecordAlertSent(ctx, firstMatch)
+		err := store.RecordAlertSent(ctx, firstMatch, 1)
 		require.NoError(t, err)
 
 		// Check with small increase
@@ -268,7 +268,7 @@ func TestStoreIntegration_RecordAlertSent(t *testing.T) {
 			IsUpdate:     false,
 		}
 
-		err := store.RecordAlertSent(ctx, alertToSend)
+		err := store.RecordAlertSent(ctx, alertToSend, 1)
 		require.NoError(t, err)
 
 		// Verify it was recorded

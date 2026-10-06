@@ -28,8 +28,9 @@ type StoreService interface {
 		daysAhead int32,
 	) ([]AlertToSend, error)
 
-	// RecordAlertSent records that an alert was sent
-	RecordAlertSent(ctx context.Context, alert AlertToSend) error
+	// RecordAlertSent records that an alert was sent, and how many SMS
+	// segments it cost.
+	RecordAlertSent(ctx context.Context, alert AlertToSend, smsSegments int32) error
 
 	// CreateUserWithAlerts creates a new user with alert preferences
 	CreateUserWithAlerts(
@@ -304,13 +305,14 @@ func (s *Store) GetAlertMatches(
 }
 
 // RecordAlertSent records that an alert was sent to avoid sending duplicates.
-func (s *Store) RecordAlertSent(ctx context.Context, alert AlertToSend) error {
+func (s *Store) RecordAlertSent(ctx context.Context, alert AlertToSend, smsSegments int32) error {
 	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
 		err := q.InsertAlertHistory(ctx, dbgen.InsertAlertHistoryParams{
 			UserUuid:     uuid.NullUUID{UUID: alert.UserUuid, Valid: true},
 			ResortUuid:   uuid.NullUUID{UUID: alert.ResortUUID, Valid: true},
 			ForecastDate: alert.ForecastDate,
 			SnowAmount:   alert.SnowAmount,
+			SmsSegments:  smsSegments,
 		})
 
 		return err

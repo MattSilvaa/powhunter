@@ -18,6 +18,7 @@ type AlertHistory struct {
 	SentAt       sql.NullTime  `json:"sent_at"`
 	ForecastDate time.Time     `json:"forecast_date"`
 	SnowAmount   float64       `json:"snow_amount"`
+	SmsSegments  int32         `json:"sms_segments"`
 }
 
 type LoginToken struct {

@@ -56,8 +56,8 @@ func (q *Queries) GetLastAlertSnowAmount(ctx context.Context, arg GetLastAlertSn
 }
 
 const insertAlertHistory = `-- name: InsertAlertHistory :exec
-INSERT INTO alert_history (user_uuid, resort_uuid, forecast_date, snow_amount, sent_at)
-VALUES ($1, $2, $3, $4, NOW())
+INSERT INTO alert_history (user_uuid, resort_uuid, forecast_date, snow_amount, sms_segments, sent_at)
+VALUES ($1, $2, $3, $4, $5, NOW())
 `
 
 type InsertAlertHistoryParams struct {
@@ -65,6 +65,7 @@ type InsertAlertHistoryParams struct {
 	ResortUuid   uuid.NullUUID `json:"resort_uuid"`
 	ForecastDate time.Time     `json:"forecast_date"`
 	SnowAmount   float64       `json:"snow_amount"`
+	SmsSegments  int32         `json:"sms_segments"`
 }
 
 func (q *Queries) InsertAlertHistory(ctx context.Context, arg InsertAlertHistoryParams) error {
@@ -73,6 +74,7 @@ func (q *Queries) InsertAlertHistory(ctx context.Context, arg InsertAlertHistory
 		arg.ResortUuid,
 		arg.ForecastDate,
 		arg.SnowAmount,
+		arg.SmsSegments,
 	)
 	return err
 }

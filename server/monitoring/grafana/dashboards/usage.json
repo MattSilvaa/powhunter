@@ -1,0 +1,504 @@
+{
+  "uid": "powhunter-usage",
+  "title": "Powhunter usage",
+  "tags": [
+    "powhunter"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "sms_price",
+        "label": "SMS price per segment (USD)",
+        "type": "textbox",
+        "query": "0.0083",
+        "current": {
+          "text": "0.0083",
+          "value": "0.0083"
+        },
+        "description": "Twilio's US list price. Carrier fees are extra; set this to the per-segment rate on your Twilio invoice."
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Subscribers",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_subscribers)",
+          "legendFormat": "Subscribers",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "description": "Users with at least one active alert: everyone the forecaster can notify."
+    },
+    {
+      "id": 2,
+      "title": "Users",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_users)",
+          "legendFormat": "Users",
+          "instant": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Users with a phone",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_users_with_phone)",
+          "legendFormat": "Users with a phone",
+          "instant": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Active alerts",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_active_alerts)",
+          "legendFormat": "Active alerts",
+          "instant": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Signups (7d)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_signups{window=\"7d\"})",
+          "legendFormat": "Signups (7d)",
+          "instant": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Web app users (7d)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_active_users{window=\"7d\"})",
+          "legendFormat": "Web app users (7d)",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "description": "Distinct users with a signed-in session seen in the last 7 days."
+    },
+    {
+      "id": 7,
+      "title": "Alerts sent (30d)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_alerts_sent{window=\"30d\"})",
+          "legendFormat": "Alerts sent (30d)",
+          "instant": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Users alerted (30d)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_users_alerted{window=\"30d\"})",
+          "legendFormat": "Users alerted (30d)",
+          "instant": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "SMS segments (30d)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_sms_segments{window=\"30d\"})",
+          "legendFormat": "SMS segments (30d)",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "description": "Twilio bills per segment. A message over 160 characters, or with an emoji, takes more than one."
+    },
+    {
+      "id": 10,
+      "title": "Est. SMS cost (30d)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_sms_segments{window=\"30d\"}) * $sms_price",
+          "legendFormat": "Est. SMS cost (30d)",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "description": "Segments \u00d7 the sms_price variable at the top of the dashboard."
+    },
+    {
+      "id": 11,
+      "title": "Est. SMS cost per subscriber (30d)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_sms_segments{window=\"30d\"}) * $sms_price / max(powhunter_usage_subscribers)",
+          "legendFormat": "Est. SMS cost per subscriber (30d)",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "description": "What a subscriber costs to serve per month: the floor for a paid tier's price."
+    },
+    {
+      "id": 12,
+      "title": "Usage refresh",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "min(powhunter_usage_refresh_success)",
+          "legendFormat": "Usage refresh",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "description": "1 when the API last read the usage numbers from the database. 0 means every other panel here is missing data, not zero."
+    },
+    {
+      "id": 13,
+      "title": "Users and subscribers",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_users)",
+          "legendFormat": "users",
+          "refId": "A"
+        },
+        {
+          "expr": "max(powhunter_usage_users_with_phone)",
+          "legendFormat": "with phone",
+          "refId": "B"
+        },
+        {
+          "expr": "max(powhunter_usage_subscribers)",
+          "legendFormat": "subscribers",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "title": "Activity in the trailing 24 hours",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_signups{window=\"1d\"})",
+          "legendFormat": "signups",
+          "refId": "A"
+        },
+        {
+          "expr": "max(powhunter_usage_alerts_sent{window=\"1d\"})",
+          "legendFormat": "alerts sent",
+          "refId": "B"
+        },
+        {
+          "expr": "max(powhunter_usage_active_users{window=\"1d\"})",
+          "legendFormat": "web app users",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "title": "Active alerts by resort",
+      "type": "bargauge",
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(max by (resort) (powhunter_usage_resort_active_alerts))",
+          "legendFormat": "{{resort}}",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "description": "How many users follow each resort. This is the audience to show a resort.",
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    }
+  ]
+}

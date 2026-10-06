@@ -233,7 +233,7 @@ func TestEndToEndFlow_CreateAlertAndVerifyInDatabase(t *testing.T) {
 	assert.Equal(t, "Test Mountain", match.ResortName)
 
 	// Record alert sent
-	err = store.RecordAlertSent(ctx, matches[0])
+	err = store.RecordAlertSent(ctx, matches[0], 1)
 	require.NoError(t, err)
 
 	// Verify alert history was recorded

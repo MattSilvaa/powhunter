@@ -86,6 +86,23 @@ Keep it under your home directory rather than `/tmp`: Docker Desktop bind-mounts
 only from shared paths, and `$HOME` is shared by default while `/tmp` may not
 be.
 
+## Usage dashboard
+
+The **Powhunter usage** dashboard shows product numbers rather than service
+health: users, subscribers (users with an active alert), signups, alerts sent,
+SMS segments and their estimated cost, and how many users follow each resort.
+The API reads them from the database at most once a minute and publishes them
+as `powhunter_usage_*`.
+
+- The 1d/7d/30d counts come straight from the database, so they are right
+  however short Prometheus's retention is. The over-time charts only go back
+  as far as `PROMETHEUS_RETENTION` (15 days by default).
+- SMS cost is segments × the `sms_price` box at the top of the dashboard. It
+  defaults to Twilio's US list price; set it to the per-segment rate on your
+  invoice, carrier fees included, for a real number.
+- If **Usage refresh** reads 0, the API could not query the database and every
+  other usage panel is missing data, not zero.
+
 ## Running the whole stack locally
 
 ```sh
