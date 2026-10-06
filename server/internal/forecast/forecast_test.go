@@ -3,6 +3,7 @@ package forecast_test
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"testing"
@@ -59,7 +60,12 @@ func newHarness(t *testing.T) *harness {
 		notifier: notifier,
 		runner: forecast.NewRunner(store, weatherClient, notifier, logger,
 			fixedNow,
-			forecast.Options{Concurrency: 1, Attempts: 2}),
+			forecast.Options{
+				Concurrency:      1,
+				Attempts:         2,
+				RetryBackoff:     time.Millisecond,
+				RateLimitBackoff: time.Millisecond,
+			}),
 	}
 }
 
@@ -181,6 +187,30 @@ func TestATransientForecastFailureIsRetried(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Zero(t, run.ResortsFailed)
+	assert.True(t, run.Succeeded)
+}
+
+func TestARateLimitedForecastIsRetried(t *testing.T) {
+	h := newHarness(t)
+
+	h.store.EXPECT().ListAllResorts(gomock.Any()).Return([]dbgen.Resort{testResort()}, nil)
+
+	gomock.InOrder(
+		h.weather.EXPECT().
+			GetSnowForecast(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil, fmt.Errorf("error getting forecast: %w", &weather.RateLimitError{})),
+		h.weather.EXPECT().
+			GetSnowForecast(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return([]weather.WeatherPrediction{{Date: forecastDate(), SnowAmount: 8}}, nil),
+	)
+
+	h.store.EXPECT().
+		GetAlertMatches(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, nil)
+
+	run, err := h.runner.Run(t.Context())
+
+	require.NoError(t, err)
 	assert.True(t, run.Succeeded)
 }
 

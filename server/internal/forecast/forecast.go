@@ -24,12 +24,17 @@ const (
 	// defaultConcurrency bounds parallel resort checks so the weather API is not
 	// hammered while still preventing one slow resort from stalling the run.
 	defaultConcurrency = 4
-	// defaultResortTimeout bounds the work for a single resort.
-	defaultResortTimeout = 90 * time.Second
+	// defaultResortTimeout bounds the work for a single resort. It leaves room
+	// for the rate-limit backoff below (30s then 60s) plus the requests.
+	defaultResortTimeout = 3 * time.Minute
 	// defaultAttempts is how many times a forecast fetch is tried.
 	defaultAttempts = 3
-	// retryBackoff is the base delay between forecast fetch attempts.
-	retryBackoff = 2 * time.Second
+	// defaultRetryBackoff is the base delay between forecast fetch attempts.
+	defaultRetryBackoff = 2 * time.Second
+	// defaultRateLimitBackoff is the base delay after a 429. Open-Meteo's
+	// limits are per minute, so a couple of seconds never outlasts them; a
+	// whole run once failed after three 429s in seven seconds.
+	defaultRateLimitBackoff = 30 * time.Second
 	// hoursPerDay converts a duration to whole days.
 	hoursPerDay = 24
 )
@@ -39,9 +44,11 @@ type resortRow = dbgen.Resort
 
 // Options configures a Runner.
 type Options struct {
-	Concurrency   int
-	ResortTimeout time.Duration
-	Attempts      int
+	Concurrency      int
+	ResortTimeout    time.Duration
+	Attempts         int
+	RetryBackoff     time.Duration
+	RateLimitBackoff time.Duration
 }
 
 // Runner executes one forecaster pass.
@@ -74,6 +81,14 @@ func NewRunner(
 
 	if opts.Attempts <= 0 {
 		opts.Attempts = defaultAttempts
+	}
+
+	if opts.RetryBackoff <= 0 {
+		opts.RetryBackoff = defaultRetryBackoff
+	}
+
+	if opts.RateLimitBackoff <= 0 {
+		opts.RateLimitBackoff = defaultRateLimitBackoff
 	}
 
 	if now == nil {
@@ -257,7 +272,7 @@ func (r *Runner) fetchForecast(
 			select {
 			case <-ctx.Done():
 				return nil, fmt.Errorf("forecast fetch cancelled: %w", ctx.Err())
-			case <-time.After(time.Duration(attempt) * retryBackoff):
+			case <-time.After(r.retryDelay(attempt, err)):
 			}
 		}
 	}
@@ -267,6 +282,17 @@ func (r *Runner) fetchForecast(
 	}
 
 	return nil, fmt.Errorf("after %d attempts: %w", r.opts.Attempts, lastErr)
+}
+
+// retryDelay is how long to wait before the next attempt. A 429 backs off far
+// longer than other failures, and for at least as long as the API asked.
+func (r *Runner) retryDelay(attempt int, err error) time.Duration {
+	var rateLimited *weather.RateLimitError
+	if !errors.As(err, &rateLimited) {
+		return time.Duration(attempt) * r.opts.RetryBackoff
+	}
+
+	return max(time.Duration(attempt)*r.opts.RateLimitBackoff, rateLimited.RetryAfter)
 }
 
 // daysAhead reports how many days separate today from the forecast date.
