@@ -3,8 +3,10 @@ package weather
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -15,6 +17,38 @@ import (
 type WeatherService interface {
 	// GetSnowForecast gets the snow forecast for a location
 	GetSnowForecast(ctx context.Context, lat, lon float64) ([]WeatherPrediction, error)
+}
+
+// ErrRateLimited reports that Open-Meteo rejected a request with 429 Too Many
+// Requests. Its free tier limits requests per IP, and Render's shared egress
+// IPs mean other tenants can exhaust that quota, so callers should back off for
+// longer than they would for other transient errors.
+var ErrRateLimited = errors.New("rate limited by Open-Meteo")
+
+// RateLimitError is returned for a 429 response. RetryAfter is the wait the
+// API asked for, or zero if it sent no usable Retry-After header.
+type RateLimitError struct {
+	RetryAfter time.Duration
+}
+
+func (e *RateLimitError) Error() string {
+	return "error from Open-Meteo API: 429 Too Many Requests"
+}
+
+// Is lets callers match any RateLimitError with errors.Is(err, ErrRateLimited).
+func (e *RateLimitError) Is(target error) bool {
+	return target == ErrRateLimited
+}
+
+// parseRetryAfter reads a Retry-After header given in seconds. The HTTP-date
+// form is not used by Open-Meteo, so it is treated as absent.
+func parseRetryAfter(value string) time.Duration {
+	seconds, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || seconds <= 0 {
+		return 0
+	}
+
+	return time.Duration(seconds) * time.Second
 }
 
 // OpenMeteoClient provides access to the Open-Meteo API.
@@ -111,6 +145,10 @@ func (c *OpenMeteoClient) GetForecast(ctx context.Context, lat, lon float64) (*O
 		return nil, fmt.Errorf("error getting forecast data: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return nil, &RateLimitError{RetryAfter: parseRetryAfter(resp.Header.Get("Retry-After"))}
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("error from Open-Meteo API: %s", resp.Status)
