@@ -75,6 +75,8 @@ func New(deps Deps) (http.Handler, func()) {
 
 	mux.Handle("GET /api/resorts",
 		deps.Metrics.Instrument("resorts", http.HandlerFunc(deps.Handlers.Resort.ListAllResorts)))
+	mux.Handle("GET /api/resorts/{uuid}/snow-history",
+		deps.Metrics.Instrument("resort_snow_history", http.HandlerFunc(deps.Handlers.History.GetSnowHistory)))
 	mux.Handle("POST /api/alerts",
 		deps.Metrics.Instrument("alerts_create", write(deps.Handlers.Alert.CreateAlert)))
 	mux.Handle("GET /api/user/alerts",

@@ -14,8 +14,14 @@ import {
 	Paper,
 	Typography,
 } from '@mui/material'
-import { AcUnit, Add, DeleteOutline, EditOutlined } from '@mui/icons-material'
-import { useNavigate } from 'react-router'
+import {
+	AcUnit,
+	Add,
+	DeleteOutline,
+	EditOutlined,
+	InsertChartOutlined,
+} from '@mui/icons-material'
+import { Link, useNavigate } from 'react-router'
 import {
 	useUserAlerts,
 	useDeleteAlert,
@@ -240,6 +246,20 @@ export default function ManageSubscriptionsPage() {
 									</Typography>
 								</Box>
 								<Box sx={{ display: 'flex', flexShrink: 0 }}>
+									<IconButton
+										component={Link}
+										to={`/resorts/${alert.resort_uuid}/history`}
+										aria-label={`Snowfall history for ${alert.resort_name}`}
+										sx={{
+											color: 'text.secondary',
+											'&:hover': {
+												color: 'primary.main',
+												bgcolor: 'primary.light',
+											},
+										}}
+									>
+										<InsertChartOutlined fontSize="small" />
+									</IconButton>
 									<IconButton
 										aria-label={`Edit alert for ${alert.resort_name}`}
 										onClick={() => setAlertToEdit(alert)}
