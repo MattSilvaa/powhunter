@@ -6,6 +6,7 @@ import "time"
 func NewClientForTest(baseURL string) *OpenMeteoClient {
 	client := NewOpenMeteoClient()
 	client.baseURL = baseURL
+	client.archiveBaseURL = baseURL
 
 	return client
 }
