@@ -68,7 +68,7 @@ describe('AlertLinkPage', () => {
 
 		renderPage('Ab12Cd34')
 		fireEvent.click(
-			await screen.findByRole('button', { name: /text your ski crew/i })
+			await screen.findByRole('button', { name: /text your crew/i })
 		)
 
 		await waitFor(() => expect(shared).toHaveLength(1))

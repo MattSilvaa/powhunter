@@ -94,7 +94,7 @@ function AlertCard({
 					startIcon={<IosShare />}
 					onClick={async () => setShareState(await share(message))}
 				>
-					Text your ski crew
+					Text your crew
 				</Button>
 				<Button
 					variant="outlined"
