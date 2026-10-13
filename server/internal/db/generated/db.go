@@ -63,6 +63,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.deleteUserAlertByUserUUIDStmt, err = db.PrepareContext(ctx, deleteUserAlertByUserUUID); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteUserAlertByUserUUID: %w", err)
 	}
+	if q.getActiveAlertsByResortStmt, err = db.PrepareContext(ctx, getActiveAlertsByResort); err != nil {
+		return nil, fmt.Errorf("error preparing query GetActiveAlertsByResort: %w", err)
+	}
+	if q.getAlertLinkDestinationStmt, err = db.PrepareContext(ctx, getAlertLinkDestination); err != nil {
+		return nil, fmt.Errorf("error preparing query GetAlertLinkDestination: %w", err)
+	}
 	if q.getLastAlertSnowAmountStmt, err = db.PrepareContext(ctx, getLastAlertSnowAmount); err != nil {
 		return nil, fmt.Errorf("error preparing query GetLastAlertSnowAmount: %w", err)
 	}
@@ -77,6 +83,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getSessionByTokenHashStmt, err = db.PrepareContext(ctx, getSessionByTokenHash); err != nil {
 		return nil, fmt.Errorf("error preparing query GetSessionByTokenHash: %w", err)
+	}
+	if q.getUsageSinceStmt, err = db.PrepareContext(ctx, getUsageSince); err != nil {
+		return nil, fmt.Errorf("error preparing query GetUsageSince: %w", err)
+	}
+	if q.getUsageTotalsStmt, err = db.PrepareContext(ctx, getUsageTotals); err != nil {
+		return nil, fmt.Errorf("error preparing query GetUsageTotals: %w", err)
 	}
 	if q.getUserAlertStmt, err = db.PrepareContext(ctx, getUserAlert); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserAlert: %w", err)
@@ -96,6 +108,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.insertAlertHistoryStmt, err = db.PrepareContext(ctx, insertAlertHistory); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertAlertHistory: %w", err)
 	}
+	if q.insertAlertLinkStmt, err = db.PrepareContext(ctx, insertAlertLink); err != nil {
+		return nil, fmt.Errorf("error preparing query InsertAlertLink: %w", err)
+	}
 	if q.listActiveAlertsStmt, err = db.PrepareContext(ctx, listActiveAlerts); err != nil {
 		return nil, fmt.Errorf("error preparing query ListActiveAlerts: %w", err)
 	}
@@ -104,6 +119,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.markEmailVerifiedStmt, err = db.PrepareContext(ctx, markEmailVerified); err != nil {
 		return nil, fmt.Errorf("error preparing query MarkEmailVerified: %w", err)
+	}
+	if q.recordAlertLinkClickStmt, err = db.PrepareContext(ctx, recordAlertLinkClick); err != nil {
+		return nil, fmt.Errorf("error preparing query RecordAlertLinkClick: %w", err)
 	}
 	if q.touchSessionStmt, err = db.PrepareContext(ctx, touchSession); err != nil {
 		return nil, fmt.Errorf("error preparing query TouchSession: %w", err)
@@ -193,6 +211,16 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing deleteUserAlertByUserUUIDStmt: %w", cerr)
 		}
 	}
+	if q.getActiveAlertsByResortStmt != nil {
+		if cerr := q.getActiveAlertsByResortStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getActiveAlertsByResortStmt: %w", cerr)
+		}
+	}
+	if q.getAlertLinkDestinationStmt != nil {
+		if cerr := q.getAlertLinkDestinationStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getAlertLinkDestinationStmt: %w", cerr)
+		}
+	}
 	if q.getLastAlertSnowAmountStmt != nil {
 		if cerr := q.getLastAlertSnowAmountStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getLastAlertSnowAmountStmt: %w", cerr)
@@ -216,6 +244,16 @@ func (q *Queries) Close() error {
 	if q.getSessionByTokenHashStmt != nil {
 		if cerr := q.getSessionByTokenHashStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getSessionByTokenHashStmt: %w", cerr)
+		}
+	}
+	if q.getUsageSinceStmt != nil {
+		if cerr := q.getUsageSinceStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getUsageSinceStmt: %w", cerr)
+		}
+	}
+	if q.getUsageTotalsStmt != nil {
+		if cerr := q.getUsageTotalsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getUsageTotalsStmt: %w", cerr)
 		}
 	}
 	if q.getUserAlertStmt != nil {
@@ -248,6 +286,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing insertAlertHistoryStmt: %w", cerr)
 		}
 	}
+	if q.insertAlertLinkStmt != nil {
+		if cerr := q.insertAlertLinkStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing insertAlertLinkStmt: %w", cerr)
+		}
+	}
 	if q.listActiveAlertsStmt != nil {
 		if cerr := q.listActiveAlertsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing listActiveAlertsStmt: %w", cerr)
@@ -261,6 +304,11 @@ func (q *Queries) Close() error {
 	if q.markEmailVerifiedStmt != nil {
 		if cerr := q.markEmailVerifiedStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing markEmailVerifiedStmt: %w", cerr)
+		}
+	}
+	if q.recordAlertLinkClickStmt != nil {
+		if cerr := q.recordAlertLinkClickStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing recordAlertLinkClickStmt: %w", cerr)
 		}
 	}
 	if q.touchSessionStmt != nil {
@@ -345,20 +393,26 @@ type Queries struct {
 	deleteSessionStmt                     *sql.Stmt
 	deleteUserAlertStmt                   *sql.Stmt
 	deleteUserAlertByUserUUIDStmt         *sql.Stmt
+	getActiveAlertsByResortStmt           *sql.Stmt
+	getAlertLinkDestinationStmt           *sql.Stmt
 	getLastAlertSnowAmountStmt            *sql.Stmt
 	getOrCreateUserByEmailStmt            *sql.Stmt
 	getResortAlertsStmt                   *sql.Stmt
 	getResortByUUIDStmt                   *sql.Stmt
 	getSessionByTokenHashStmt             *sql.Stmt
+	getUsageSinceStmt                     *sql.Stmt
+	getUsageTotalsStmt                    *sql.Stmt
 	getUserAlertStmt                      *sql.Stmt
 	getUserAlertsByEmailStmt              *sql.Stmt
 	getUserAlertsByUserUUIDStmt           *sql.Stmt
 	getUserByEmailStmt                    *sql.Stmt
 	getUserByUUIDStmt                     *sql.Stmt
 	insertAlertHistoryStmt                *sql.Stmt
+	insertAlertLinkStmt                   *sql.Stmt
 	listActiveAlertsStmt                  *sql.Stmt
 	listResortsStmt                       *sql.Stmt
 	markEmailVerifiedStmt                 *sql.Stmt
+	recordAlertLinkClickStmt              *sql.Stmt
 	touchSessionStmt                      *sql.Stmt
 	updateUserAlertStmt                   *sql.Stmt
 	updateUserAlertSettingsByUserUUIDStmt *sql.Stmt
@@ -384,20 +438,26 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		deleteSessionStmt:                     q.deleteSessionStmt,
 		deleteUserAlertStmt:                   q.deleteUserAlertStmt,
 		deleteUserAlertByUserUUIDStmt:         q.deleteUserAlertByUserUUIDStmt,
+		getActiveAlertsByResortStmt:           q.getActiveAlertsByResortStmt,
+		getAlertLinkDestinationStmt:           q.getAlertLinkDestinationStmt,
 		getLastAlertSnowAmountStmt:            q.getLastAlertSnowAmountStmt,
 		getOrCreateUserByEmailStmt:            q.getOrCreateUserByEmailStmt,
 		getResortAlertsStmt:                   q.getResortAlertsStmt,
 		getResortByUUIDStmt:                   q.getResortByUUIDStmt,
 		getSessionByTokenHashStmt:             q.getSessionByTokenHashStmt,
+		getUsageSinceStmt:                     q.getUsageSinceStmt,
+		getUsageTotalsStmt:                    q.getUsageTotalsStmt,
 		getUserAlertStmt:                      q.getUserAlertStmt,
 		getUserAlertsByEmailStmt:              q.getUserAlertsByEmailStmt,
 		getUserAlertsByUserUUIDStmt:           q.getUserAlertsByUserUUIDStmt,
 		getUserByEmailStmt:                    q.getUserByEmailStmt,
 		getUserByUUIDStmt:                     q.getUserByUUIDStmt,
 		insertAlertHistoryStmt:                q.insertAlertHistoryStmt,
+		insertAlertLinkStmt:                   q.insertAlertLinkStmt,
 		listActiveAlertsStmt:                  q.listActiveAlertsStmt,
 		listResortsStmt:                       q.listResortsStmt,
 		markEmailVerifiedStmt:                 q.markEmailVerifiedStmt,
+		recordAlertLinkClickStmt:              q.recordAlertLinkClickStmt,
 		touchSessionStmt:                      q.touchSessionStmt,
 		updateUserAlertStmt:                   q.updateUserAlertStmt,
 		updateUserAlertSettingsByUserUUIDStmt: q.updateUserAlertSettingsByUserUUIDStmt,

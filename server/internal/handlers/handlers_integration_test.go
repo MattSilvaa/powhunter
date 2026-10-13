@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/MattSilvaa/powhunter/internal/db"
 	dbgen "github.com/MattSilvaa/powhunter/internal/db/generated"
 	"github.com/MattSilvaa/powhunter/internal/testutil"
 	"github.com/google/uuid"
@@ -233,7 +234,7 @@ func TestEndToEndFlow_CreateAlertAndVerifyInDatabase(t *testing.T) {
 	assert.Equal(t, "Test Mountain", match.ResortName)
 
 	// Record alert sent
-	err = store.RecordAlertSent(ctx, matches[0])
+	err = store.RecordAlertSent(ctx, matches[0], db.SentAlert{SMSSegments: 1})
 	require.NoError(t, err)
 
 	// Verify alert history was recorded

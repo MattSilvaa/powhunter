@@ -51,6 +51,7 @@ type Handlers struct {
 	Account *AccountHandler
 	Contact *ContactHandler
 	Auth    *AuthHandler
+	Link    *LinkHandler
 	auth    *auth.Service
 	store   *db.Store
 }
@@ -156,6 +157,7 @@ func NewHandlers(cfg config.Config, logger *slog.Logger) (*Handlers, error) {
 		Account: NewAccountHandler(store, logger),
 		Contact: contactHandler,
 		Auth:    NewAuthHandler(authService, mailer, cfg.AppBaseURL, logger),
+		Link:    NewLinkHandler(store.Queries(), cfg.AppBaseURL, logger),
 		auth:    authService,
 		store:   store,
 	}, nil

@@ -12,6 +12,7 @@ import (
 
 	"github.com/MattSilvaa/powhunter/internal/auth"
 	"github.com/MattSilvaa/powhunter/internal/config"
+	dbgen "github.com/MattSilvaa/powhunter/internal/db/generated"
 	"github.com/MattSilvaa/powhunter/internal/handlers"
 	"github.com/MattSilvaa/powhunter/internal/metrics"
 	"github.com/MattSilvaa/powhunter/internal/server"
@@ -78,6 +79,7 @@ func run(logger *slog.Logger) error {
 
 	registry := metrics.NewRegistry()
 	registry.RegisterDBStats(h.Store().DB())
+	registry.RegisterUsage(dbgen.New(h.Store().DB()), logger)
 
 	handler, cleanup := server.New(server.Deps{
 		Config:   cfg,

@@ -1,11 +1,13 @@
 package forecast_test
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 	dbgen "github.com/MattSilvaa/powhunter/internal/db/generated"
 	dbmocks "github.com/MattSilvaa/powhunter/internal/db/mocks"
 	"github.com/MattSilvaa/powhunter/internal/forecast"
+	"github.com/MattSilvaa/powhunter/internal/notify"
 	notifymocks "github.com/MattSilvaa/powhunter/internal/notify/mocks"
 	"github.com/MattSilvaa/powhunter/internal/weather"
 	weathermocks "github.com/MattSilvaa/powhunter/internal/weather/mocks"
@@ -47,6 +50,12 @@ type harness struct {
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 
+	return newHarnessWithLinks(t, "")
+}
+
+func newHarnessWithLinks(t *testing.T, linkBaseURL string) *harness {
+	t.Helper()
+
 	ctrl := gomock.NewController(t)
 	store := dbmocks.NewMockStoreService(ctrl)
 	weatherClient := weathermocks.NewMockWeatherService(ctrl)
@@ -61,6 +70,7 @@ func newHarness(t *testing.T) *harness {
 		runner: forecast.NewRunner(store, weatherClient, notifier, logger,
 			fixedNow,
 			forecast.Options{
+				LinkBaseURL:      linkBaseURL,
 				Concurrency:      1,
 				Attempts:         2,
 				RetryBackoff:     time.Millisecond,
@@ -91,7 +101,11 @@ func testAlert() db.AlertToSend {
 }
 
 func (h *harness) expectOneMatchingAlert(alert db.AlertToSend) {
-	h.store.EXPECT().ListAllResorts(gomock.Any()).Return([]dbgen.Resort{testResort()}, nil)
+	h.expectOneMatchingAlertAt(testResort(), alert)
+}
+
+func (h *harness) expectOneMatchingAlertAt(resort dbgen.Resort, alert db.AlertToSend) {
+	h.store.EXPECT().ListAllResorts(gomock.Any()).Return([]dbgen.Resort{resort}, nil)
 	h.weather.EXPECT().
 		GetSnowForecast(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return([]weather.WeatherPrediction{{Date: forecastDate(), SnowAmount: 8}}, nil)
@@ -106,7 +120,7 @@ func TestASuccessfulSendIsRecordedExactlyOnce(t *testing.T) {
 
 	h.expectOneMatchingAlert(alert)
 	h.notifier.EXPECT().SendSMS(alert.UserPhone, gomock.Any()).Return(nil).Times(1)
-	h.store.EXPECT().RecordAlertSent(gomock.Any(), alert).Return(nil).Times(1)
+	h.store.EXPECT().RecordAlertSent(gomock.Any(), alert, db.SentAlert{SMSSegments: 1}).Return(nil).Times(1)
 
 	run, err := h.runner.Run(t.Context())
 
@@ -114,6 +128,34 @@ func TestASuccessfulSendIsRecordedExactlyOnce(t *testing.T) {
 	assert.Equal(t, 1, run.AlertsSent)
 	assert.Zero(t, run.AlertsFailed)
 	assert.True(t, run.Succeeded)
+}
+
+func TestASentAlertCarriesATrackedLinkToTheResortReport(t *testing.T) {
+	h := newHarnessWithLinks(t, "https://api.example.com")
+	alert := testAlert()
+
+	resort := testResort()
+	resort.UrlHost = sql.NullString{String: "https://www.vail.com/", Valid: true}
+	resort.UrlPathname = sql.NullString{String: "/snow-report", Valid: true}
+
+	var message string
+
+	h.expectOneMatchingAlertAt(resort, alert)
+	h.notifier.EXPECT().SendSMS(alert.UserPhone, gomock.Any()).
+		DoAndReturn(func(_, body string) error { message = body; return nil })
+	h.store.EXPECT().RecordAlertSent(gomock.Any(), alert, gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ db.AlertToSend, sent db.SentAlert) error {
+			assert.True(t, notify.IsLinkCode(sent.LinkCode))
+			assert.True(t, strings.HasSuffix(message, " https://api.example.com/go/"+sent.LinkCode),
+				"the SMS should end with the link that is recorded, got %q", message)
+			assert.Equal(t, "https://www.vail.com/snow-report", sent.LinkDestination)
+			assert.Equal(t, int32(1), sent.SMSSegments)
+
+			return nil
+		})
+
+	_, err := h.runner.Run(t.Context())
+	require.NoError(t, err)
 }
 
 // A failed send used to be recorded anyway, which permanently suppressed that
@@ -124,7 +166,7 @@ func TestAFailedSendIsNotRecorded(t *testing.T) {
 
 	h.expectOneMatchingAlert(alert)
 	h.notifier.EXPECT().SendSMS(alert.UserPhone, gomock.Any()).Return(errors.New("twilio down"))
-	h.store.EXPECT().RecordAlertSent(gomock.Any(), gomock.Any()).Times(0)
+	h.store.EXPECT().RecordAlertSent(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	run, err := h.runner.Run(t.Context())
 
@@ -142,7 +184,7 @@ func TestAUserWithoutAPhoneNumberIsNeitherSentNorRecorded(t *testing.T) {
 
 	h.expectOneMatchingAlert(alert)
 	h.notifier.EXPECT().SendSMS(gomock.Any(), gomock.Any()).Times(0)
-	h.store.EXPECT().RecordAlertSent(gomock.Any(), gomock.Any()).Times(0)
+	h.store.EXPECT().RecordAlertSent(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	run, err := h.runner.Run(t.Context())
 
@@ -156,7 +198,8 @@ func TestADeliveredAlertWithAFailedRecordIsReported(t *testing.T) {
 
 	h.expectOneMatchingAlert(alert)
 	h.notifier.EXPECT().SendSMS(alert.UserPhone, gomock.Any()).Return(nil)
-	h.store.EXPECT().RecordAlertSent(gomock.Any(), alert).Return(errors.New("write failed"))
+	h.store.EXPECT().RecordAlertSent(gomock.Any(), alert, db.SentAlert{SMSSegments: 1}).
+		Return(errors.New("write failed"))
 
 	run, err := h.runner.Run(t.Context())
 

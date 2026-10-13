@@ -6,6 +6,7 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -27,6 +28,12 @@ type Querier interface {
 	DeleteSession(ctx context.Context, tokenHash string) error
 	DeleteUserAlert(ctx context.Context, arg DeleteUserAlertParams) error
 	DeleteUserAlertByUserUUID(ctx context.Context, arg DeleteUserAlertByUserUUIDParams) error
+	// How many users follow each resort. Every resort is listed, including those
+	// nobody follows, so a resort dropping to zero shows as zero rather than as a
+	// series that silently disappears.
+	GetActiveAlertsByResort(ctx context.Context) ([]GetActiveAlertsByResortRow, error)
+	// For requests that should not count as a click, such as link previews.
+	GetAlertLinkDestination(ctx context.Context, code string) (string, error)
 	GetLastAlertSnowAmount(ctx context.Context, arg GetLastAlertSnowAmountParams) (float64, error)
 	// Requesting a login link for an address that has no account creates one, so
 	// signup and login are the same flow. DO UPDATE rather than DO NOTHING because
@@ -38,6 +45,11 @@ type Querier interface {
 	// single round trip. Expired rows never match, so a stale cookie reads as
 	// signed out even before the reaper removes it.
 	GetSessionByTokenHash(ctx context.Context, tokenHash string) (GetSessionByTokenHashRow, error)
+	// Activity since a cutoff. Called once per reporting window.
+	GetUsageSince(ctx context.Context, since time.Time) (GetUsageSinceRow, error)
+	// Point-in-time counts for the usage metrics. A subscriber is a user with at
+	// least one active alert: that is who the forecaster can actually notify.
+	GetUsageTotals(ctx context.Context) (GetUsageTotalsRow, error)
 	GetUserAlert(ctx context.Context, arg GetUserAlertParams) (UserAlert, error)
 	GetUserAlertsByEmail(ctx context.Context, email string) ([]GetUserAlertsByEmailRow, error)
 	// The three queries below key off the authenticated user's UUID rather than an
@@ -46,10 +58,13 @@ type Querier interface {
 	GetUserAlertsByUserUUID(ctx context.Context, userUuid uuid.NullUUID) ([]GetUserAlertsByUserUUIDRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUUID(ctx context.Context, argUuid uuid.UUID) (User, error)
-	InsertAlertHistory(ctx context.Context, arg InsertAlertHistoryParams) error
+	InsertAlertHistory(ctx context.Context, arg InsertAlertHistoryParams) (int32, error)
+	InsertAlertLink(ctx context.Context, arg InsertAlertLinkParams) error
 	ListActiveAlerts(ctx context.Context) ([]ListActiveAlertsRow, error)
 	ListResorts(ctx context.Context) ([]Resort, error)
 	MarkEmailVerified(ctx context.Context, argUuid uuid.UUID) error
+	// Counts a click and returns where to send the visitor, in one round trip.
+	RecordAlertLinkClick(ctx context.Context, code string) (string, error)
 	TouchSession(ctx context.Context, arg TouchSessionParams) error
 	UpdateUserAlert(ctx context.Context, arg UpdateUserAlertParams) (UserAlert, error)
 	// Changes only the thresholds. Unlike UpdateUserAlert it leaves active alone,

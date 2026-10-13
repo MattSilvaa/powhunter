@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -44,6 +46,9 @@ type resortRow = dbgen.Resort
 
 // Options configures a Runner.
 type Options struct {
+	// LinkBaseURL is the public address of the API's /go redirect, such as
+	// "https://api.example.com". Empty sends alerts without a tracked link.
+	LinkBaseURL      string
 	Concurrency      int
 	ResortTimeout    time.Duration
 	Attempts         int
@@ -208,8 +213,10 @@ func (r *Runner) processPrediction(
 
 	totals.add(func(run *metrics.ForecastRun) { run.AlertsMatched += len(alerts) })
 
+	destination := resortReportURL(resort)
+
 	for _, alert := range alerts {
-		r.deliver(ctx, alert, logger, totals)
+		r.deliver(ctx, alert, destination, logger, totals)
 	}
 }
 
@@ -217,6 +224,7 @@ func (r *Runner) processPrediction(
 func (r *Runner) deliver(
 	ctx context.Context,
 	alert db.AlertToSend,
+	destination string,
 	logger *slog.Logger,
 	totals *summary,
 ) {
@@ -228,7 +236,10 @@ func (r *Runner) deliver(
 		return
 	}
 
-	message := notify.FormatSnowAlertMessage(alert)
+	sent, link := r.newLink(ctx, destination, logger)
+	message := notify.FormatSnowAlertMessage(alert, link)
+	sent.SMSSegments = notify.SMSSegments(message)
+
 	if err := r.notifier.SendSMS(alert.UserPhone, message); err != nil {
 		// Do not record an alert that was never delivered.
 		logger.ErrorContext(ctx, "failed to send SMS", "error", err)
@@ -239,12 +250,51 @@ func (r *Runner) deliver(
 
 	totals.add(func(run *metrics.ForecastRun) { run.AlertsSent++ })
 
-	if err := r.store.RecordAlertSent(ctx, alert); err != nil {
+	if err := r.store.RecordAlertSent(ctx, alert, sent); err != nil {
 		// The SMS is already delivered, so the next run would send a duplicate.
 		logger.ErrorContext(ctx, "SMS delivered but recording history failed, next run may duplicate",
 			"error", err)
 		totals.add(func(run *metrics.ForecastRun) { run.RecordsFailed++ })
 	}
+}
+
+// newLink picks a tracked link for one alert. The link is only stored once the
+// SMS is delivered, so a failed send leaves nothing behind. Any problem here
+// sends the alert without a link: the alert matters, the link is a bonus.
+func (r *Runner) newLink(ctx context.Context, destination string, logger *slog.Logger) (db.SentAlert, string) {
+	if r.opts.LinkBaseURL == "" || destination == "" {
+		return db.SentAlert{}, ""
+	}
+
+	code, err := notify.NewLinkCode()
+	if err != nil {
+		logger.WarnContext(ctx, "sending alert without a link", "error", err)
+
+		return db.SentAlert{}, ""
+	}
+
+	return db.SentAlert{LinkCode: code, LinkDestination: destination}, r.opts.LinkBaseURL + "/go/" + code
+}
+
+// resortReportURL is the resort's mountain report page, or empty when the
+// resort has no usable address. Only http(s) addresses are accepted, since the
+// API redirects visitors to whatever is stored.
+func resortReportURL(resort resortRow) string {
+	if !resort.UrlHost.Valid || resort.UrlHost.String == "" {
+		return ""
+	}
+
+	raw := strings.TrimRight(resort.UrlHost.String, "/")
+	if resort.UrlPathname.Valid && resort.UrlPathname.String != "" {
+		raw += "/" + strings.TrimLeft(resort.UrlPathname.String, "/")
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" {
+		return ""
+	}
+
+	return parsed.String()
 }
 
 // fetchForecast retries transient weather API failures, which previously

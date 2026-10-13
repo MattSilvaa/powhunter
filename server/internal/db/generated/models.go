@@ -18,6 +18,18 @@ type AlertHistory struct {
 	SentAt       sql.NullTime  `json:"sent_at"`
 	ForecastDate time.Time     `json:"forecast_date"`
 	SnowAmount   float64       `json:"snow_amount"`
+	SmsSegments  int32         `json:"sms_segments"`
+}
+
+type AlertLink struct {
+	ID             int32        `json:"id"`
+	Code           string       `json:"code"`
+	AlertHistoryID int32        `json:"alert_history_id"`
+	DestinationUrl string       `json:"destination_url"`
+	Clicks         int32        `json:"clicks"`
+	FirstClickedAt sql.NullTime `json:"first_clicked_at"`
+	LastClickedAt  sql.NullTime `json:"last_clicked_at"`
+	CreatedAt      time.Time    `json:"created_at"`
 }
 
 type LoginToken struct {

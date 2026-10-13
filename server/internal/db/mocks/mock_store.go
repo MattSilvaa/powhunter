@@ -189,17 +189,17 @@ func (mr *MockStoreServiceMockRecorder) ListAllResorts(ctx any) *gomock.Call {
 }
 
 // RecordAlertSent mocks base method.
-func (m *MockStoreService) RecordAlertSent(ctx context.Context, alert db.AlertToSend) error {
+func (m *MockStoreService) RecordAlertSent(ctx context.Context, alert db.AlertToSend, sent db.SentAlert) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RecordAlertSent", ctx, alert)
+	ret := m.ctrl.Call(m, "RecordAlertSent", ctx, alert, sent)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // RecordAlertSent indicates an expected call of RecordAlertSent.
-func (mr *MockStoreServiceMockRecorder) RecordAlertSent(ctx, alert any) *gomock.Call {
+func (mr *MockStoreServiceMockRecorder) RecordAlertSent(ctx, alert, sent any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordAlertSent", reflect.TypeOf((*MockStoreService)(nil).RecordAlertSent), ctx, alert)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordAlertSent", reflect.TypeOf((*MockStoreService)(nil).RecordAlertSent), ctx, alert, sent)
 }
 
 // UpdateAlertForUser mocks base method.

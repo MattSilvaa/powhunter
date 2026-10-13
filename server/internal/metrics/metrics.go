@@ -4,6 +4,7 @@ package metrics
 
 import (
 	"database/sql"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -66,6 +67,11 @@ func NewRegistry() *Registry {
 // visible rather than showing up only as slow requests.
 func (m *Registry) RegisterDBStats(database *sql.DB) {
 	m.registry.MustRegister(collectors.NewDBStatsCollector(database, "powhunter"))
+}
+
+// RegisterUsage publishes product usage read through the given queries.
+func (m *Registry) RegisterUsage(querier UsageQuerier, logger *slog.Logger) {
+	m.registry.MustRegister(NewUsageCollector(querier, logger, nil))
 }
 
 // Handler serves the metrics endpoint.

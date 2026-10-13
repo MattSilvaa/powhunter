@@ -6,8 +6,10 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -76,7 +78,7 @@ func run(logger *slog.Logger) error {
 		notify.NewTwilioClient(fromNumber),
 		logger,
 		time.Now,
-		forecast.Options{},
+		forecast.Options{LinkBaseURL: linkBaseURL(logger, os.Getenv("LINK_BASE_URL"))},
 	)
 
 	summary, runErr := runner.Run(ctx)
@@ -105,6 +107,30 @@ func run(logger *slog.Logger) error {
 	}
 
 	return nil
+}
+
+// linkBaseURL validates where alert links point. A bad value logs and turns
+// links off rather than failing the run: alerts without a link still do their
+// job, and the run exiting non-zero over a typo would deliver nothing.
+func linkBaseURL(logger *slog.Logger, raw string) string {
+	if raw == "" {
+		logger.Info("LINK_BASE_URL is not set; alerts are sent without a tracked link")
+		return ""
+	}
+
+	parsed, err := url.Parse(strings.TrimRight(raw, "/"))
+	// A path is rejected because the API serves /go at its root: a base such as
+	// https://api.example.com/go would produce /go/go/<code> and break every link.
+	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" ||
+		parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		logger.Warn("LINK_BASE_URL must be a bare http(s) origin such as https://api.example.com; "+
+			"alerts are sent without a tracked link",
+			"value", raw)
+
+		return ""
+	}
+
+	return parsed.String()
 }
 
 // publishMetrics reports the run to a Pushgateway when one is configured.

@@ -19,21 +19,15 @@ The phone number should be in E.164 format (e.g., `+12025551234`).
 ### Usage Example
 
 ```go
-// Initialize Twilio client
-twilioClient := notify.NewTwilioClient(
-    os.Getenv("TWILIO_ACCOUNT_SID"),
-    os.Getenv("TWILIO_AUTH_TOKEN"),
-    os.Getenv("TWILIO_FROM_NUMBER"),
-)
+// Credentials come from TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN.
+twilioClient := notify.NewTwilioClient(os.Getenv("TWILIO_FROM_NUMBER"))
 
-// Send a snow alert SMS
-message := notify.FormatSnowAlertMessage(
-    "Crystal Mountain", 
-    8.5, 
-    time.Now().AddDate(0, 0, 2),
-)
-err := twilioClient.SendSMS("+12025551234", message)
-if err != nil {
+// The second argument is an optional tracked link (see LINK_BASE_URL). With a
+// link, optional phrases are dropped so the message stays in one segment.
+message := notify.FormatSnowAlertMessage(alert, "https://api.example.com/go/Ab12Cd34")
+segments := notify.SMSSegments(message) // what Twilio will bill
+
+if err := twilioClient.SendSMS(alert.UserPhone, message); err != nil {
     log.Printf("Error sending SMS: %v", err)
 }
 ```

@@ -68,6 +68,11 @@ func New(deps Deps) (http.Handler, func()) {
 		return middleware.NoStore(middleware.RequireUser(handler))
 	}
 
+	// The tracked link at the end of each alert SMS. Uncacheable, or a repeat
+	// visit would be answered by a cache and never counted.
+	mux.Handle("GET /go/{code}",
+		deps.Metrics.Instrument("alert_link", middleware.NoStore(http.HandlerFunc(deps.Handlers.Link.Redirect))))
+
 	mux.Handle("GET /api/resorts",
 		deps.Metrics.Instrument("resorts", http.HandlerFunc(deps.Handlers.Resort.ListAllResorts)))
 	mux.Handle("POST /api/alerts",
