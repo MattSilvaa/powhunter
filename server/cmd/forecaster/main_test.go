@@ -72,6 +72,7 @@ func TestLinkBaseURL(t *testing.T) {
 		{"api.example.com", ""},
 		{"javascript:alert(1)", ""},
 		{"https://api.example.com/?ref=sms", ""},
+		{"https://api.example.com/go", ""},
 	}
 
 	for _, tt := range tests {

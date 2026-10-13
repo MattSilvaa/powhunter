@@ -56,7 +56,11 @@
           "refId": "A"
         }
       ],
-      "description": "Users with at least one active alert: everyone the forecaster can notify."
+      "description": "Users with at least one active alert: everyone the forecaster can notify.",
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      }
     },
     {
       "id": 2,
@@ -85,7 +89,11 @@
           "instant": true,
           "refId": "A"
         }
-      ]
+      ],
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      }
     },
     {
       "id": 3,
@@ -114,7 +122,11 @@
           "instant": true,
           "refId": "A"
         }
-      ]
+      ],
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      }
     },
     {
       "id": 4,
@@ -143,7 +155,11 @@
           "instant": true,
           "refId": "A"
         }
-      ]
+      ],
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      }
     },
     {
       "id": 5,
@@ -172,7 +188,11 @@
           "instant": true,
           "refId": "A"
         }
-      ]
+      ],
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      }
     },
     {
       "id": 6,
@@ -202,7 +222,11 @@
           "refId": "A"
         }
       ],
-      "description": "Distinct users with a signed-in session seen in the last 7 days."
+      "description": "Distinct users with a signed-in session seen in the last 7 days.",
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      }
     },
     {
       "id": 7,
@@ -231,7 +255,11 @@
           "instant": true,
           "refId": "A"
         }
-      ]
+      ],
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      }
     },
     {
       "id": 8,
@@ -260,7 +288,11 @@
           "instant": true,
           "refId": "A"
         }
-      ]
+      ],
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      }
     },
     {
       "id": 9,
@@ -290,7 +322,11 @@
           "refId": "A"
         }
       ],
-      "description": "Twilio bills per segment. A message over 160 characters, or with an emoji, takes more than one."
+      "description": "Twilio bills per segment. A message over 160 characters, or with an emoji, takes more than one.",
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      }
     },
     {
       "id": 10,
@@ -320,7 +356,11 @@
           "refId": "A"
         }
       ],
-      "description": "Segments \u00d7 the sms_price variable at the top of the dashboard."
+      "description": "Segments \u00d7 the sms_price variable at the top of the dashboard.",
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      }
     },
     {
       "id": 11,
@@ -350,7 +390,11 @@
           "refId": "A"
         }
       ],
-      "description": "What a subscriber costs to serve per month: the floor for a paid tier's price."
+      "description": "What a subscriber costs to serve per month: the floor for a paid tier's price.",
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      }
     },
     {
       "id": 12,
@@ -368,7 +412,33 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Failing"
+                },
+                "1": {
+                  "text": "OK"
+                }
+              }
+            }
+          ]
         },
         "overrides": []
       },
@@ -380,7 +450,11 @@
           "refId": "A"
         }
       ],
-      "description": "1 when the API last read the usage numbers from the database. 0 means every other panel here is missing data, not zero."
+      "description": "1 when the API last read the usage numbers from the database. 0 means every other panel here is missing data, not zero.",
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none"
+      }
     },
     {
       "id": 13,
@@ -486,7 +560,11 @@
           "instant": true,
           "refId": "A"
         }
-      ]
+      ],
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      }
     },
     {
       "id": 17,
@@ -516,7 +594,11 @@
           "instant": true,
           "refId": "A"
         }
-      ]
+      ],
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      }
     },
     {
       "id": 18,
@@ -546,14 +628,18 @@
           "instant": true,
           "refId": "A"
         }
-      ]
+      ],
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      }
     },
     {
       "id": 15,
       "title": "Active alerts by resort",
       "type": "bargauge",
       "gridPos": {
-        "h": 12,
+        "h": 20,
         "w": 24,
         "x": 0,
         "y": 20
@@ -564,7 +650,11 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
         },
         "overrides": []
       },

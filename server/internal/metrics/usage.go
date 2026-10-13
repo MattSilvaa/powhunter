@@ -118,21 +118,22 @@ func (c *UsageCollector) Describe(ch chan<- *prometheus.Desc) {
 // Collect implements prometheus.Collector. A failed refresh reports only
 // refresh_success 0: serving stale counts as if they were current would hide
 // the outage, and failing the whole scrape would take the HTTP metrics with it.
+//
+// A failure is cached for the refresh interval just like a success. Retrying
+// on every scrape would hold each scrape for up to the query timeout while the
+// database is down, and add load to a database that is already struggling.
 func (c *UsageCollector) Collect(ch chan<- prometheus.Metric) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.cached == nil || c.now().Sub(c.refreshedAt) >= usageRefreshInterval {
+	if c.refreshedAt.IsZero() || c.now().Sub(c.refreshedAt) >= usageRefreshInterval {
 		ctx, cancel := context.WithTimeout(context.Background(), usageQueryTimeout)
 		defer cancel()
 
 		metrics, err := c.read(ctx)
 		if err != nil {
 			c.logger.ErrorContext(ctx, "failed to read usage metrics", "error", err)
-			c.cached = nil
-			ch <- prometheus.MustNewConstMetric(c.refreshSuccess, prometheus.GaugeValue, 0)
-
-			return
+			metrics = []prometheus.Metric{prometheus.MustNewConstMetric(c.refreshSuccess, prometheus.GaugeValue, 0)}
 		}
 
 		c.cached = metrics

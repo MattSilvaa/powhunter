@@ -119,9 +119,12 @@ func linkBaseURL(logger *slog.Logger, raw string) string {
 	}
 
 	parsed, err := url.Parse(strings.TrimRight(raw, "/"))
+	// A path is rejected because the API serves /go at its root: a base such as
+	// https://api.example.com/go would produce /go/go/<code> and break every link.
 	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" ||
-		parsed.RawQuery != "" || parsed.Fragment != "" {
-		logger.Warn("LINK_BASE_URL is not an http(s) address; alerts are sent without a tracked link",
+		parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		logger.Warn("LINK_BASE_URL must be a bare http(s) origin such as https://api.example.com; "+
+			"alerts are sent without a tracked link",
 			"value", raw)
 
 		return ""

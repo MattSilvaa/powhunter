@@ -107,4 +107,9 @@ powhunter_usage_refresh_success 0
 	collector := newCollector(q, &now)
 	require.NoError(t, testutil.CollectAndCompare(collector, strings.NewReader(expected)))
 	assert.Equal(t, 1, testutil.CollectAndCount(collector), "no stale or partial counts should be served")
+	assert.Equal(t, 1, q.calls, "a failure should not be retried within the refresh interval")
+
+	now = now.Add(time.Minute)
+	q.err = nil
+	assert.Greater(t, testutil.CollectAndCount(collector), 1, "the next interval should read again and recover")
 }
