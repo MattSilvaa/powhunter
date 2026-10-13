@@ -9,7 +9,11 @@ COPY alertmanager.yml /etc/alertmanager/alertmanager.yml
 COPY entrypoint.sh /entrypoint.sh
 
 USER root
-RUN chmod +x /entrypoint.sh
+# Render SSH starts the user's login shell, and the base image gives nobody
+# /bin/false, so every SSH session closed the moment it opened. nobody keeps
+# its uid, so nothing it already owns changes.
+RUN chmod +x /entrypoint.sh && \
+    sed -i 's|^nobody:\(.*\):/bin/false$|nobody:\1:/bin/sh|' /etc/passwd
 USER nobody
 
 ENTRYPOINT ["/entrypoint.sh"]

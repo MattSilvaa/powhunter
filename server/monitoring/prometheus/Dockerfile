@@ -17,7 +17,12 @@ COPY rules /etc/prometheus/rules
 COPY entrypoint.sh /entrypoint.sh
 
 USER root
-RUN chmod +x /entrypoint.sh
+# Render SSH starts the user's login shell, and the base image gives nobody
+# /bin/false, so every SSH session closed the moment it opened and the tunnel
+# to Prometheus in README.md could not be used. nobody keeps its uid, so files
+# it already owns, such as the Prometheus data disk, stay writable.
+RUN chmod +x /entrypoint.sh && \
+    sed -i 's|^nobody:\(.*\):/bin/false$|nobody:\1:/bin/sh|' /etc/passwd
 USER nobody
 
 ENTRYPOINT ["/entrypoint.sh"]

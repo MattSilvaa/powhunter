@@ -39,6 +39,13 @@ ssh -N -L 9093:localhost:9093 srv-daep03v40ujc7385eqs0@ssh.oregon.render.com
 Leave the tunnel running in its own terminal. Note local 9091 is also what the
 compose Pushgateway binds, so do not run that service while a tunnel is open.
 
+**If the key is accepted but the connection closes at once** ("Connection to
+ssh.oregon.render.com closed by remote host", or "channel 3: open failed"),
+the instance has no login shell for SSH to start. Render SSH runs the user's
+login shell, and the Prometheus and Alertmanager base images give `nobody`
+`/bin/false`; both Dockerfiles switch it to `/bin/sh`. If this comes back, check
+that a base image update has not undone it.
+
 ### Run Grafana against it
 
 ```sh
