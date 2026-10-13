@@ -32,8 +32,10 @@ func (f *fakeUsage) GetUsageTotals(context.Context) (dbgen.GetUsageTotalsRow, er
 func (f *fakeUsage) GetUsageSince(_ context.Context, since time.Time) (dbgen.GetUsageSinceRow, error) {
 	f.since = append(f.since, since)
 
-	return dbgen.GetUsageSinceRow{Signups: 2, ActiveUsers: 3, AlertsSent: 4, UsersAlerted: 3, SmsSegments: 5,
-		LinksSent: 4, LinksClicked: 1}, nil
+	return dbgen.GetUsageSinceRow{
+		Signups: 2, SignupsReferred: 1, ActiveUsers: 3, AlertsSent: 4, UsersAlerted: 3, SmsSegments: 5,
+		LinksSent: 4, LinksClicked: 1,
+	}, nil
 }
 
 func (f *fakeUsage) GetActiveAlertsByResort(context.Context) ([]dbgen.GetActiveAlertsByResortRow, error) {
@@ -58,6 +60,11 @@ powhunter_usage_subscribers 6
 powhunter_usage_sms_segments{window="1d"} 5
 powhunter_usage_sms_segments{window="7d"} 5
 powhunter_usage_sms_segments{window="30d"} 5
+# HELP powhunter_usage_signups_referred Users created in the trailing window from a shared alert link.
+# TYPE powhunter_usage_signups_referred gauge
+powhunter_usage_signups_referred{window="1d"} 1
+powhunter_usage_signups_referred{window="7d"} 1
+powhunter_usage_signups_referred{window="30d"} 1
 # HELP powhunter_usage_links_clicked Tracked links sent in the trailing window that were opened at least once.
 # TYPE powhunter_usage_links_clicked gauge
 powhunter_usage_links_clicked{window="1d"} 1
@@ -72,6 +79,7 @@ powhunter_usage_refresh_success 1
 `
 	require.NoError(t, testutil.CollectAndCompare(newCollector(q, &now), strings.NewReader(expected),
 		"powhunter_usage_subscribers", "powhunter_usage_sms_segments", "powhunter_usage_links_clicked",
+		"powhunter_usage_signups_referred",
 		"powhunter_usage_resort_active_alerts", "powhunter_usage_refresh_success"))
 
 	assert.Equal(t, []time.Time{

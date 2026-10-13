@@ -69,6 +69,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getAlertLinkDestinationStmt, err = db.PrepareContext(ctx, getAlertLinkDestination); err != nil {
 		return nil, fmt.Errorf("error preparing query GetAlertLinkDestination: %w", err)
 	}
+	if q.getAlertLinkDetailsStmt, err = db.PrepareContext(ctx, getAlertLinkDetails); err != nil {
+		return nil, fmt.Errorf("error preparing query GetAlertLinkDetails: %w", err)
+	}
 	if q.getLastAlertSnowAmountStmt, err = db.PrepareContext(ctx, getLastAlertSnowAmount); err != nil {
 		return nil, fmt.Errorf("error preparing query GetLastAlertSnowAmount: %w", err)
 	}
@@ -219,6 +222,11 @@ func (q *Queries) Close() error {
 	if q.getAlertLinkDestinationStmt != nil {
 		if cerr := q.getAlertLinkDestinationStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getAlertLinkDestinationStmt: %w", cerr)
+		}
+	}
+	if q.getAlertLinkDetailsStmt != nil {
+		if cerr := q.getAlertLinkDetailsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getAlertLinkDetailsStmt: %w", cerr)
 		}
 	}
 	if q.getLastAlertSnowAmountStmt != nil {
@@ -395,6 +403,7 @@ type Queries struct {
 	deleteUserAlertByUserUUIDStmt         *sql.Stmt
 	getActiveAlertsByResortStmt           *sql.Stmt
 	getAlertLinkDestinationStmt           *sql.Stmt
+	getAlertLinkDetailsStmt               *sql.Stmt
 	getLastAlertSnowAmountStmt            *sql.Stmt
 	getOrCreateUserByEmailStmt            *sql.Stmt
 	getResortAlertsStmt                   *sql.Stmt
@@ -440,6 +449,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		deleteUserAlertByUserUUIDStmt:         q.deleteUserAlertByUserUUIDStmt,
 		getActiveAlertsByResortStmt:           q.getActiveAlertsByResortStmt,
 		getAlertLinkDestinationStmt:           q.getAlertLinkDestinationStmt,
+		getAlertLinkDetailsStmt:               q.getAlertLinkDetailsStmt,
 		getLastAlertSnowAmountStmt:            q.getLastAlertSnowAmountStmt,
 		getOrCreateUserByEmailStmt:            q.getOrCreateUserByEmailStmt,
 		getResortAlertsStmt:                   q.getResortAlertsStmt,

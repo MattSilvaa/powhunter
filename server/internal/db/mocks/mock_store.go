@@ -59,17 +59,17 @@ func (mr *MockStoreServiceMockRecorder) CreateAlertsForUser(ctx, userUUID, minSn
 }
 
 // CreateUserWithAlerts mocks base method.
-func (m *MockStoreService) CreateUserWithAlerts(ctx context.Context, email, phone string, minSnowAmount float64, notificationDays int32, resortUUIDs []string) error {
+func (m *MockStoreService) CreateUserWithAlerts(ctx context.Context, email, phone string, minSnowAmount float64, notificationDays int32, resortUUIDs []string, referralCode string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateUserWithAlerts", ctx, email, phone, minSnowAmount, notificationDays, resortUUIDs)
+	ret := m.ctrl.Call(m, "CreateUserWithAlerts", ctx, email, phone, minSnowAmount, notificationDays, resortUUIDs, referralCode)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreateUserWithAlerts indicates an expected call of CreateUserWithAlerts.
-func (mr *MockStoreServiceMockRecorder) CreateUserWithAlerts(ctx, email, phone, minSnowAmount, notificationDays, resortUUIDs any) *gomock.Call {
+func (mr *MockStoreServiceMockRecorder) CreateUserWithAlerts(ctx, email, phone, minSnowAmount, notificationDays, resortUUIDs, referralCode any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUserWithAlerts", reflect.TypeOf((*MockStoreService)(nil).CreateUserWithAlerts), ctx, email, phone, minSnowAmount, notificationDays, resortUUIDs)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUserWithAlerts", reflect.TypeOf((*MockStoreService)(nil).CreateUserWithAlerts), ctx, email, phone, minSnowAmount, notificationDays, resortUUIDs, referralCode)
 }
 
 // DeleteAlertForUser mocks base method.

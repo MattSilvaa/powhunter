@@ -539,7 +539,7 @@
       "description": "Alerts sent with a tracked link. Zero means LINK_BASE_URL is not set on the forecaster.",
       "gridPos": {
         "h": 4,
-        "w": 8,
+        "w": 6,
         "x": 0,
         "y": 16
       },
@@ -573,8 +573,8 @@
       "description": "Links from the last 30 days opened at least once. Link previews are not counted.",
       "gridPos": {
         "h": 4,
-        "w": 8,
-        "x": 8,
+        "w": 6,
+        "x": 6,
         "y": 16
       },
       "datasource": {
@@ -607,8 +607,8 @@
       "description": "Share of alerts whose link was opened: how often an alert makes someone act. This is the number resorts and affiliate partners will ask for.",
       "gridPos": {
         "h": 4,
-        "w": 8,
-        "x": 16,
+        "w": 6,
+        "x": 12,
         "y": 16
       },
       "datasource": {
@@ -633,6 +633,40 @@
         "colorMode": "none",
         "graphMode": "none"
       }
+    },
+    {
+      "id": 19,
+      "title": "Signups from shares (30d)",
+      "type": "stat",
+      "description": "New users who signed up from an alert a subscriber shared with friends. Divide by signups to see how much sharing drives growth.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 16
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_signups_referred{window=\"30d\"})",
+          "legendFormat": "Signups from shares (30d)",
+          "instant": true,
+          "refId": "A"
+        }
+      ]
     },
     {
       "id": 15,

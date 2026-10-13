@@ -16,3 +16,15 @@ RETURNING destination_url;
 SELECT destination_url
 FROM alert_links
 WHERE code = $1;
+
+-- name: GetAlertLinkDetails :one
+-- What the alert link page shows: the storm, never the person it was sent to.
+SELECT r.uuid          AS resort_uuid,
+       r.name          AS resort_name,
+       h.snow_amount,
+       h.forecast_date,
+       l.destination_url
+FROM alert_links l
+         JOIN alert_history h ON h.id = l.alert_history_id
+         JOIN resorts r ON r.uuid = h.resort_uuid
+WHERE l.code = $1;

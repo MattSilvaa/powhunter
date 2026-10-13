@@ -11,6 +11,8 @@ type AlertData = {
 	notificationDays: number
 	minSnowAmount: number
 	resortsUuids: string[]
+	// The shared alert link the visitor arrived from, if any.
+	referralCode?: string
 }
 
 const createAlert = (data: AlertData): Promise<void> =>

@@ -34,6 +34,8 @@ type Querier interface {
 	GetActiveAlertsByResort(ctx context.Context) ([]GetActiveAlertsByResortRow, error)
 	// For requests that should not count as a click, such as link previews.
 	GetAlertLinkDestination(ctx context.Context, code string) (string, error)
+	// What the alert link page shows: the storm, never the person it was sent to.
+	GetAlertLinkDetails(ctx context.Context, code string) (GetAlertLinkDetailsRow, error)
 	GetLastAlertSnowAmount(ctx context.Context, arg GetLastAlertSnowAmountParams) (float64, error)
 	// Requesting a login link for an address that has no account creates one, so
 	// signup and login are the same flow. DO UPDATE rather than DO NOTHING because
@@ -82,6 +84,9 @@ type Querier interface {
 	// that has none. Replacing an existing number would let anyone who knows an
 	// address redirect that person's SMS alerts to themselves; changing the
 	// number is done signed in, through UpdateUserPhone.
+	//
+	// The referral code is only recorded for a new account: someone who already
+	// signed up was not brought in by the link they used this time.
 	UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error)
 }
 

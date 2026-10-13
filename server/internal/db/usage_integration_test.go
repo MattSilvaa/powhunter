@@ -30,6 +30,10 @@ func TestUsageQueries(t *testing.T) {
 	subscriber := testutil.SeedTestUser(t, queries, "subscriber@example.com", "+15551234567")
 	testutil.SeedTestAlert(t, queries, subscriber.Uuid, alta.Uuid, 6, 3)
 
+	// A friend who signed up from the shared alert link.
+	require.NoError(t, store.CreateUserWithAlerts(ctx, "friend@example.com", "", 6, 3,
+		[]string{alta.Uuid.String()}, "Ab12Cd34"))
+
 	// An old signup with no phone and no alerts counts as a user only.
 	lapsed := testutil.SeedTestUser(t, queries, "lapsed@example.com", "")
 	_, err := testDB.ExecContext(ctx,
@@ -55,12 +59,18 @@ func TestUsageQueries(t *testing.T) {
 
 	totals, err := queries.GetUsageTotals(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, dbgen.GetUsageTotalsRow{Users: 2, UsersWithPhone: 1, Subscribers: 1, ActiveAlerts: 1}, totals)
+	assert.Equal(t, dbgen.GetUsageTotalsRow{Users: 3, UsersWithPhone: 1, Subscribers: 2, ActiveAlerts: 2}, totals)
+
+	details, err := queries.GetAlertLinkDetails(ctx, "Ab12Cd34")
+	require.NoError(t, err)
+	assert.Equal(t, "Alta", details.ResortName)
+	assert.Equal(t, alta.Uuid, details.ResortUuid)
+	assert.Equal(t, "https://www.alta.com/", details.DestinationUrl)
 
 	recent, err := queries.GetUsageSince(ctx, time.Now().Add(-30*24*time.Hour))
 	require.NoError(t, err)
 	assert.Equal(t, dbgen.GetUsageSinceRow{
-		Signups: 1, ActiveUsers: 1, AlertsSent: 1, UsersAlerted: 1, SmsSegments: 2,
+		Signups: 2, SignupsReferred: 1, ActiveUsers: 1, AlertsSent: 1, UsersAlerted: 1, SmsSegments: 2,
 		LinksSent: 1, LinksClicked: 1,
 	}, recent)
 
@@ -71,7 +81,7 @@ func TestUsageQueries(t *testing.T) {
 	byResort, err := queries.GetActiveAlertsByResort(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, []dbgen.GetActiveAlertsByResortRow{
-		{Name: "Alta", ActiveAlerts: 1},
+		{Name: "Alta", ActiveAlerts: 2},
 		{Name: "Unfollowed", ActiveAlerts: 0},
 	}, byResort)
 }

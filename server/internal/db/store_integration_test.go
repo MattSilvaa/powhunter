@@ -38,6 +38,7 @@ func TestStoreIntegration_CreateUserWithAlerts(t *testing.T) {
 			8.0,
 			3,
 			[]string{resort1.Uuid.String(), resort2.Uuid.String()},
+			"",
 		)
 		require.NoError(t, err)
 
@@ -72,6 +73,7 @@ func TestStoreIntegration_CreateUserWithAlerts(t *testing.T) {
 			10.0,
 			5,
 			[]string{resort1.Uuid.String()},
+			"",
 		)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "user_alerts_user_uuid_resort_uuid_key")
@@ -90,7 +92,7 @@ func TestStoreIntegration_SignupDoesNotReplaceAnExistingPhone(t *testing.T) {
 	user := testutil.SeedTestUser(t, queries, "victim@example.com", "+15551234567")
 
 	err := store.CreateUserWithAlerts(ctx, "victim@example.com", "+15559999999", 6.0, 3,
-		[]string{resort.Uuid.String()})
+		[]string{resort.Uuid.String()}, "")
 	require.NoError(t, err)
 
 	stored, err := queries.GetUserByUUID(ctx, user.Uuid)
@@ -321,7 +323,7 @@ func TestStoreIntegration_UpsertResortKeepsUUIDAndAlerts(t *testing.T) {
 
 	original := testutil.SeedTestResort(t, queries, "Alta", 40.0, -111.0)
 	require.NoError(t, store.CreateUserWithAlerts(
-		ctx, "upsert@example.com", "", 6.0, 2, []string{original.Uuid.String()},
+		ctx, "upsert@example.com", "", 6.0, 2, []string{original.Uuid.String()}, "",
 	))
 
 	updated := testutil.SeedTestResort(t, queries, "Alta", 40.5884, -111.6386)
@@ -365,7 +367,7 @@ func TestStoreIntegration_ConcurrentSignupsShareOneUser(t *testing.T) {
 			defer wg.Done()
 
 			errs[index] = store.CreateUserWithAlerts(
-				context.Background(), email, "+15551234567", 6.0, 3, []string{resortUUID},
+				context.Background(), email, "+15551234567", 6.0, 3, []string{resortUUID}, "",
 			)
 		}(i, resort)
 	}

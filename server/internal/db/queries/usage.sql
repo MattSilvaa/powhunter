@@ -12,6 +12,10 @@ WITH window_start AS (SELECT sqlc.arg(since)::timestamptz AS since)
 SELECT (SELECT COUNT(*)
         FROM users u, window_start w
         WHERE u.created_at >= w.since)::bigint                  AS signups,
+       (SELECT COUNT(*)
+        FROM users u, window_start w
+        WHERE u.created_at >= w.since
+          AND u.referral_code IS NOT NULL)::bigint              AS signups_referred,
        (SELECT COUNT(DISTINCT s.user_uuid)
         FROM sessions s, window_start w
         WHERE s.last_seen_at >= w.since)::bigint                AS active_users,
