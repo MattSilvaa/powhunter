@@ -459,6 +459,96 @@
       ]
     },
     {
+      "id": 16,
+      "title": "Alerts with a link (30d)",
+      "type": "stat",
+      "description": "Alerts sent with a tracked link. Zero means LINK_BASE_URL is not set on the forecaster.",
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 16
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_links_sent{window=\"30d\"})",
+          "legendFormat": "Alerts with a link (30d)",
+          "instant": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "title": "Links opened (30d)",
+      "type": "stat",
+      "description": "Links from the last 30 days opened at least once. Link previews are not counted.",
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 16
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_links_clicked{window=\"30d\"})",
+          "legendFormat": "Links opened (30d)",
+          "instant": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "title": "Click-through rate (30d)",
+      "type": "stat",
+      "description": "Share of alerts whose link was opened: how often an alert makes someone act. This is the number resorts and affiliate partners will ask for.",
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 16
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(powhunter_usage_links_clicked{window=\"30d\"}) / max(powhunter_usage_links_sent{window=\"30d\"})",
+          "legendFormat": "Click-through rate (30d)",
+          "instant": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
       "id": 15,
       "title": "Active alerts by resort",
       "type": "bargauge",
@@ -466,7 +556,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 20
       },
       "datasource": {
         "type": "prometheus",

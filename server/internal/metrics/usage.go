@@ -66,6 +66,8 @@ type UsageCollector struct {
 	alertsSent     *prometheus.Desc
 	usersAlerted   *prometheus.Desc
 	smsSegments    *prometheus.Desc
+	linksSent      *prometheus.Desc
+	linksClicked   *prometheus.Desc
 	refreshSuccess *prometheus.Desc
 }
 
@@ -95,6 +97,9 @@ func NewUsageCollector(querier UsageQuerier, logger *slog.Logger, now func() tim
 		alertsSent:     desc("alerts_sent", "Alerts delivered in the trailing window.", "window"),
 		usersAlerted:   desc("users_alerted", "Distinct users alerted in the trailing window.", "window"),
 		smsSegments:    desc("sms_segments", "SMS segments billed in the trailing window.", "window"),
+		linksSent:      desc("links_sent", "Alerts sent with a tracked link in the trailing window.", "window"),
+		linksClicked: desc("links_clicked",
+			"Tracked links sent in the trailing window that were opened at least once.", "window"),
 		refreshSuccess: desc("refresh_success", "Whether the last usage refresh read the database."),
 	}
 }
@@ -104,7 +109,7 @@ func (c *UsageCollector) Describe(ch chan<- *prometheus.Desc) {
 	for _, d := range []*prometheus.Desc{
 		c.users, c.usersWithPhone, c.subscribers, c.activeAlerts, c.resortAlerts,
 		c.signups, c.activeUsers, c.alertsSent, c.usersAlerted, c.smsSegments,
-		c.refreshSuccess,
+		c.linksSent, c.linksClicked, c.refreshSuccess,
 	} {
 		ch <- d
 	}
@@ -168,6 +173,8 @@ func (c *UsageCollector) read(ctx context.Context) ([]prometheus.Metric, error) 
 			gauge(c.alertsSent, since.AlertsSent, window.label),
 			gauge(c.usersAlerted, since.UsersAlerted, window.label),
 			gauge(c.smsSegments, since.SmsSegments, window.label),
+			gauge(c.linksSent, since.LinksSent, window.label),
+			gauge(c.linksClicked, since.LinksClicked, window.label),
 		)
 	}
 

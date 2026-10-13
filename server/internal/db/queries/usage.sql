@@ -23,7 +23,16 @@ SELECT (SELECT COUNT(*)
         WHERE h.sent_at >= w.since)::bigint                     AS users_alerted,
        (SELECT COALESCE(SUM(h.sms_segments), 0)
         FROM alert_history h, window_start w
-        WHERE h.sent_at >= w.since)::bigint                     AS sms_segments;
+        WHERE h.sent_at >= w.since)::bigint                     AS sms_segments,
+       (SELECT COUNT(*)
+        FROM alert_links l, window_start w
+        WHERE l.created_at >= w.since)::bigint                  AS links_sent,
+       -- Links sent in the window that were opened at least once, whenever the
+       -- click came. Dividing by links_sent gives the click-through rate.
+       (SELECT COUNT(*)
+        FROM alert_links l, window_start w
+        WHERE l.created_at >= w.since
+          AND l.clicks > 0)::bigint                             AS links_clicked;
 
 -- name: GetActiveAlertsByResort :many
 -- How many users follow each resort. Every resort is listed, including those

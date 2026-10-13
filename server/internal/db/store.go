@@ -28,9 +28,9 @@ type StoreService interface {
 		daysAhead int32,
 	) ([]AlertToSend, error)
 
-	// RecordAlertSent records that an alert was sent, and how many SMS
-	// segments it cost.
-	RecordAlertSent(ctx context.Context, alert AlertToSend, smsSegments int32) error
+	// RecordAlertSent records that an alert was sent, what it cost and the
+	// tracked link it carried.
+	RecordAlertSent(ctx context.Context, alert AlertToSend, sent SentAlert) error
 
 	// CreateUserWithAlerts creates a new user with alert preferences
 	CreateUserWithAlerts(
@@ -304,18 +304,46 @@ func (s *Store) GetAlertMatches(
 	return alertsToSend, nil
 }
 
-// RecordAlertSent records that an alert was sent to avoid sending duplicates.
-func (s *Store) RecordAlertSent(ctx context.Context, alert AlertToSend, smsSegments int32) error {
+// SentAlert describes what was actually delivered for an alert.
+type SentAlert struct {
+	// SMSSegments is how many segments the carrier bills for the message.
+	SMSSegments int32
+	// LinkCode identifies the tracked link in the message. Empty when the
+	// message carried no link.
+	LinkCode string
+	// LinkDestination is where the link redirects to.
+	LinkDestination string
+}
+
+// RecordAlertSent records that an alert was sent to avoid sending duplicates,
+// along with the tracked link it carried. Both are written together, so a link
+// that resolves always has a history row behind it.
+func (s *Store) RecordAlertSent(ctx context.Context, alert AlertToSend, sent SentAlert) error {
 	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
-		err := q.InsertAlertHistory(ctx, dbgen.InsertAlertHistoryParams{
+		historyID, err := q.InsertAlertHistory(ctx, dbgen.InsertAlertHistoryParams{
 			UserUuid:     uuid.NullUUID{UUID: alert.UserUuid, Valid: true},
 			ResortUuid:   uuid.NullUUID{UUID: alert.ResortUUID, Valid: true},
 			ForecastDate: alert.ForecastDate,
 			SnowAmount:   alert.SnowAmount,
-			SmsSegments:  smsSegments,
+			SmsSegments:  sent.SMSSegments,
 		})
+		if err != nil {
+			return fmt.Errorf("recording alert history: %w", err)
+		}
 
-		return err
+		if sent.LinkCode == "" {
+			return nil
+		}
+
+		if linkErr := q.InsertAlertLink(ctx, dbgen.InsertAlertLinkParams{
+			Code:           sent.LinkCode,
+			AlertHistoryID: historyID,
+			DestinationUrl: sent.LinkDestination,
+		}); linkErr != nil {
+			return fmt.Errorf("recording alert link: %w", linkErr)
+		}
+
+		return nil
 	})
 }
 

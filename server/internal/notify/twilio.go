@@ -57,8 +57,14 @@ func (t *TwilioClient) SendSMS(to, message string) error {
 	return nil
 }
 
-// FormatSnowAlertMessage formats a snow alert SMS message.
-func FormatSnowAlertMessage(alert db.AlertToSend) string {
+// FormatSnowAlertMessage formats a snow alert SMS message, ending with link
+// when one is given.
+//
+// A link is long enough to push an alert into a second segment, which doubles
+// what that message costs. So with a link, the optional closing phrases are
+// dropped one at a time until the message fits in a single segment. Without a
+// link the wording is unchanged.
+func FormatSnowAlertMessage(alert db.AlertToSend, link string) string {
 	forecastDate := alert.ForecastDate
 	resortName := alert.ResortName
 	snowAmount := alert.SnowAmount
@@ -78,11 +84,35 @@ func FormatSnowAlertMessage(alert db.AlertToSend) string {
 		timeStr = "on " + forecastDate.Format("Monday, Jan 2")
 	}
 
+	// Wordings from fullest to shortest.
+	var wordings []string
+
 	if alert.IsUpdate {
-		return fmt.Sprintf("Powder Alert Update! %s is now expecting %.1f inches of snow %s - even more powder than before! Time to hit the slopes!",
+		lead := fmt.Sprintf("Powder Alert Update! %s is now expecting %.1f inches of snow %s",
 			resortName, snowAmount, timeStr)
+		wordings = []string{
+			lead + " - even more powder than before! Time to hit the slopes!",
+			lead + " - even more powder than before!",
+			lead + ".",
+		}
+	} else {
+		lead := fmt.Sprintf("Powder Alert! %s is expecting %.1f inches of snow %s.",
+			resortName, snowAmount, timeStr)
+		wordings = []string{
+			lead + " Time to hit the slopes!",
+			lead,
+		}
 	}
 
-	return fmt.Sprintf("Powder Alert! %s is expecting %.1f inches of snow %s. Time to hit the slopes!",
-		resortName, snowAmount, timeStr)
+	if link == "" {
+		return wordings[0]
+	}
+
+	for _, wording := range wordings {
+		if message := wording + " " + link; SMSSegments(message) == 1 {
+			return message
+		}
+	}
+
+	return wordings[len(wordings)-1] + " " + link
 }

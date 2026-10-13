@@ -60,3 +60,24 @@ func TestPublishMetricsLogsFailedPush(t *testing.T) {
 func newTestLogger(out *bytes.Buffer) *slog.Logger {
 	return slog.New(slog.NewTextHandler(out, nil))
 }
+
+func TestLinkBaseURL(t *testing.T) {
+	tests := []struct {
+		raw  string
+		want string
+	}{
+		{"", ""},
+		{"https://api.example.com/", "https://api.example.com"},
+		{"http://localhost:8080", "http://localhost:8080"},
+		{"api.example.com", ""},
+		{"javascript:alert(1)", ""},
+		{"https://api.example.com/?ref=sms", ""},
+	}
+
+	for _, tt := range tests {
+		var out bytes.Buffer
+		if got := linkBaseURL(newTestLogger(&out), tt.raw); got != tt.want {
+			t.Errorf("linkBaseURL(%q) = %q, want %q", tt.raw, got, tt.want)
+		}
+	}
+}

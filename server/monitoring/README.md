@@ -100,6 +100,9 @@ as `powhunter_usage_*`.
 - SMS cost is segments × the `sms_price` box at the top of the dashboard. It
   defaults to Twilio's US list price; set it to the per-segment rate on your
   invoice, carrier fees included, for a real number.
+- Click-through is the share of alerts whose link was opened. Links are only
+  added when `LINK_BASE_URL` is set on the forecaster; until then those panels
+  read zero. Link previews from messaging apps are redirected but not counted.
 - If **Usage refresh** reads 0, the API could not query the database and every
   other usage panel is missing data, not zero.
 

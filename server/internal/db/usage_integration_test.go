@@ -5,6 +5,7 @@ package db_test
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
@@ -42,7 +43,15 @@ func TestUsageQueries(t *testing.T) {
 
 	alert := db.AlertToSend{UserUuid: subscriber.Uuid, ResortUUID: alta.Uuid, SnowAmount: 8,
 		ForecastDate: time.Now().Add(24 * time.Hour)}
-	require.NoError(t, store.RecordAlertSent(ctx, alert, 2))
+	require.NoError(t, store.RecordAlertSent(ctx, alert,
+		db.SentAlert{SMSSegments: 2, LinkCode: "Ab12Cd34", LinkDestination: "https://www.alta.com/"}))
+
+	destination, err := queries.RecordAlertLinkClick(ctx, "Ab12Cd34")
+	require.NoError(t, err)
+	assert.Equal(t, "https://www.alta.com/", destination)
+
+	_, err = queries.RecordAlertLinkClick(ctx, "Zz99Yy88")
+	require.ErrorIs(t, err, sql.ErrNoRows, "an unknown code should not resolve")
 
 	totals, err := queries.GetUsageTotals(ctx)
 	require.NoError(t, err)
@@ -52,6 +61,7 @@ func TestUsageQueries(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, dbgen.GetUsageSinceRow{
 		Signups: 1, ActiveUsers: 1, AlertsSent: 1, UsersAlerted: 1, SmsSegments: 2,
+		LinksSent: 1, LinksClicked: 1,
 	}, recent)
 
 	future, err := queries.GetUsageSince(ctx, time.Now().Add(time.Hour))

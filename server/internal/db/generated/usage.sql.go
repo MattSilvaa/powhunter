@@ -66,7 +66,16 @@ SELECT (SELECT COUNT(*)
         WHERE h.sent_at >= w.since)::bigint                     AS users_alerted,
        (SELECT COALESCE(SUM(h.sms_segments), 0)
         FROM alert_history h, window_start w
-        WHERE h.sent_at >= w.since)::bigint                     AS sms_segments
+        WHERE h.sent_at >= w.since)::bigint                     AS sms_segments,
+       (SELECT COUNT(*)
+        FROM alert_links l, window_start w
+        WHERE l.created_at >= w.since)::bigint                  AS links_sent,
+       -- Links sent in the window that were opened at least once, whenever the
+       -- click came. Dividing by links_sent gives the click-through rate.
+       (SELECT COUNT(*)
+        FROM alert_links l, window_start w
+        WHERE l.created_at >= w.since
+          AND l.clicks > 0)::bigint                             AS links_clicked
 `
 
 type GetUsageSinceRow struct {
@@ -75,6 +84,8 @@ type GetUsageSinceRow struct {
 	AlertsSent   int64 `json:"alerts_sent"`
 	UsersAlerted int64 `json:"users_alerted"`
 	SmsSegments  int64 `json:"sms_segments"`
+	LinksSent    int64 `json:"links_sent"`
+	LinksClicked int64 `json:"links_clicked"`
 }
 
 // Activity since a cutoff. Called once per reporting window.
@@ -87,6 +98,8 @@ func (q *Queries) GetUsageSince(ctx context.Context, since time.Time) (GetUsageS
 		&i.AlertsSent,
 		&i.UsersAlerted,
 		&i.SmsSegments,
+		&i.LinksSent,
+		&i.LinksClicked,
 	)
 	return i, err
 }
