@@ -55,6 +55,10 @@ WITH window_start AS (SELECT $1::timestamptz AS since)
 SELECT (SELECT COUNT(*)
         FROM users u, window_start w
         WHERE u.created_at >= w.since)::bigint                  AS signups,
+       (SELECT COUNT(*)
+        FROM users u, window_start w
+        WHERE u.created_at >= w.since
+          AND u.referral_code IS NOT NULL)::bigint              AS signups_referred,
        (SELECT COUNT(DISTINCT s.user_uuid)
         FROM sessions s, window_start w
         WHERE s.last_seen_at >= w.since)::bigint                AS active_users,
@@ -79,13 +83,14 @@ SELECT (SELECT COUNT(*)
 `
 
 type GetUsageSinceRow struct {
-	Signups      int64 `json:"signups"`
-	ActiveUsers  int64 `json:"active_users"`
-	AlertsSent   int64 `json:"alerts_sent"`
-	UsersAlerted int64 `json:"users_alerted"`
-	SmsSegments  int64 `json:"sms_segments"`
-	LinksSent    int64 `json:"links_sent"`
-	LinksClicked int64 `json:"links_clicked"`
+	Signups         int64 `json:"signups"`
+	SignupsReferred int64 `json:"signups_referred"`
+	ActiveUsers     int64 `json:"active_users"`
+	AlertsSent      int64 `json:"alerts_sent"`
+	UsersAlerted    int64 `json:"users_alerted"`
+	SmsSegments     int64 `json:"sms_segments"`
+	LinksSent       int64 `json:"links_sent"`
+	LinksClicked    int64 `json:"links_clicked"`
 }
 
 // Activity since a cutoff. Called once per reporting window.
@@ -94,6 +99,7 @@ func (q *Queries) GetUsageSince(ctx context.Context, since time.Time) (GetUsageS
 	var i GetUsageSinceRow
 	err := row.Scan(
 		&i.Signups,
+		&i.SignupsReferred,
 		&i.ActiveUsers,
 		&i.AlertsSent,
 		&i.UsersAlerted,

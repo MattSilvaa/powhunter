@@ -33,8 +33,11 @@ RETURNING *;
 -- that has none. Replacing an existing number would let anyone who knows an
 -- address redirect that person's SMS alerts to themselves; changing the
 -- number is done signed in, through UpdateUserPhone.
-INSERT INTO users (email, phone)
-VALUES ($1, $2)
+--
+-- The referral code is only recorded for a new account: someone who already
+-- signed up was not brought in by the link they used this time.
+INSERT INTO users (email, phone, referral_code)
+VALUES ($1, $2, $3)
 ON CONFLICT (email) DO UPDATE
     SET phone = COALESCE(users.phone, EXCLUDED.phone)
 RETURNING *;

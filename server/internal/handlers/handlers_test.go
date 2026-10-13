@@ -57,6 +57,46 @@ func TestCreateAlert(t *testing.T) {
 		expectedError   *ErrorResponse
 	}{
 		{
+			name:   "Signup from a shared alert link records its code",
+			method: http.MethodPost,
+			requestBody: CreateAlertRequest{
+				Email:            "friend@example.com",
+				Phone:            "1234567890",
+				NotificationDays: 3,
+				MinSnowAmount:    5.0,
+				ResortsUuids:     []string{testResortUUID1},
+				ReferralCode:     "Ab12Cd34",
+			},
+			setupMock: func(m *mocks.MockStoreService) {
+				m.EXPECT().
+					CreateUserWithAlerts(gomock.Any(), "friend@example.com", "+11234567890", 5.0, int32(3),
+						[]string{testResortUUID1}, "Ab12Cd34").
+					Return(nil)
+			},
+			expectedStatus: http.StatusCreated,
+			expectedBody:   map[string]string{"status": "success", "message": "Alert created successfully"},
+		},
+		{
+			name:   "A malformed referral code is dropped, not rejected",
+			method: http.MethodPost,
+			requestBody: CreateAlertRequest{
+				Email:            "friend@example.com",
+				Phone:            "1234567890",
+				NotificationDays: 3,
+				MinSnowAmount:    5.0,
+				ResortsUuids:     []string{testResortUUID1},
+				ReferralCode:     "<script>",
+			},
+			setupMock: func(m *mocks.MockStoreService) {
+				m.EXPECT().
+					CreateUserWithAlerts(gomock.Any(), "friend@example.com", "+11234567890", 5.0, int32(3),
+						[]string{testResortUUID1}, "").
+					Return(nil)
+			},
+			expectedStatus: http.StatusCreated,
+			expectedBody:   map[string]string{"status": "success", "message": "Alert created successfully"},
+		},
+		{
 			name:   "Success",
 			method: http.MethodPost,
 			requestBody: CreateAlertRequest{
@@ -75,6 +115,7 @@ func TestCreateAlert(t *testing.T) {
 						5.0,
 						int32(3),
 						[]string{testResortUUID1, testResortUUID2},
+						"",
 					).
 					Return(nil)
 			},
@@ -203,6 +244,7 @@ func TestCreateAlert(t *testing.T) {
 						5.0,
 						int32(3),
 						[]string{testResortUUID1},
+						"",
 					).
 					Return(pqErr)
 			},
@@ -231,6 +273,7 @@ func TestCreateAlert(t *testing.T) {
 						5.0,
 						int32(3),
 						[]string{testResortUUID1},
+						"",
 					).
 					Return(errors.New("database error"))
 			},

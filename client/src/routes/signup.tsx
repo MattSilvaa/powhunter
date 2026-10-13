@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
 	Alert,
 	Box,
@@ -9,7 +9,7 @@ import {
 	Paper,
 	TextField,
 } from '@mui/material'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import { useResorts } from '../shared/useResorts.ts'
 import { useCreateAlert } from '../shared/useCreateAlert.ts'
 import PageHeader from '../components/pageHeader.tsx'
@@ -18,6 +18,12 @@ import AlertSettingsFields from '../components/alertSettingsFields.tsx'
 
 export default function SignUpPage() {
 	const navigate = useNavigate()
+	// A friend arriving from a shared alert lands here with that alert's resort
+	// and code in the URL.
+	const [searchParams] = useSearchParams()
+	const sharedResort = searchParams.get('resort') ?? ''
+	const referralCode = searchParams.get('ref') ?? ''
+	const prefilled = useRef(false)
 	const [formData, setFormData] = useState({
 		email: '',
 		phone: '',
@@ -38,6 +44,19 @@ export default function SignUpPage() {
 	} = useCreateAlert()
 
 	const { resorts = [], loading, error } = useResorts()
+
+	// Pick the shared resort once the list has loaded, and only once: doing it
+	// on every render would put it back each time the visitor unticked it.
+	useEffect(() => {
+		if (prefilled.current || !sharedResort) {
+			return
+		}
+
+		if (resorts.some((r) => r.uuid === sharedResort)) {
+			prefilled.current = true
+			setFormData((prev) => ({ ...prev, resorts: [sharedResort] }))
+		}
+	}, [resorts, sharedResort])
 
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const { name, value } = e.target
@@ -125,6 +144,7 @@ export default function SignUpPage() {
 				minSnowAmount: formData.minSnowAmount,
 				notificationDays: formData.notificationDays,
 				resortsUuids,
+				...(referralCode && { referralCode }),
 			},
 			{
 				onSuccess: () => {

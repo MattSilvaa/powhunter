@@ -62,6 +62,7 @@ type UsageCollector struct {
 	activeAlerts   *prometheus.Desc
 	resortAlerts   *prometheus.Desc
 	signups        *prometheus.Desc
+	referred       *prometheus.Desc
 	activeUsers    *prometheus.Desc
 	alertsSent     *prometheus.Desc
 	usersAlerted   *prometheus.Desc
@@ -93,11 +94,13 @@ func NewUsageCollector(querier UsageQuerier, logger *slog.Logger, now func() tim
 		activeAlerts:   desc("active_alerts", "Active alerts across all users."),
 		resortAlerts:   desc("resort_active_alerts", "Active alerts per resort.", "resort"),
 		signups:        desc("signups", "Users created in the trailing window.", "window"),
-		activeUsers:    desc("active_users", "Users who used the web app in the trailing window.", "window"),
-		alertsSent:     desc("alerts_sent", "Alerts delivered in the trailing window.", "window"),
-		usersAlerted:   desc("users_alerted", "Distinct users alerted in the trailing window.", "window"),
-		smsSegments:    desc("sms_segments", "SMS segments billed in the trailing window.", "window"),
-		linksSent:      desc("links_sent", "Alerts sent with a tracked link in the trailing window.", "window"),
+		referred: desc("signups_referred",
+			"Users created in the trailing window from a shared alert link.", "window"),
+		activeUsers:  desc("active_users", "Users who used the web app in the trailing window.", "window"),
+		alertsSent:   desc("alerts_sent", "Alerts delivered in the trailing window.", "window"),
+		usersAlerted: desc("users_alerted", "Distinct users alerted in the trailing window.", "window"),
+		smsSegments:  desc("sms_segments", "SMS segments billed in the trailing window.", "window"),
+		linksSent:    desc("links_sent", "Alerts sent with a tracked link in the trailing window.", "window"),
 		linksClicked: desc("links_clicked",
 			"Tracked links sent in the trailing window that were opened at least once.", "window"),
 		refreshSuccess: desc("refresh_success", "Whether the last usage refresh read the database."),
@@ -108,7 +111,7 @@ func NewUsageCollector(querier UsageQuerier, logger *slog.Logger, now func() tim
 func (c *UsageCollector) Describe(ch chan<- *prometheus.Desc) {
 	for _, d := range []*prometheus.Desc{
 		c.users, c.usersWithPhone, c.subscribers, c.activeAlerts, c.resortAlerts,
-		c.signups, c.activeUsers, c.alertsSent, c.usersAlerted, c.smsSegments,
+		c.signups, c.referred, c.activeUsers, c.alertsSent, c.usersAlerted, c.smsSegments,
 		c.linksSent, c.linksClicked, c.refreshSuccess,
 	} {
 		ch <- d
@@ -170,6 +173,7 @@ func (c *UsageCollector) read(ctx context.Context) ([]prometheus.Metric, error) 
 
 		metrics = append(metrics,
 			gauge(c.signups, since.Signups, window.label),
+			gauge(c.referred, since.SignupsReferred, window.label),
 			gauge(c.activeUsers, since.ActiveUsers, window.label),
 			gauge(c.alertsSent, since.AlertsSent, window.label),
 			gauge(c.usersAlerted, since.UsersAlerted, window.label),

@@ -217,6 +217,9 @@ type CreateAlertRequest struct {
 	NotificationDays int      `json:"notificationDays"`
 	MinSnowAmount    float64  `json:"minSnowAmount"`
 	ResortsUuids     []string `json:"resortsUuids"`
+	// ReferralCode is the code of the shared alert link the visitor arrived
+	// from. Optional, and ignored unless it has the shape of a link code.
+	ReferralCode string `json:"referralCode,omitempty"`
 }
 
 // The three handlers below take the account from the session established by
@@ -325,6 +328,13 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A malformed code is dropped rather than rejected: attribution is a
+	// bonus, and a signup must never fail over it.
+	referralCode := ""
+	if notify.IsLinkCode(req.ReferralCode) {
+		referralCode = req.ReferralCode
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), handlerTimeout)
 	defer cancel()
 
@@ -335,6 +345,7 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		req.MinSnowAmount,
 		int32(req.NotificationDays),
 		req.ResortsUuids,
+		referralCode,
 	)
 	if err != nil {
 		log.Printf("Failed to create alert: %v", err)

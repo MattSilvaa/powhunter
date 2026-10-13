@@ -32,13 +32,15 @@ type StoreService interface {
 	// tracked link it carried.
 	RecordAlertSent(ctx context.Context, alert AlertToSend, sent SentAlert) error
 
-	// CreateUserWithAlerts creates a new user with alert preferences
+	// CreateUserWithAlerts creates a new user with alert preferences.
+	// referralCode is the shared alert link that brought them in, or empty.
 	CreateUserWithAlerts(
 		ctx context.Context,
 		email, phone string,
 		minSnowAmount float64,
 		notificationDays int32,
 		resortUUIDs []string,
+		referralCode string,
 	) error
 
 	// GetUserAlertsByEmail returns all alerts for a user by email
@@ -131,7 +133,7 @@ func (s *Store) ListAllResorts(ctx context.Context) ([]dbgen.Resort, error) {
 }
 
 func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
-	minSnowAmount float64, notificationDays int32, resortUUIDs []string) error {
+	minSnowAmount float64, notificationDays int32, resortUUIDs []string, referralCode string) error {
 	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
 		phoneParam := sql.NullString{
 			String: phone,
@@ -142,8 +144,9 @@ func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
 		// two concurrent signups with the same email both saw no row, both
 		// inserted, and one failed on the unique constraint as a 500.
 		user, err := q.UpsertUser(ctx, dbgen.UpsertUserParams{
-			Email: email,
-			Phone: phoneParam,
+			Email:        email,
+			Phone:        phoneParam,
+			ReferralCode: sql.NullString{String: referralCode, Valid: referralCode != ""},
 		})
 		if err != nil {
 			return fmt.Errorf("error creating user: %w", err)

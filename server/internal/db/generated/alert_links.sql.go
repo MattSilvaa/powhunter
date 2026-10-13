@@ -7,6 +7,9 @@ package db
 
 import (
 	"context"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 const getAlertLinkDestination = `-- name: GetAlertLinkDestination :one
@@ -21,6 +24,40 @@ func (q *Queries) GetAlertLinkDestination(ctx context.Context, code string) (str
 	var destination_url string
 	err := row.Scan(&destination_url)
 	return destination_url, err
+}
+
+const getAlertLinkDetails = `-- name: GetAlertLinkDetails :one
+SELECT r.uuid          AS resort_uuid,
+       r.name          AS resort_name,
+       h.snow_amount,
+       h.forecast_date,
+       l.destination_url
+FROM alert_links l
+         JOIN alert_history h ON h.id = l.alert_history_id
+         JOIN resorts r ON r.uuid = h.resort_uuid
+WHERE l.code = $1
+`
+
+type GetAlertLinkDetailsRow struct {
+	ResortUuid     uuid.UUID `json:"resort_uuid"`
+	ResortName     string    `json:"resort_name"`
+	SnowAmount     float64   `json:"snow_amount"`
+	ForecastDate   time.Time `json:"forecast_date"`
+	DestinationUrl string    `json:"destination_url"`
+}
+
+// What the alert link page shows: the storm, never the person it was sent to.
+func (q *Queries) GetAlertLinkDetails(ctx context.Context, code string) (GetAlertLinkDetailsRow, error) {
+	row := q.queryRow(ctx, q.getAlertLinkDetailsStmt, getAlertLinkDetails, code)
+	var i GetAlertLinkDetailsRow
+	err := row.Scan(
+		&i.ResortUuid,
+		&i.ResortName,
+		&i.SnowAmount,
+		&i.ForecastDate,
+		&i.DestinationUrl,
+	)
+	return i, err
 }
 
 const insertAlertLink = `-- name: InsertAlertLink :exec

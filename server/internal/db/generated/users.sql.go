@@ -18,7 +18,7 @@ INSERT INTO users (
 ) VALUES (
   $1, $2
 )
-RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at
+RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code
 `
 
 type CreateUserParams struct {
@@ -38,6 +38,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.PasswordHash,
 		&i.EmailVerifiedAt,
 		&i.UpdatedAt,
+		&i.ReferralCode,
 	)
 	return i, err
 }
@@ -47,7 +48,7 @@ INSERT INTO users (email)
 VALUES ($1)
 ON CONFLICT (email) DO UPDATE
     SET updated_at = NOW()
-RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at
+RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code
 `
 
 // Requesting a login link for an address that has no account creates one, so
@@ -65,12 +66,13 @@ func (q *Queries) GetOrCreateUserByEmail(ctx context.Context, email string) (Use
 		&i.PasswordHash,
 		&i.EmailVerifiedAt,
 		&i.UpdatedAt,
+		&i.ReferralCode,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at FROM users
+SELECT id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code FROM users
 WHERE email = $1 LIMIT 1
 `
 
@@ -86,12 +88,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.PasswordHash,
 		&i.EmailVerifiedAt,
 		&i.UpdatedAt,
+		&i.ReferralCode,
 	)
 	return i, err
 }
 
 const getUserByUUID = `-- name: GetUserByUUID :one
-SELECT id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at FROM users
+SELECT id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code FROM users
 WHERE uuid = $1 LIMIT 1
 `
 
@@ -107,6 +110,7 @@ func (q *Queries) GetUserByUUID(ctx context.Context, argUuid uuid.UUID) (User, e
 		&i.PasswordHash,
 		&i.EmailVerifiedAt,
 		&i.UpdatedAt,
+		&i.ReferralCode,
 	)
 	return i, err
 }
@@ -116,7 +120,7 @@ UPDATE users
 SET phone      = $2,
     updated_at = NOW()
 WHERE uuid = $1
-RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at
+RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code
 `
 
 type UpdateUserPhoneParams struct {
@@ -136,21 +140,23 @@ func (q *Queries) UpdateUserPhone(ctx context.Context, arg UpdateUserPhoneParams
 		&i.PasswordHash,
 		&i.EmailVerifiedAt,
 		&i.UpdatedAt,
+		&i.ReferralCode,
 	)
 	return i, err
 }
 
 const upsertUser = `-- name: UpsertUser :one
-INSERT INTO users (email, phone)
-VALUES ($1, $2)
+INSERT INTO users (email, phone, referral_code)
+VALUES ($1, $2, $3)
 ON CONFLICT (email) DO UPDATE
     SET phone = COALESCE(users.phone, EXCLUDED.phone)
-RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at
+RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code
 `
 
 type UpsertUserParams struct {
-	Email string         `json:"email"`
-	Phone sql.NullString `json:"phone"`
+	Email        string         `json:"email"`
+	Phone        sql.NullString `json:"phone"`
+	ReferralCode sql.NullString `json:"referral_code"`
 }
 
 // Get-or-create in a single statement. A read-then-write race meant two
@@ -161,8 +167,11 @@ type UpsertUserParams struct {
 // that has none. Replacing an existing number would let anyone who knows an
 // address redirect that person's SMS alerts to themselves; changing the
 // number is done signed in, through UpdateUserPhone.
+//
+// The referral code is only recorded for a new account: someone who already
+// signed up was not brought in by the link they used this time.
 func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error) {
-	row := q.queryRow(ctx, q.upsertUserStmt, upsertUser, arg.Email, arg.Phone)
+	row := q.queryRow(ctx, q.upsertUserStmt, upsertUser, arg.Email, arg.Phone, arg.ReferralCode)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -173,6 +182,7 @@ func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, e
 		&i.PasswordHash,
 		&i.EmailVerifiedAt,
 		&i.UpdatedAt,
+		&i.ReferralCode,
 	)
 	return i, err
 }

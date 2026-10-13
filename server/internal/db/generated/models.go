@@ -70,6 +70,7 @@ type User struct {
 	PasswordHash    sql.NullString `json:"password_hash"`
 	EmailVerifiedAt sql.NullTime   `json:"email_verified_at"`
 	UpdatedAt       time.Time      `json:"updated_at"`
+	ReferralCode    sql.NullString `json:"referral_code"`
 }
 
 type UserAlert struct {

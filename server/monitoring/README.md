@@ -110,6 +110,9 @@ as `powhunter_usage_*`.
 - Click-through is the share of alerts whose link was opened. Links are only
   added when `LINK_BASE_URL` is set on the forecaster; until then those panels
   read zero. Link previews from messaging apps are redirected but not counted.
+- **Signups from shares** counts new users who arrived through an alert a
+  subscriber shared from its alert page ("Text your ski crew"). Divided by
+  signups, it shows how much of the growth sharing brings in.
 - If **Usage refresh** reads 0, the API could not query the database and every
   other usage panel is missing data, not zero.
 
