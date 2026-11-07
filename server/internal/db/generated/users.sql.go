@@ -159,7 +159,10 @@ const upsertUser = `-- name: UpsertUser :one
 INSERT INTO users (email, phone, referral_code, signup_source, signup_campaign)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (email) DO UPDATE
-    SET phone = COALESCE(users.phone, EXCLUDED.phone)
+    SET phone = CASE
+                    WHEN users.email_verified_at IS NULL THEN EXCLUDED.phone
+                    ELSE users.phone
+                END
 RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code, signup_source, signup_campaign
 `
 
@@ -175,10 +178,12 @@ type UpsertUserParams struct {
 // concurrent signups with the same email both attempted an insert, and one
 // failed on the unique constraint as a 500.
 //
-// Signup is anonymous, so the phone supplied here only fills in an account
-// that has none. Replacing an existing number would let anyone who knows an
-// address redirect that person's SMS alerts to themselves; changing the
-// number is done signed in, through UpdateUserPhone.
+// Signup is anonymous, so the phone supplied here never touches a confirmed
+// account, not even one with no number yet: that would let anyone who knows an
+// address point the owner's SMS alerts at themselves. Changing it is done
+// signed in, through UpdateUserPhone. An unconfirmed account does take the new number, or someone
+// who signed up first with a victim's address would keep their own phone on it
+// after the victim signed up and confirmed.
 //
 // The referral code and signup source are only recorded for a new account:
 // someone who already signed up was not brought in by the link they used this

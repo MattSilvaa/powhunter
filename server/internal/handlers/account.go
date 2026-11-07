@@ -154,7 +154,7 @@ func (h *AccountHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 	phone, err := validate.Phone(req.Phone)
 	if err != nil {
-		sendErrorResponse(w, "MISSING_PHONE", "Please enter a valid phone number", http.StatusBadRequest)
+		sendErrorResponse(w, "MISSING_PHONE", "Please enter a US or Canadian phone number", http.StatusBadRequest)
 		return
 	}
 

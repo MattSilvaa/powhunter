@@ -49,7 +49,20 @@ func TestPhone(t *testing.T) {
 		{name: "ten digits assumed north american", input: "6195733405", want: "+16195733405"},
 		{name: "formatted", input: "(619) 573-3405", want: "+16195733405"},
 		{name: "already e164", input: "+16195733405", want: "+16195733405"},
+		{name: "country code without plus", input: "1 619 573 3405", want: "+16195733405"},
 		{name: "too short", input: "12345", wantErr: true},
+		// International numbers are refused: SMS to them is the usual target of
+		// toll-fraud abuse, and the service only operates in North America.
+		{name: "international", input: "+44 20 7946 0958", wantErr: true},
+		{name: "eleven digits not starting with one", input: "26195733405", wantErr: true},
+		{name: "area code starting with one", input: "(123) 456-7890", wantErr: true},
+		{name: "exchange starting with zero", input: "619-073-3405", wantErr: true},
+		// +1 but not the US or Canada: the Caribbean numbers SMS pumping targets.
+		{name: "bahamas", input: "+1 242 555 0123", wantErr: true},
+		{name: "jamaica", input: "(876) 555-0123", wantErr: true},
+		{name: "premium rate", input: "900-555-0123", wantErr: true},
+		{name: "us territory", input: "787-555-0123", want: "+17875550123"},
+		{name: "non-ascii digits", input: "٦١٩٥٧٣٣٤٠٥", wantErr: true},
 		{name: "letters", input: "555-CALL-NOW", wantErr: true},
 		{name: "empty", input: "", wantErr: true},
 	}
@@ -97,4 +110,10 @@ func TestTag(t *testing.T) {
 			t.Errorf("Tag(%q) = %q, want %q", raw, got, want)
 		}
 	}
+}
+
+// A name or subject with a newline in it could add email headers of its own.
+func TestSingleLineStripsControlCharacters(t *testing.T) {
+	assert.Equal(t, "Ann Bcc: evil@example.com", validate.SingleLine("  Ann\r\nBcc: evil@example.com\t"))
+	assert.Equal(t, "plain", validate.SingleLine("plain"))
 }

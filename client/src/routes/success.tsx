@@ -9,7 +9,7 @@ type SuccessState = { resortNames?: string[] } | null
 
 export function meta() {
 	return pageMeta({
-		title: "You're all set | Pow Hunter",
+		title: 'Check your email | Pow Hunter',
 		path: '/success',
 		noindex: true,
 	})
@@ -47,14 +47,14 @@ export default function SuccessPage() {
 				</Box>
 
 				<Typography variant="h3" component="h1" gutterBottom>
-					{"You're all set"}
+					Check your email
 				</Typography>
 				<Typography
 					color="text.secondary"
 					sx={{ mb: 4, maxWidth: 420, mx: 'auto' }}
 				>
-					{"Your powder alert is live. We'll text you when fresh snow is in " +
-						'the forecast at your resorts.'}
+					{'We sent you a link to confirm your email. Your powder alerts ' +
+						'start as soon as you click it.'}
 				</Typography>
 
 				<Box

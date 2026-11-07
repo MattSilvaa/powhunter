@@ -7,6 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -190,4 +194,56 @@ func TestContactHandler_SecurityHeaders(t *testing.T) {
 	for header, expectedValue := range expectedHeaders {
 		assert.Equal(t, expectedValue, rr.Header().Get(header), "Header mismatch: %s", header)
 	}
+}
+
+// Every contact field comes from a stranger. A newline in the name could add
+// email headers, and one in the message could forge a line in the contact log.
+func TestContactHandlerNeutralizesNewlines(t *testing.T) {
+	logPath := filepath.Join(t.TempDir(), "contacts.log")
+	t.Setenv("CONTACT_LOG_PATH", logPath)
+
+	mailer := &captureMailer{}
+	handler := &ContactHandler{mailer: mailer, support: "support@powhunter.app"}
+
+	rr := httptest.NewRecorder()
+	handler.HandleContact(rr, postJSON(t, "/api/contact", ContactRequest{
+		Name:    "Ann\r\nBcc: victim@example.com",
+		Email:   "ann@example.com",
+		Message: "hi\n[2026-01-01T00:00:00Z] Name: forged",
+	}))
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	require.Len(t, mailer.sent, 1)
+	assert.Equal(t, "Contact Form Submission from Ann Bcc: victim@example.com", mailer.sent[0].Subject)
+
+	logged, err := os.ReadFile(logPath)
+	require.NoError(t, err)
+	assert.Equal(t, 1, strings.Count(string(logged), "\n"), "one entry, one line")
+
+	info, err := os.Stat(logPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+}
+
+// OpenFile applies its mode only when it creates the file, so a log an older
+// release left world-readable must be tightened, not just appended to.
+func TestContactHandlerRestrictsAnExistingLog(t *testing.T) {
+	logPath := filepath.Join(t.TempDir(), "contacts.log")
+	// The insecure starting state under test.
+	require.NoError(t, os.WriteFile(logPath, []byte("old entry\n"), 0o644))
+	t.Setenv("CONTACT_LOG_PATH", logPath)
+
+	handler := &ContactHandler{mailer: &captureMailer{}, support: "support@powhunter.app"}
+
+	rr := httptest.NewRecorder()
+	handler.HandleContact(rr, postJSON(t, "/api/contact", ContactRequest{
+		Name:    "Ann",
+		Email:   "ann@example.com",
+		Message: "hi",
+	}))
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	info, err := os.Stat(logPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 }

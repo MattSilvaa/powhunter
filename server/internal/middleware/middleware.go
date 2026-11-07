@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"time"
 )
 
@@ -184,24 +185,32 @@ func MaxBytes(limit int64) func(http.Handler) http.Handler {
 	}
 }
 
-// ClientIP returns the address to attribute a request to. The proxy header is
-// only trusted when the deployment actually sits behind a proxy, otherwise any
-// caller could spoof it to escape rate limiting.
+// ClientIP returns the address to attribute a request to. Proxy headers are
+// only read when the deployment actually sits behind a proxy, otherwise any
+// caller could spoof them to escape rate limiting.
+//
+// Behind a proxy, the left-most X-Forwarded-For entry is whatever the client
+// chose to send: Render's proxy appends to the header rather than replacing it.
+// So the headers set by the edge itself are preferred (Cloudflare, in front of
+// Render, overwrites CF-Connecting-IP and True-Client-IP), and failing those
+// the right-most X-Forwarded-For entry, which is the one our own proxy added.
 func ClientIP(r *http.Request, trustProxy bool) string {
 	if trustProxy {
-		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-			// The left-most entry is the original client.
-			for i := range len(forwarded) {
-				if forwarded[i] == ',' {
-					return trimSpace(forwarded[:i])
-				}
+		for _, header := range []string{"CF-Connecting-IP", "True-Client-IP"} {
+			if ip := parseIP(r.Header.Get(header)); ip != "" {
+				return ip
 			}
-
-			return trimSpace(forwarded)
 		}
 
-		if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
-			return trimSpace(realIP)
+		if forwarded := r.Header.Values("X-Forwarded-For"); len(forwarded) > 0 {
+			last := forwarded[len(forwarded)-1]
+			if comma := strings.LastIndexByte(last, ','); comma >= 0 {
+				last = last[comma+1:]
+			}
+
+			if ip := parseIP(last); ip != "" {
+				return ip
+			}
 		}
 	}
 
@@ -213,19 +222,15 @@ func ClientIP(r *http.Request, trustProxy bool) string {
 	return host
 }
 
-func trimSpace(s string) string {
-	start := 0
-	end := len(s)
-
-	for start < end && (s[start] == ' ' || s[start] == '\t') {
-		start++
+// parseIP returns the canonical form of an IP address, or "" for anything
+// else, so a junk header value cannot become a rate-limit key.
+func parseIP(raw string) string {
+	ip := net.ParseIP(strings.TrimSpace(raw))
+	if ip == nil {
+		return ""
 	}
 
-	for end > start && (s[end-1] == ' ' || s[end-1] == '\t') {
-		end--
-	}
-
-	return s[start:end]
+	return ip.String()
 }
 
 // Chain applies middleware so the first argument is the outermost layer.

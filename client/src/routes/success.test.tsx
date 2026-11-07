@@ -20,4 +20,18 @@ describe('SuccessPage', () => {
 		).toBeTruthy()
 		expect(screen.getByText(/your resorts already picked/i)).toBeTruthy()
 	})
+
+	// Alerts only start once the emailed link is clicked, so the page must not
+	// claim they are already live.
+	test('asks the subscriber to confirm their email', () => {
+		render(
+			<MemoryRouter initialEntries={['/success']}>
+				<SuccessPage />
+			</MemoryRouter>
+		)
+
+		expect(
+			screen.getByRole('heading', { level: 1, name: /check your email/i })
+		).toBeTruthy()
+	})
 })

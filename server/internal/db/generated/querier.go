@@ -17,16 +17,17 @@ type Querier interface {
 	// UPDATE: only one caller can win the race, so a link forwarded to someone else
 	// cannot be redeemed twice.
 	ConsumeLoginToken(ctx context.Context, tokenHash string) (uuid.UUID, error)
+	// How many sign-in links an account was sent since a given time. Bounds how
+	// often one inbox can be mailed, whatever addresses the requests come from.
+	CountRecentLoginTokens(ctx context.Context, arg CountRecentLoginTokensParams) (int64, error)
 	CreateLoginToken(ctx context.Context, arg CreateLoginTokenParams) (LoginToken, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserAlert(ctx context.Context, arg CreateUserAlertParams) (UserAlert, error)
-	DeleteAllUserAlerts(ctx context.Context, email string) error
 	DeleteAllUserAlertsByUserUUID(ctx context.Context, userUuid uuid.NullUUID) error
 	DeleteExpiredLoginTokens(ctx context.Context) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteSession(ctx context.Context, tokenHash string) error
-	DeleteUserAlert(ctx context.Context, arg DeleteUserAlertParams) error
 	DeleteUserAlertByUserUUID(ctx context.Context, arg DeleteUserAlertByUserUUIDParams) error
 	// How many users follow each resort. Every resort is listed, including those
 	// nobody follows, so a resort dropping to zero shows as zero rather than as a
@@ -41,6 +42,8 @@ type Querier interface {
 	// signup and login are the same flow. DO UPDATE rather than DO NOTHING because
 	// DO NOTHING returns no row on conflict.
 	GetOrCreateUserByEmail(ctx context.Context, email string) (User, error)
+	// Only accounts with a confirmed email are alerted. Signup is anonymous, so an
+	// unconfirmed account may carry a phone number its owner never agreed to text.
 	GetResortAlerts(ctx context.Context, resortUuid uuid.NullUUID) ([]UserAlert, error)
 	GetResortByUUID(ctx context.Context, argUuid uuid.UUID) (Resort, error)
 	// Returns the session together with its user so authenticating a request is a
@@ -57,7 +60,6 @@ type Querier interface {
 	// least one active alert: that is who the forecaster can actually notify.
 	GetUsageTotals(ctx context.Context) (GetUsageTotalsRow, error)
 	GetUserAlert(ctx context.Context, arg GetUserAlertParams) (UserAlert, error)
-	GetUserAlertsByEmail(ctx context.Context, email string) ([]GetUserAlertsByEmailRow, error)
 	// The three queries below key off the authenticated user's UUID rather than an
 	// email supplied by the caller. Taking the identity from the session is what
 	// stops one person reading or deleting another person's alerts.
@@ -80,14 +82,22 @@ type Querier interface {
 	// Keyed on name so re-seeding keeps existing UUIDs and the alerts that
 	// reference them, rather than deleting and recreating every resort.
 	UpsertResort(ctx context.Context, arg UpsertResortParams) (Resort, error)
+	// Anonymous signup for an unconfirmed account. Signing up again for the same
+	// resort must not fail: the first confirmation email may never have arrived,
+	// and a 409 would both block a fresh link and roll back the phone update that
+	// stops a squatter keeping their number on someone else's address. The latest
+	// thresholds win, as the latest phone does.
+	UpsertUnconfirmedUserAlert(ctx context.Context, arg UpsertUnconfirmedUserAlertParams) error
 	// Get-or-create in a single statement. A read-then-write race meant two
 	// concurrent signups with the same email both attempted an insert, and one
 	// failed on the unique constraint as a 500.
 	//
-	// Signup is anonymous, so the phone supplied here only fills in an account
-	// that has none. Replacing an existing number would let anyone who knows an
-	// address redirect that person's SMS alerts to themselves; changing the
-	// number is done signed in, through UpdateUserPhone.
+	// Signup is anonymous, so the phone supplied here never touches a confirmed
+	// account, not even one with no number yet: that would let anyone who knows an
+	// address point the owner's SMS alerts at themselves. Changing it is done
+	// signed in, through UpdateUserPhone. An unconfirmed account does take the new number, or someone
+	// who signed up first with a victim's address would keep their own phone on it
+	// after the victim signed up and confirmed.
 	//
 	// The referral code and signup source are only recorded for a new account:
 	// someone who already signed up was not brought in by the link they used this

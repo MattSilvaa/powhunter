@@ -29,8 +29,9 @@ const (
 	MinSnowAmount = 0.5
 	MaxSnowAmount = 24.0
 
-	minPhoneDigits = 10
-	maxPhoneDigits = 15
+	// nanpDigits is the length of a North American number without its
+	// country code.
+	nanpDigits = 10
 )
 
 // ErrInvalid marks a value that failed validation.
@@ -70,8 +71,12 @@ func Email(raw string) (string, error) {
 	return strings.ToLower(address.Address), nil
 }
 
-// Phone normalizes a phone number to E.164. The forecaster sends SMS to
-// whatever is stored, so an unnormalized number is a delivery failure.
+// Phone normalizes a US or Canadian phone number to E.164.
+//
+// Only North American numbers are accepted. Alerts are sent by SMS at the
+// service's expense, and sending to premium international numbers is the usual
+// way an open SMS form is abused to run up a bill ("SMS pumping"). The signup
+// form is presented as North American, so this matches what users are told.
 func Phone(raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
@@ -80,11 +85,9 @@ func Phone(raw string) (string, error) {
 
 	var digits strings.Builder
 
-	hasPlus := strings.HasPrefix(trimmed, "+")
-
 	for _, r := range trimmed {
 		switch {
-		case unicode.IsDigit(r):
+		case r >= '0' && r <= '9':
 			digits.WriteRune(r)
 		case r == '+' || r == '-' || r == ' ' || r == '(' || r == ')' || r == '.':
 			// Formatting characters are ignored.
@@ -94,17 +97,75 @@ func Phone(raw string) (string, error) {
 	}
 
 	number := digits.String()
-	if len(number) < minPhoneDigits || len(number) > maxPhoneDigits {
-		return "", invalid("phone", "must be between 10 and 15 digits")
+
+	// Accept a bare 10-digit number or one written with the +1 / 1 country code.
+	if len(number) == nanpDigits+1 && number[0] == '1' {
+		number = number[1:]
 	}
 
-	// A bare 10-digit number is assumed to be North American, matching how the
-	// signup form is presented today.
-	if !hasPlus && len(number) == minPhoneDigits {
-		return "+1" + number, nil
+	if len(number) != nanpDigits {
+		return "", invalid("phone", "must be a US or Canadian number")
 	}
 
-	return "+" + number, nil
+	// In the North American Numbering Plan neither the area code nor the
+	// exchange may start with 0 or 1.
+	if number[0] < '2' || number[3] < '2' {
+		return "", invalid("phone", "must be a US or Canadian number")
+	}
+
+	if _, blocked := nonNorthAmericanAreaCodes[number[:3]]; blocked {
+		return "", invalid("phone", "must be a US or Canadian number")
+	}
+
+	return "+1" + number, nil
+}
+
+// nonNorthAmericanAreaCodes are +1 area codes that are not the United States
+// or Canada: the Caribbean and Atlantic countries that share the North
+// American Numbering Plan, plus premium-rate 900. Texting them is
+// international SMS at international prices, and they are a well-known
+// target for SMS pumping fraud. US territories such as Puerto Rico and Guam
+// are the US and stay allowed.
+//
+//nolint:gochecknoglobals // a fixed lookup table
+var nonNorthAmericanAreaCodes = map[string]struct{}{
+	"242": {}, // Bahamas
+	"246": {}, // Barbados
+	"264": {}, // Anguilla
+	"268": {}, // Antigua and Barbuda
+	"284": {}, // British Virgin Islands
+	"345": {}, // Cayman Islands
+	"441": {}, // Bermuda
+	"473": {}, // Grenada
+	"649": {}, // Turks and Caicos
+	"658": {}, // Jamaica
+	"664": {}, // Montserrat
+	"721": {}, // Sint Maarten
+	"758": {}, // Saint Lucia
+	"767": {}, // Dominica
+	"784": {}, // Saint Vincent and the Grenadines
+	"809": {}, // Dominican Republic
+	"829": {}, // Dominican Republic
+	"849": {}, // Dominican Republic
+	"868": {}, // Trinidad and Tobago
+	"869": {}, // Saint Kitts and Nevis
+	"876": {}, // Jamaica
+	"900": {}, // premium rate
+}
+
+// SingleLine trims a value and removes control characters such as CR and LF.
+// Use it for anything that ends up in an email header, where a newline would
+// let the submitter add headers of their own.
+func SingleLine(raw string) string {
+	cleaned := strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+
+		return r
+	}, raw)
+
+	return strings.Join(strings.Fields(cleaned), " ")
 }
 
 // NotificationDays checks the forecast window is within the supported range.

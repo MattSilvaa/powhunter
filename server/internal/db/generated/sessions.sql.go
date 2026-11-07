@@ -31,6 +31,27 @@ func (q *Queries) ConsumeLoginToken(ctx context.Context, tokenHash string) (uuid
 	return user_uuid, err
 }
 
+const countRecentLoginTokens = `-- name: CountRecentLoginTokens :one
+SELECT count(*)
+FROM login_tokens
+WHERE user_uuid = $1
+  AND created_at > $2
+`
+
+type CountRecentLoginTokensParams struct {
+	UserUuid  uuid.UUID `json:"user_uuid"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// How many sign-in links an account was sent since a given time. Bounds how
+// often one inbox can be mailed, whatever addresses the requests come from.
+func (q *Queries) CountRecentLoginTokens(ctx context.Context, arg CountRecentLoginTokensParams) (int64, error) {
+	row := q.queryRow(ctx, q.countRecentLoginTokensStmt, countRecentLoginTokens, arg.UserUuid, arg.CreatedAt)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createLoginToken = `-- name: CreateLoginToken :one
 INSERT INTO login_tokens (user_uuid, token_hash, expires_at)
 VALUES ($1, $2, $3) RETURNING id, user_uuid, token_hash, expires_at, consumed_at, created_at

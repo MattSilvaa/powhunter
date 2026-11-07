@@ -33,7 +33,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 	DUPLICATE_ENTRY: 'This alert already exists.',
 	MISSING_EMAIL: 'Please enter a valid email address.',
 	INVALID_EMAIL: 'Please enter a valid email address.',
-	MISSING_PHONE: 'Please enter a valid phone number to receive SMS alerts.',
+	MISSING_PHONE: 'Please enter a US or Canadian phone number to receive SMS alerts.',
 	MISSING_RESORTS: 'Please select at least one resort to receive alerts for.',
 	MISSING_NAME: 'Please enter your name.',
 	MISSING_MESSAGE: 'Please enter a message.',

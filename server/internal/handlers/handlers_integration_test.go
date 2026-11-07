@@ -9,9 +9,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"testing"
 	"time"
 
+	"github.com/MattSilvaa/powhunter/internal/auth"
 	"github.com/MattSilvaa/powhunter/internal/db"
 	dbgen "github.com/MattSilvaa/powhunter/internal/db/generated"
 	"github.com/MattSilvaa/powhunter/internal/testutil"
@@ -30,12 +32,13 @@ func TestAlertHandlerIntegration_CreateAlert(t *testing.T) {
 	resort1 := testutil.SeedTestResort(t, queries, "Vail", 39.6403, -106.3742)
 	resort2 := testutil.SeedTestResort(t, queries, "Breckenridge", 39.4817, -106.0384)
 
-	handler := &AlertHandler{store: store}
+	handler, err := NewAlertHandler(store, auth.NewService(queries, false, false), &captureMailer{}, "https://powhunter.app")
+	require.NoError(t, err)
 
 	t.Run("Successfully create alert with real database", func(t *testing.T) {
 		requestBody := CreateAlertRequest{
 			Email:            "integration@test.com",
-			Phone:            "+15551234567",
+			Phone:            "+15552345678",
 			NotificationDays: 3,
 			MinSnowAmount:    8.0,
 			ResortsUuids:     []string{resort1.Uuid.String(), resort2.Uuid.String()},
@@ -68,8 +71,14 @@ func TestAlertHandlerIntegration_CreateAlert(t *testing.T) {
 		assert.Len(t, alerts, 2)
 	})
 
-	t.Run("Duplicate email returns conflict", func(t *testing.T) {
-		// First request
+	// A lost or filtered confirmation email must not strand someone: signing up
+	// again before confirming succeeds and sends a fresh link.
+	t.Run("Repeat unconfirmed signup succeeds and sends a fresh link", func(t *testing.T) {
+		mailer := &captureMailer{}
+		retryHandler, handlerErr := NewAlertHandler(store, auth.NewService(queries, false, false), mailer,
+			"https://powhunter.app")
+		require.NoError(t, handlerErr)
+
 		requestBody := CreateAlertRequest{
 			Email:            "duplicate@test.com",
 			Phone:            "+15559876543",
@@ -81,25 +90,16 @@ func TestAlertHandlerIntegration_CreateAlert(t *testing.T) {
 		body, err := json.Marshal(requestBody)
 		require.NoError(t, err)
 
-		req := httptest.NewRequest(http.MethodPost, "/api/alert", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		rr := httptest.NewRecorder()
+		for range 2 {
+			req := httptest.NewRequest(http.MethodPost, "/api/alert", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			rr := httptest.NewRecorder()
 
-		handler.CreateAlert(rr, req)
-		assert.Equal(t, http.StatusCreated, rr.Code)
+			retryHandler.CreateAlert(rr, req)
+			assert.Equal(t, http.StatusCreated, rr.Code)
+		}
 
-		// Duplicate request
-		req2 := httptest.NewRequest(http.MethodPost, "/api/alert", bytes.NewReader(body))
-		req2.Header.Set("Content-Type", "application/json")
-		rr2 := httptest.NewRecorder()
-
-		handler.CreateAlert(rr2, req2)
-		assert.Equal(t, http.StatusConflict, rr2.Code)
-
-		var errorResponse ErrorResponse
-		err = json.NewDecoder(rr2.Body).Decode(&errorResponse)
-		require.NoError(t, err)
-		assert.Equal(t, "DUPLICATE_ALERT", errorResponse.Error)
+		assert.Len(t, mailer.sent, 2)
 	})
 
 	// A malformed resort identifier is a client mistake. It previously reached
@@ -107,7 +107,7 @@ func TestAlertHandlerIntegration_CreateAlert(t *testing.T) {
 	t.Run("Invalid resort UUID is rejected as a bad request", func(t *testing.T) {
 		requestBody := CreateAlertRequest{
 			Email:            "invalidresort@test.com",
-			Phone:            "+15551111111",
+			Phone:            "+15552221111",
 			NotificationDays: 3,
 			MinSnowAmount:    8.0,
 			ResortsUuids:     []string{"not-a-valid-uuid"},
@@ -192,8 +192,11 @@ func TestEndToEndFlow_CreateAlertAndVerifyInDatabase(t *testing.T) {
 	// Seed resort
 	resort := testutil.SeedTestResort(t, queries, "Test Mountain", 39.6403, -106.3742)
 
-	// Create alert via API
-	alertHandler := &AlertHandler{store: store}
+	// Create alert via API, with the real auth service behind the emailed link.
+	authService := auth.NewService(queries, false, false)
+	mailer := &captureMailer{}
+	alertHandler, err := NewAlertHandler(store, authService, mailer, "https://powhunter.app")
+	require.NoError(t, err)
 
 	requestBody := CreateAlertRequest{
 		Email:            "endtoend@test.com",
@@ -218,14 +221,30 @@ func TestEndToEndFlow_CreateAlertAndVerifyInDatabase(t *testing.T) {
 	now := time.Now()
 	forecastDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 
-	matches, err := store.GetAlertMatches(
-		ctx,
-		resort.Uuid.String(),
-		forecastDate,
-		12.0, // More than minimum
-		5,    // Within notification window
-	)
+	matchAlerts := func() []db.AlertToSend {
+		matches, matchErr := store.GetAlertMatches(
+			ctx,
+			resort.Uuid.String(),
+			forecastDate,
+			12.0, // More than minimum
+			5,    // Within notification window
+		)
+		require.NoError(t, matchErr)
+
+		return matches
+	}
+
+	// Nothing is texted until the address is confirmed.
+	assert.Empty(t, matchAlerts())
+
+	// Click the emailed link.
+	require.Len(t, mailer.sent, 1)
+	link := regexp.MustCompile(`token=([A-Za-z0-9_-]+)`).FindStringSubmatch(mailer.sent[0].HTML)
+	require.Len(t, link, 2)
+	_, _, err = authService.Redeem(ctx, link[1])
 	require.NoError(t, err)
+
+	matches := matchAlerts()
 	require.Len(t, matches, 1)
 
 	match := matches[0]

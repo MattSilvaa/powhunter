@@ -41,11 +41,21 @@ const (
 
 	// CookieName is the session cookie.
 	CookieName = "powhunter_session"
+
+	// MaxLinksPerWindow and linkWindow bound how many sign-in links one account
+	// is sent. The per-IP rate limit alone could not stop many addresses
+	// pointing requests at the same inbox.
+	MaxLinksPerWindow = 3
+	linkWindow        = 15 * time.Minute
 )
 
 // ErrInvalidToken reports a login token that is unknown, expired, or already
 // redeemed. The three cases are deliberately indistinguishable to the caller.
 var ErrInvalidToken = errors.New("invalid or expired login token")
+
+// ErrTooManyLinks reports an account that was sent MaxLinksPerWindow sign-in
+// links recently and must wait before it is sent another.
+var ErrTooManyLinks = errors.New("too many sign-in links requested")
 
 // ErrNoSession reports a request that carries no usable session.
 var ErrNoSession = errors.New("no active session")
@@ -55,6 +65,7 @@ var ErrNoSession = errors.New("no active session")
 type Queries interface {
 	GetOrCreateUserByEmail(ctx context.Context, email string) (dbgen.User, error)
 	CreateLoginToken(ctx context.Context, arg dbgen.CreateLoginTokenParams) (dbgen.LoginToken, error)
+	CountRecentLoginTokens(ctx context.Context, arg dbgen.CountRecentLoginTokensParams) (int64, error)
 	ConsumeLoginToken(ctx context.Context, tokenHash string) (uuid.UUID, error)
 	CreateSession(ctx context.Context, arg dbgen.CreateSessionParams) (dbgen.Session, error)
 	GetSessionByTokenHash(ctx context.Context, tokenHash string) (dbgen.GetSessionByTokenHashRow, error)
@@ -117,6 +128,18 @@ func (s *Service) IssueLoginToken(ctx context.Context, email string) (string, er
 	user, err := s.queries.GetOrCreateUserByEmail(ctx, email)
 	if err != nil {
 		return "", fmt.Errorf("resolving user for %q: %w", email, err)
+	}
+
+	recent, err := s.queries.CountRecentLoginTokens(ctx, dbgen.CountRecentLoginTokensParams{
+		UserUuid:  user.Uuid,
+		CreatedAt: s.now().Add(-linkWindow),
+	})
+	if err != nil {
+		return "", fmt.Errorf("counting recent login tokens: %w", err)
+	}
+
+	if recent >= MaxLinksPerWindow {
+		return "", ErrTooManyLinks
 	}
 
 	token, hash, err := newToken()

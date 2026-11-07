@@ -2,6 +2,14 @@
 INSERT INTO login_tokens (user_uuid, token_hash, expires_at)
 VALUES ($1, $2, $3) RETURNING *;
 
+-- name: CountRecentLoginTokens :one
+-- How many sign-in links an account was sent since a given time. Bounds how
+-- often one inbox can be mailed, whatever addresses the requests come from.
+SELECT count(*)
+FROM login_tokens
+WHERE user_uuid = $1
+  AND created_at > $2;
+
 -- name: ConsumeLoginToken :one
 -- Redeeming a token is a conditional UPDATE rather than a SELECT followed by an
 -- UPDATE: only one caller can win the race, so a link forwarded to someone else

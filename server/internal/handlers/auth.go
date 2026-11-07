@@ -28,15 +28,18 @@ type AuthService interface {
 
 // AuthHandler serves the magic-link login endpoints.
 type AuthHandler struct {
-	auth    AuthService
-	mailer  notify.Mailer
-	baseURL string
-	logger  *slog.Logger
+	auth   AuthService
+	links  linkMailer
+	logger *slog.Logger
 }
 
 // NewAuthHandler builds the login endpoints.
 func NewAuthHandler(service AuthService, mailer notify.Mailer, baseURL string, logger *slog.Logger) *AuthHandler {
-	return &AuthHandler{auth: service, mailer: mailer, baseURL: baseURL, logger: logger}
+	return &AuthHandler{
+		auth:   service,
+		links:  linkMailer{issuer: service, mailer: mailer, baseURL: baseURL},
+		logger: logger,
+	}
 }
 
 type requestLinkRequest struct {
@@ -90,26 +93,58 @@ func (h *AuthHandler) RequestLink(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) sendLoginLink(ctx context.Context, email string) error {
-	token, err := h.auth.IssueLoginToken(ctx, email)
+	return h.links.send(ctx, email, linkEmail{
+		Subject: "Your Powhunter sign-in link",
+		Heading: "Sign in to Powhunter",
+		Intro:   "Click the link below to sign in.",
+		Action:  "Sign in to Powhunter",
+	})
+}
+
+// LinkIssuer issues the single-use login tokens behind emailed links.
+type LinkIssuer interface {
+	IssueLoginToken(ctx context.Context, email string) (string, error)
+}
+
+// linkMailer emails single-use sign-in links. Signing in, and confirming a
+// signup, are the same thing underneath: redeeming the link proves the
+// recipient controls the address.
+type linkMailer struct {
+	issuer  LinkIssuer
+	mailer  notify.Mailer
+	baseURL string
+}
+
+// linkEmail is the wording of one kind of link email. Every field is a fixed
+// string, never caller input, so none of it needs escaping.
+type linkEmail struct {
+	Subject string
+	Heading string
+	Intro   string
+	Action  string
+}
+
+func (m linkMailer) send(ctx context.Context, email string, content linkEmail) error {
+	token, err := m.issuer.IssueLoginToken(ctx, email)
 	if err != nil {
 		return fmt.Errorf("issuing login token: %w", err)
 	}
 
-	link := fmt.Sprintf("%s/login?token=%s", h.baseURL, url.QueryEscape(token))
+	link := fmt.Sprintf("%s/login?token=%s", m.baseURL, url.QueryEscape(token))
 
 	body := fmt.Sprintf(`
-		<h2>Sign in to Powhunter</h2>
-		<p>Click the link below to sign in. It works once and expires in %d minutes.</p>
-		<p><a href="%s">Sign in to Powhunter</a></p>
+		<h2>%s</h2>
+		<p>%s It works once and expires in %d minutes.</p>
+		<p><a href="%s">%s</a></p>
 		<p>If you did not request this, you can ignore this email.</p>
-	`, int(auth.LoginTokenTTL.Minutes()), html.EscapeString(link))
+	`, content.Heading, content.Intro, int(auth.LoginTokenTTL.Minutes()), html.EscapeString(link), content.Action)
 
-	if sendErr := h.mailer.Send(ctx, notify.Email{
+	if sendErr := m.mailer.Send(ctx, notify.Email{
 		To:      []string{email},
-		Subject: "Your Powhunter sign-in link",
+		Subject: content.Subject,
 		HTML:    body,
 	}); sendErr != nil {
-		return fmt.Errorf("sending login email: %w", sendErr)
+		return fmt.Errorf("sending link email: %w", sendErr)
 	}
 
 	return nil

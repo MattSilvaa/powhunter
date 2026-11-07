@@ -30,6 +30,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.consumeLoginTokenStmt, err = db.PrepareContext(ctx, consumeLoginToken); err != nil {
 		return nil, fmt.Errorf("error preparing query ConsumeLoginToken: %w", err)
 	}
+	if q.countRecentLoginTokensStmt, err = db.PrepareContext(ctx, countRecentLoginTokens); err != nil {
+		return nil, fmt.Errorf("error preparing query CountRecentLoginTokens: %w", err)
+	}
 	if q.createLoginTokenStmt, err = db.PrepareContext(ctx, createLoginToken); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateLoginToken: %w", err)
 	}
@@ -42,9 +45,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.createUserAlertStmt, err = db.PrepareContext(ctx, createUserAlert); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateUserAlert: %w", err)
 	}
-	if q.deleteAllUserAlertsStmt, err = db.PrepareContext(ctx, deleteAllUserAlerts); err != nil {
-		return nil, fmt.Errorf("error preparing query DeleteAllUserAlerts: %w", err)
-	}
 	if q.deleteAllUserAlertsByUserUUIDStmt, err = db.PrepareContext(ctx, deleteAllUserAlertsByUserUUID); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteAllUserAlertsByUserUUID: %w", err)
 	}
@@ -56,9 +56,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.deleteSessionStmt, err = db.PrepareContext(ctx, deleteSession); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteSession: %w", err)
-	}
-	if q.deleteUserAlertStmt, err = db.PrepareContext(ctx, deleteUserAlert); err != nil {
-		return nil, fmt.Errorf("error preparing query DeleteUserAlert: %w", err)
 	}
 	if q.deleteUserAlertByUserUUIDStmt, err = db.PrepareContext(ctx, deleteUserAlertByUserUUID); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteUserAlertByUserUUID: %w", err)
@@ -98,9 +95,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getUserAlertStmt, err = db.PrepareContext(ctx, getUserAlert); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserAlert: %w", err)
-	}
-	if q.getUserAlertsByEmailStmt, err = db.PrepareContext(ctx, getUserAlertsByEmail); err != nil {
-		return nil, fmt.Errorf("error preparing query GetUserAlertsByEmail: %w", err)
 	}
 	if q.getUserAlertsByUserUUIDStmt, err = db.PrepareContext(ctx, getUserAlertsByUserUUID); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserAlertsByUserUUID: %w", err)
@@ -144,6 +138,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.upsertResortStmt, err = db.PrepareContext(ctx, upsertResort); err != nil {
 		return nil, fmt.Errorf("error preparing query UpsertResort: %w", err)
 	}
+	if q.upsertUnconfirmedUserAlertStmt, err = db.PrepareContext(ctx, upsertUnconfirmedUserAlert); err != nil {
+		return nil, fmt.Errorf("error preparing query UpsertUnconfirmedUserAlert: %w", err)
+	}
 	if q.upsertUserStmt, err = db.PrepareContext(ctx, upsertUser); err != nil {
 		return nil, fmt.Errorf("error preparing query UpsertUser: %w", err)
 	}
@@ -160,6 +157,11 @@ func (q *Queries) Close() error {
 	if q.consumeLoginTokenStmt != nil {
 		if cerr := q.consumeLoginTokenStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing consumeLoginTokenStmt: %w", cerr)
+		}
+	}
+	if q.countRecentLoginTokensStmt != nil {
+		if cerr := q.countRecentLoginTokensStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countRecentLoginTokensStmt: %w", cerr)
 		}
 	}
 	if q.createLoginTokenStmt != nil {
@@ -182,11 +184,6 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing createUserAlertStmt: %w", cerr)
 		}
 	}
-	if q.deleteAllUserAlertsStmt != nil {
-		if cerr := q.deleteAllUserAlertsStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing deleteAllUserAlertsStmt: %w", cerr)
-		}
-	}
 	if q.deleteAllUserAlertsByUserUUIDStmt != nil {
 		if cerr := q.deleteAllUserAlertsByUserUUIDStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing deleteAllUserAlertsByUserUUIDStmt: %w", cerr)
@@ -205,11 +202,6 @@ func (q *Queries) Close() error {
 	if q.deleteSessionStmt != nil {
 		if cerr := q.deleteSessionStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing deleteSessionStmt: %w", cerr)
-		}
-	}
-	if q.deleteUserAlertStmt != nil {
-		if cerr := q.deleteUserAlertStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing deleteUserAlertStmt: %w", cerr)
 		}
 	}
 	if q.deleteUserAlertByUserUUIDStmt != nil {
@@ -275,11 +267,6 @@ func (q *Queries) Close() error {
 	if q.getUserAlertStmt != nil {
 		if cerr := q.getUserAlertStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getUserAlertStmt: %w", cerr)
-		}
-	}
-	if q.getUserAlertsByEmailStmt != nil {
-		if cerr := q.getUserAlertsByEmailStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getUserAlertsByEmailStmt: %w", cerr)
 		}
 	}
 	if q.getUserAlertsByUserUUIDStmt != nil {
@@ -352,6 +339,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing upsertResortStmt: %w", cerr)
 		}
 	}
+	if q.upsertUnconfirmedUserAlertStmt != nil {
+		if cerr := q.upsertUnconfirmedUserAlertStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing upsertUnconfirmedUserAlertStmt: %w", cerr)
+		}
+	}
 	if q.upsertUserStmt != nil {
 		if cerr := q.upsertUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing upsertUserStmt: %w", cerr)
@@ -398,16 +390,15 @@ type Queries struct {
 	tx                                    *sql.Tx
 	checkAlertSentStmt                    *sql.Stmt
 	consumeLoginTokenStmt                 *sql.Stmt
+	countRecentLoginTokensStmt            *sql.Stmt
 	createLoginTokenStmt                  *sql.Stmt
 	createSessionStmt                     *sql.Stmt
 	createUserStmt                        *sql.Stmt
 	createUserAlertStmt                   *sql.Stmt
-	deleteAllUserAlertsStmt               *sql.Stmt
 	deleteAllUserAlertsByUserUUIDStmt     *sql.Stmt
 	deleteExpiredLoginTokensStmt          *sql.Stmt
 	deleteExpiredSessionsStmt             *sql.Stmt
 	deleteSessionStmt                     *sql.Stmt
-	deleteUserAlertStmt                   *sql.Stmt
 	deleteUserAlertByUserUUIDStmt         *sql.Stmt
 	getActiveAlertsByResortStmt           *sql.Stmt
 	getAlertLinkDestinationStmt           *sql.Stmt
@@ -421,7 +412,6 @@ type Queries struct {
 	getUsageSinceStmt                     *sql.Stmt
 	getUsageTotalsStmt                    *sql.Stmt
 	getUserAlertStmt                      *sql.Stmt
-	getUserAlertsByEmailStmt              *sql.Stmt
 	getUserAlertsByUserUUIDStmt           *sql.Stmt
 	getUserByEmailStmt                    *sql.Stmt
 	getUserByUUIDStmt                     *sql.Stmt
@@ -436,6 +426,7 @@ type Queries struct {
 	updateUserAlertSettingsByUserUUIDStmt *sql.Stmt
 	updateUserPhoneStmt                   *sql.Stmt
 	upsertResortStmt                      *sql.Stmt
+	upsertUnconfirmedUserAlertStmt        *sql.Stmt
 	upsertUserStmt                        *sql.Stmt
 }
 
@@ -445,16 +436,15 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		tx:                                    tx,
 		checkAlertSentStmt:                    q.checkAlertSentStmt,
 		consumeLoginTokenStmt:                 q.consumeLoginTokenStmt,
+		countRecentLoginTokensStmt:            q.countRecentLoginTokensStmt,
 		createLoginTokenStmt:                  q.createLoginTokenStmt,
 		createSessionStmt:                     q.createSessionStmt,
 		createUserStmt:                        q.createUserStmt,
 		createUserAlertStmt:                   q.createUserAlertStmt,
-		deleteAllUserAlertsStmt:               q.deleteAllUserAlertsStmt,
 		deleteAllUserAlertsByUserUUIDStmt:     q.deleteAllUserAlertsByUserUUIDStmt,
 		deleteExpiredLoginTokensStmt:          q.deleteExpiredLoginTokensStmt,
 		deleteExpiredSessionsStmt:             q.deleteExpiredSessionsStmt,
 		deleteSessionStmt:                     q.deleteSessionStmt,
-		deleteUserAlertStmt:                   q.deleteUserAlertStmt,
 		deleteUserAlertByUserUUIDStmt:         q.deleteUserAlertByUserUUIDStmt,
 		getActiveAlertsByResortStmt:           q.getActiveAlertsByResortStmt,
 		getAlertLinkDestinationStmt:           q.getAlertLinkDestinationStmt,
@@ -468,7 +458,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getUsageSinceStmt:                     q.getUsageSinceStmt,
 		getUsageTotalsStmt:                    q.getUsageTotalsStmt,
 		getUserAlertStmt:                      q.getUserAlertStmt,
-		getUserAlertsByEmailStmt:              q.getUserAlertsByEmailStmt,
 		getUserAlertsByUserUUIDStmt:           q.getUserAlertsByUserUUIDStmt,
 		getUserByEmailStmt:                    q.getUserByEmailStmt,
 		getUserByUUIDStmt:                     q.getUserByUUIDStmt,
@@ -483,6 +472,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		updateUserAlertSettingsByUserUUIDStmt: q.updateUserAlertSettingsByUserUUIDStmt,
 		updateUserPhoneStmt:                   q.updateUserPhoneStmt,
 		upsertResortStmt:                      q.upsertResortStmt,
+		upsertUnconfirmedUserAlertStmt:        q.upsertUnconfirmedUserAlertStmt,
 		upsertUserStmt:                        q.upsertUserStmt,
 	}
 }

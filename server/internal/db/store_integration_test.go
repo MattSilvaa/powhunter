@@ -31,7 +31,7 @@ func TestStoreIntegration_CreateUserWithAlerts(t *testing.T) {
 	t.Run("Create user with multiple alerts", func(t *testing.T) {
 		ctx := context.Background()
 
-		err := store.CreateUserWithAlerts(
+		alreadyConfirmed, err := store.CreateUserWithAlerts(
 			ctx,
 			"test@example.com",
 			"+15551234567",
@@ -41,6 +41,7 @@ func TestStoreIntegration_CreateUserWithAlerts(t *testing.T) {
 			db.Attribution{},
 		)
 		require.NoError(t, err)
+		assert.False(t, alreadyConfirmed)
 
 		// Verify user was created
 		user, err := queries.GetUserByEmail(ctx, "test@example.com")
@@ -60,13 +61,13 @@ func TestStoreIntegration_CreateUserWithAlerts(t *testing.T) {
 		}
 	})
 
-	t.Run("Existing email reuses the user and rejects a duplicate alert", func(t *testing.T) {
+	// Signing up again before confirming must not fail: the first confirmation
+	// email may never have arrived. The same user is reused, and the latest
+	// thresholds replace the old ones.
+	t.Run("Unconfirmed signup for the same resort again updates the alert", func(t *testing.T) {
 		ctx := context.Background()
 
-		// The same email must not create a second user; it reuses the existing one
-		// and then fails on the (user_uuid, resort_uuid) uniqueness constraint,
-		// which the handler maps to a 409 DUPLICATE_ALERT.
-		err := store.CreateUserWithAlerts(
+		alreadyConfirmed, err := store.CreateUserWithAlerts(
 			ctx,
 			"test@example.com", // Same email
 			"+15559876543",
@@ -75,14 +76,27 @@ func TestStoreIntegration_CreateUserWithAlerts(t *testing.T) {
 			[]string{resort1.Uuid.String()},
 			db.Attribution{},
 		)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "user_alerts_user_uuid_resort_uuid_key")
+		require.NoError(t, err)
+		assert.False(t, alreadyConfirmed)
+
+		user, err := queries.GetUserByEmail(ctx, "test@example.com")
+		require.NoError(t, err)
+		assert.Equal(t, "+15559876543", user.Phone.String)
+
+		alert, err := queries.GetUserAlert(ctx, dbgen.GetUserAlertParams{
+			UserUuid:   uuid.NullUUID{UUID: user.Uuid, Valid: true},
+			ResortUuid: uuid.NullUUID{UUID: resort1.Uuid, Valid: true},
+		})
+		require.NoError(t, err)
+		assert.InDelta(t, 10.0, alert.MinSnowAmount, 0.001)
+		assert.Equal(t, int32(5), alert.NotificationDays)
 	})
 }
 
-// Signup is anonymous, so it must not be able to change where an existing
-// account's SMS alerts go. Only the signed-in profile update may do that.
-func TestStoreIntegration_SignupDoesNotReplaceAnExistingPhone(t *testing.T) {
+// Signup is anonymous, so it must not be able to change a confirmed account:
+// not where its SMS alerts go, and not which resorts it is alerted for. Only the
+// signed-in account endpoints may do that.
+func TestStoreIntegration_SignupDoesNotChangeAConfirmedAccount(t *testing.T) {
 	testDB, store, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
 
@@ -91,19 +105,92 @@ func TestStoreIntegration_SignupDoesNotReplaceAnExistingPhone(t *testing.T) {
 	resort := testutil.SeedTestResort(t, queries, "Test Resort", 39.6403, -106.3742)
 	user := testutil.SeedTestUser(t, queries, "victim@example.com", "+15551234567")
 
-	err := store.CreateUserWithAlerts(ctx, "victim@example.com", "+15559999999", 6.0, 3,
+	alreadyConfirmed, err := store.CreateUserWithAlerts(ctx, "victim@example.com", "+15559999999", 6.0, 3,
 		[]string{resort.Uuid.String()}, db.Attribution{})
 	require.NoError(t, err)
+	assert.True(t, alreadyConfirmed)
 
 	stored, err := queries.GetUserByUUID(ctx, user.Uuid)
 	require.NoError(t, err)
 	assert.Equal(t, "+15551234567", stored.Phone.String)
+
+	alerts, err := store.GetUserAlerts(ctx, user.Uuid)
+	require.NoError(t, err)
+	assert.Empty(t, alerts, "an anonymous signup must not add alerts to someone else's account")
 
 	require.NoError(t, store.UpdateUserPhone(ctx, user.Uuid, "+15550000000"))
 
 	stored, err = queries.GetUserByUUID(ctx, user.Uuid)
 	require.NoError(t, err)
 	assert.Equal(t, "+15550000000", stored.Phone.String)
+}
+
+// Someone who signs up first with another person's address must not keep their
+// own phone on it once the real owner signs up.
+// A confirmed account with no phone yet, from someone who only ever signed in,
+// must not take a number from an anonymous signup either.
+func TestStoreIntegration_SignupDoesNotFillThePhoneOfAConfirmedAccount(t *testing.T) {
+	testDB, store, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+
+	ctx := t.Context()
+	queries := dbgen.New(testDB)
+	resort := testutil.SeedTestResort(t, queries, "Test Resort", 39.6403, -106.3742)
+	owner := testutil.SeedTestUser(t, queries, "owner@example.com", "")
+
+	_, err := store.CreateUserWithAlerts(ctx, "owner@example.com", "+15559999999", 6.0, 3,
+		[]string{resort.Uuid.String()}, db.Attribution{})
+	require.NoError(t, err)
+
+	stored, err := queries.GetUserByUUID(ctx, owner.Uuid)
+	require.NoError(t, err)
+	assert.False(t, stored.Phone.Valid)
+}
+
+func TestStoreIntegration_SignupReplacesThePhoneOnAnUnconfirmedAccount(t *testing.T) {
+	testDB, store, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+
+	ctx := t.Context()
+	queries := dbgen.New(testDB)
+	resort := testutil.SeedTestResort(t, queries, "Test Resort", 39.6403, -106.3742)
+	squatter := testutil.SeedUnconfirmedTestUser(t, queries, "owner@example.com", "+15559999999")
+	// The squatter picked the same resort the owner then picks, which used to
+	// fail the owner's signup and roll back the phone replacement.
+	testutil.SeedTestAlert(t, queries, squatter.Uuid, resort.Uuid, 5.0, 3)
+
+	_, err := store.CreateUserWithAlerts(ctx, "owner@example.com", "+15551234567", 6.0, 3,
+		[]string{resort.Uuid.String()}, db.Attribution{})
+	require.NoError(t, err)
+
+	stored, err := queries.GetUserByUUID(ctx, squatter.Uuid)
+	require.NoError(t, err)
+	assert.Equal(t, "+15551234567", stored.Phone.String)
+}
+
+// An unconfirmed account may carry a phone number its owner never agreed to
+// text, so the forecaster must not see it until the email link is clicked.
+func TestStoreIntegration_GetAlertMatchesSkipsUnconfirmedAccounts(t *testing.T) {
+	testDB, store, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+
+	ctx := t.Context()
+	queries := dbgen.New(testDB)
+	resort := testutil.SeedTestResort(t, queries, "Test Resort", 39.6403, -106.3742)
+	user := testutil.SeedUnconfirmedTestUser(t, queries, "new@example.com", "+15551234567")
+	testutil.SeedTestAlert(t, queries, user.Uuid, resort.Uuid, 5.0, 3)
+
+	forecastDate := time.Now().Add(24 * time.Hour).Truncate(24 * time.Hour)
+
+	matches, err := store.GetAlertMatches(ctx, resort.Uuid.String(), forecastDate, 8.0, 1)
+	require.NoError(t, err)
+	assert.Empty(t, matches)
+
+	require.NoError(t, queries.MarkEmailVerified(ctx, user.Uuid))
+
+	matches, err = store.GetAlertMatches(ctx, resort.Uuid.String(), forecastDate, 8.0, 1)
+	require.NoError(t, err)
+	assert.Len(t, matches, 1)
 }
 
 func TestStoreIntegration_AccountAlerts(t *testing.T) {
@@ -322,9 +409,10 @@ func TestStoreIntegration_UpsertResortKeepsUUIDAndAlerts(t *testing.T) {
 	queries := dbgen.New(testDB)
 
 	original := testutil.SeedTestResort(t, queries, "Alta", 40.0, -111.0)
-	require.NoError(t, store.CreateUserWithAlerts(
+	_, err := store.CreateUserWithAlerts(
 		ctx, "upsert@example.com", "", 6.0, 2, []string{original.Uuid.String()}, db.Attribution{},
-	))
+	)
+	require.NoError(t, err)
 
 	updated := testutil.SeedTestResort(t, queries, "Alta", 40.5884, -111.6386)
 
@@ -366,7 +454,7 @@ func TestStoreIntegration_ConcurrentSignupsShareOneUser(t *testing.T) {
 		go func(index int, resortUUID string) {
 			defer wg.Done()
 
-			errs[index] = store.CreateUserWithAlerts(
+			_, errs[index] = store.CreateUserWithAlerts(
 				context.Background(), email, "+15551234567", 6.0, 3, []string{resortUUID}, db.Attribution{},
 			)
 		}(i, resort)
@@ -384,7 +472,10 @@ func TestStoreIntegration_ConcurrentSignupsShareOneUser(t *testing.T) {
 		testDB.QueryRow("SELECT count(*) FROM users WHERE email = $1", email).Scan(&userCount))
 	assert.Equal(t, 1, userCount, "the same email must map to exactly one user")
 
-	alerts, err := store.GetUserAlertsByEmail(context.Background(), email)
-	require.NoError(t, err)
-	assert.Len(t, alerts, 2)
+	var alertCount int
+
+	require.NoError(t, testDB.QueryRow(
+		"SELECT count(*) FROM user_alerts ua JOIN users u ON u.uuid = ua.user_uuid WHERE u.email = $1",
+		email).Scan(&alertCount))
+	assert.Equal(t, 2, alertCount)
 }

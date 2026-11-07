@@ -31,12 +31,13 @@ func TestUsageQueries(t *testing.T) {
 	testutil.SeedTestAlert(t, queries, subscriber.Uuid, alta.Uuid, 6, 3)
 
 	// A friend who signed up from the shared alert link.
-	require.NoError(t, store.CreateUserWithAlerts(ctx, "friend@example.com", "", 6, 3,
-		[]string{alta.Uuid.String()}, db.Attribution{ReferralCode: "Ab12Cd34"}))
+	_, err := store.CreateUserWithAlerts(ctx, "friend@example.com", "", 6, 3,
+		[]string{alta.Uuid.String()}, db.Attribution{ReferralCode: "Ab12Cd34"})
+	require.NoError(t, err)
 
 	// An old signup with no phone and no alerts counts as a user only.
 	lapsed := testutil.SeedTestUser(t, queries, "lapsed@example.com", "")
-	_, err := testDB.ExecContext(ctx,
+	_, err = testDB.ExecContext(ctx,
 		"UPDATE users SET created_at = NOW() - INTERVAL '60 days' WHERE uuid = $1", lapsed.Uuid)
 	require.NoError(t, err)
 
@@ -86,8 +87,9 @@ func TestUsageQueries(t *testing.T) {
 	}, byResort)
 
 	// A signup from a tagged Reddit post, counted under its source.
-	require.NoError(t, store.CreateUserWithAlerts(ctx, "redditor@example.com", "", 6, 3,
-		[]string{alta.Uuid.String()}, db.Attribution{Source: "reddit", Campaign: "cosnow"}))
+	_, err = store.CreateUserWithAlerts(ctx, "redditor@example.com", "", 6, 3,
+		[]string{alta.Uuid.String()}, db.Attribution{Source: "reddit", Campaign: "cosnow"})
+	require.NoError(t, err)
 
 	bySource, err := queries.GetSignupsBySource(ctx, time.Now().Add(-30*24*time.Hour))
 	require.NoError(t, err)

@@ -1,6 +1,7 @@
 package middleware_test
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -148,7 +149,75 @@ func TestClientIPIgnoresProxyHeaderWhenUntrusted(t *testing.T) {
 	req.Header.Set("X-Forwarded-For", "198.51.100.7, 203.0.113.1")
 
 	assert.Equal(t, "203.0.113.10", middleware.ClientIP(req, false))
-	assert.Equal(t, "198.51.100.7", middleware.ClientIP(req, true))
+}
+
+// Render's proxy appends to X-Forwarded-For, so the left-most entry is whatever
+// the client sent. Trusting it let a caller pick a fresh address per request and
+// never hit a rate limit.
+func TestClientIPBehindAProxyCannotBeSpoofed(t *testing.T) {
+	newRequest := func(headers map[string]string) *http.Request {
+		req := httptest.NewRequest(http.MethodGet, "/api/resorts", nil)
+		req.RemoteAddr = "10.0.0.5:1234"
+		for name, value := range headers {
+			req.Header.Set(name, value)
+		}
+
+		return req
+	}
+
+	cases := map[string]struct {
+		headers map[string]string
+		want    string
+	}{
+		"edge header wins over a forged forwarded-for": {
+			headers: map[string]string{
+				"CF-Connecting-IP": "198.51.100.7",
+				"X-Forwarded-For":  "1.2.3.4, 198.51.100.7",
+			},
+			want: "198.51.100.7",
+		},
+		"right-most forwarded-for entry is the one our proxy added": {
+			headers: map[string]string{"X-Forwarded-For": "1.2.3.4, 198.51.100.7"},
+			want:    "198.51.100.7",
+		},
+		"junk falls back to the connection address": {
+			headers: map[string]string{"CF-Connecting-IP": "not-an-ip", "X-Forwarded-For": "also junk"},
+			want:    "10.0.0.5",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, middleware.ClientIP(newRequest(tc.headers), true))
+		})
+	}
+}
+
+// A flood of distinct addresses must neither grow the table without bound nor
+// escape limiting: once full, newcomers share one bucket.
+func TestRateLimiterStaysBoundedUnderManyClients(t *testing.T) {
+	// Slow enough that no bucket refills during the test, however loaded the
+	// machine running it is.
+	limiter := middleware.NewRateLimiter(middleware.RateLimitConfig{RequestsPerSecond: 0.001, Burst: 1}, false)
+	defer limiter.Close()
+
+	limiter.SetMaxVisitors(3)
+	handler := limiter.Middleware(okHandler())
+
+	statuses := make([]int, 0, 6)
+
+	for i := range 6 {
+		req := httptest.NewRequest(http.MethodPost, "/api/alerts", nil)
+		req.RemoteAddr = fmt.Sprintf("203.0.113.%d:1234", i)
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
+		statuses = append(statuses, rr.Code)
+	}
+
+	assert.LessOrEqual(t, limiter.VisitorCount(), 4, "three clients plus the shared overflow bucket")
+	// The first three get their own allowance; the fourth takes the overflow
+	// bucket's only token, and every later newcomer is refused.
+	assert.Equal(t, []int{200, 200, 200, 200, 429, 429}, statuses)
 }
 
 func TestMaxBytesRejectsOversizedBodies(t *testing.T) {

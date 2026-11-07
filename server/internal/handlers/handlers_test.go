@@ -7,6 +7,7 @@ import (
 	"github.com/MattSilvaa/powhunter/internal/db"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	dbgen "github.com/MattSilvaa/powhunter/internal/db/generated"
@@ -30,9 +31,86 @@ func testAlertHandler(t *testing.T) (*AlertHandler, *mocks.MockStoreService) {
 
 	handler := &AlertHandler{
 		store: mockStore,
+		links: linkMailer{issuer: &stubAuthService{}, mailer: &captureMailer{}, baseURL: "https://powhunter.app"},
 	}
 
 	return handler, mockStore
+}
+
+// signupRequest posts a valid anonymous signup.
+func signupRequest(t *testing.T) *http.Request {
+	t.Helper()
+
+	return postJSON(t, "/api/alerts", CreateAlertRequest{
+		Email:            "rider@example.com",
+		Phone:            "3035550123",
+		NotificationDays: 3,
+		MinSnowAmount:    5.0,
+		ResortsUuids:     []string{testResortUUID1},
+	})
+}
+
+// Signup is anonymous, so nothing may be texted until the owner of the address
+// clicks the emailed link.
+func TestCreateAlertEmailsAConfirmationLink(t *testing.T) {
+	handler, mockStore := testAlertHandler(t)
+	mailer := &captureMailer{}
+	issuer := &stubAuthService{}
+	handler.links = linkMailer{issuer: issuer, mailer: mailer, baseURL: "https://powhunter.app"}
+
+	mockStore.EXPECT().CreateUserWithAlerts(gomock.Any(), "rider@example.com", gomock.Any(), gomock.Any(),
+		gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil)
+
+	rr := httptest.NewRecorder()
+	handler.CreateAlert(rr, signupRequest(t))
+
+	assert.Equal(t, http.StatusCreated, rr.Code)
+	assert.Equal(t, "rider@example.com", issuer.issuedFor)
+	require.Len(t, mailer.sent, 1)
+	assert.Equal(t, "Confirm your Powhunter alerts", mailer.sent[0].Subject)
+	assert.Contains(t, mailer.sent[0].HTML, "https://powhunter.app/login?token=login-token")
+}
+
+// Someone who only knows an address must not change a confirmed account, and
+// the response must not reveal that the account exists.
+func TestCreateAlertForAConfirmedAccountOnlySendsASignInLink(t *testing.T) {
+	handler, mockStore := testAlertHandler(t)
+	mailer := &captureMailer{}
+	handler.links = linkMailer{issuer: &stubAuthService{}, mailer: mailer, baseURL: "https://powhunter.app"}
+
+	mockStore.EXPECT().CreateUserWithAlerts(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
+		gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil)
+
+	rr := httptest.NewRecorder()
+	handler.CreateAlert(rr, signupRequest(t))
+
+	assert.Equal(t, http.StatusCreated, rr.Code)
+	assert.JSONEq(t, `{"status":"success","message":"Alert created successfully"}`, rr.Body.String())
+	require.Len(t, mailer.sent, 1)
+	assert.Equal(t, "Sign in to update your Powhunter alerts", mailer.sent[0].Subject)
+}
+
+// A form on another site can post a text/plain body with the visitor's cookie
+// and no CORS preflight. Only a JSON content type forces the preflight.
+func TestDecodeJSONRejectsNonJSONAndTrailingData(t *testing.T) {
+	handler, _ := testAlertHandler(t)
+
+	formPost := httptest.NewRequest(http.MethodPost, "/api/alerts",
+		strings.NewReader(`{"email":"a@b.co"}`))
+	formPost.Header.Set("Content-Type", "text/plain")
+
+	rr := httptest.NewRecorder()
+	handler.CreateAlert(rr, formPost)
+	assert.Equal(t, http.StatusUnsupportedMediaType, rr.Code)
+
+	// What a text/plain form encodes as name=value: JSON followed by junk.
+	trailing := httptest.NewRequest(http.MethodPost, "/api/alerts",
+		strings.NewReader(`{"email":"a@b.co"}=`))
+	trailing.Header.Set("Content-Type", "application/json")
+
+	rr = httptest.NewRecorder()
+	handler.CreateAlert(rr, trailing)
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
 
 func testResortHandler(t *testing.T) (*ResortHandler, *mocks.MockStoreService) {
@@ -62,7 +140,7 @@ func TestCreateAlert(t *testing.T) {
 			method: http.MethodPost,
 			requestBody: CreateAlertRequest{
 				Email:            "friend@example.com",
-				Phone:            "1234567890",
+				Phone:            "3035550123",
 				NotificationDays: 3,
 				MinSnowAmount:    5.0,
 				ResortsUuids:     []string{testResortUUID1},
@@ -70,9 +148,9 @@ func TestCreateAlert(t *testing.T) {
 			},
 			setupMock: func(m *mocks.MockStoreService) {
 				m.EXPECT().
-					CreateUserWithAlerts(gomock.Any(), "friend@example.com", "+11234567890", 5.0, int32(3),
+					CreateUserWithAlerts(gomock.Any(), "friend@example.com", "+13035550123", 5.0, int32(3),
 						[]string{testResortUUID1}, db.Attribution{ReferralCode: "Ab12Cd34"}).
-					Return(nil)
+					Return(false, nil)
 			},
 			expectedStatus: http.StatusCreated,
 			expectedBody:   map[string]string{"status": "success", "message": "Alert created successfully"},
@@ -82,7 +160,7 @@ func TestCreateAlert(t *testing.T) {
 			method: http.MethodPost,
 			requestBody: CreateAlertRequest{
 				Email:            "friend@example.com",
-				Phone:            "1234567890",
+				Phone:            "3035550123",
 				NotificationDays: 3,
 				MinSnowAmount:    5.0,
 				ResortsUuids:     []string{testResortUUID1},
@@ -91,9 +169,9 @@ func TestCreateAlert(t *testing.T) {
 			},
 			setupMock: func(m *mocks.MockStoreService) {
 				m.EXPECT().
-					CreateUserWithAlerts(gomock.Any(), "friend@example.com", "+11234567890", 5.0, int32(3),
+					CreateUserWithAlerts(gomock.Any(), "friend@example.com", "+13035550123", 5.0, int32(3),
 						[]string{testResortUUID1}, db.Attribution{Source: "reddit"}).
-					Return(nil)
+					Return(false, nil)
 			},
 			expectedStatus: http.StatusCreated,
 			expectedBody:   map[string]string{"status": "success", "message": "Alert created successfully"},
@@ -103,7 +181,7 @@ func TestCreateAlert(t *testing.T) {
 			method: http.MethodPost,
 			requestBody: CreateAlertRequest{
 				Email:            "friend@example.com",
-				Phone:            "1234567890",
+				Phone:            "3035550123",
 				NotificationDays: 3,
 				MinSnowAmount:    5.0,
 				ResortsUuids:     []string{testResortUUID1},
@@ -111,9 +189,9 @@ func TestCreateAlert(t *testing.T) {
 			},
 			setupMock: func(m *mocks.MockStoreService) {
 				m.EXPECT().
-					CreateUserWithAlerts(gomock.Any(), "friend@example.com", "+11234567890", 5.0, int32(3),
+					CreateUserWithAlerts(gomock.Any(), "friend@example.com", "+13035550123", 5.0, int32(3),
 						[]string{testResortUUID1}, db.Attribution{}).
-					Return(nil)
+					Return(false, nil)
 			},
 			expectedStatus: http.StatusCreated,
 			expectedBody:   map[string]string{"status": "success", "message": "Alert created successfully"},
@@ -123,7 +201,7 @@ func TestCreateAlert(t *testing.T) {
 			method: http.MethodPost,
 			requestBody: CreateAlertRequest{
 				Email:            "test@example.com",
-				Phone:            "1234567890",
+				Phone:            "3035550123",
 				NotificationDays: 3,
 				MinSnowAmount:    5.0,
 				ResortsUuids:     []string{testResortUUID1, testResortUUID2},
@@ -133,13 +211,13 @@ func TestCreateAlert(t *testing.T) {
 					CreateUserWithAlerts(
 						gomock.Any(),
 						"test@example.com",
-						"+11234567890",
+						"+13035550123",
 						5.0,
 						int32(3),
 						[]string{testResortUUID1, testResortUUID2},
 						db.Attribution{},
 					).
-					Return(nil)
+					Return(false, nil)
 			},
 			expectedStatus: http.StatusCreated,
 			expectedHeaders: map[string]string{
@@ -159,7 +237,7 @@ func TestCreateAlert(t *testing.T) {
 			method: http.MethodGet,
 			requestBody: CreateAlertRequest{
 				Email:            "test@example.com",
-				Phone:            "1234567890",
+				Phone:            "3035550123",
 				NotificationDays: 3,
 				MinSnowAmount:    5.0,
 				ResortsUuids:     []string{testResortUUID1},
@@ -191,7 +269,7 @@ func TestCreateAlert(t *testing.T) {
 			method: http.MethodPost,
 			requestBody: CreateAlertRequest{
 				Email:            "", // Empty email
-				Phone:            "1234567890",
+				Phone:            "3035550123",
 				NotificationDays: 3,
 				MinSnowAmount:    5.0,
 				ResortsUuids:     []string{testResortUUID1},
@@ -221,7 +299,7 @@ func TestCreateAlert(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 			expectedError: &ErrorResponse{
 				Error:   "MISSING_PHONE",
-				Message: "Please enter a valid phone number",
+				Message: "Please enter a US or Canadian phone number",
 			},
 		},
 		{
@@ -229,7 +307,7 @@ func TestCreateAlert(t *testing.T) {
 			method: http.MethodPost,
 			requestBody: CreateAlertRequest{
 				Email:            "test@example.com",
-				Phone:            "1234567890",
+				Phone:            "3035550123",
 				NotificationDays: 3,
 				MinSnowAmount:    5.0,
 				ResortsUuids:     []string{}, // Empty resorts
@@ -248,7 +326,7 @@ func TestCreateAlert(t *testing.T) {
 			method: http.MethodPost,
 			requestBody: CreateAlertRequest{
 				Email:            "existing@example.com",
-				Phone:            "1234567890",
+				Phone:            "3035550123",
 				NotificationDays: 3,
 				MinSnowAmount:    5.0,
 				ResortsUuids:     []string{testResortUUID1},
@@ -262,13 +340,13 @@ func TestCreateAlert(t *testing.T) {
 					CreateUserWithAlerts(
 						gomock.Any(),
 						"existing@example.com",
-						"+11234567890",
+						"+13035550123",
 						5.0,
 						int32(3),
 						[]string{testResortUUID1},
 						db.Attribution{},
 					).
-					Return(pqErr)
+					Return(false, pqErr)
 			},
 			expectedStatus: http.StatusConflict,
 			expectedError: &ErrorResponse{
@@ -281,7 +359,7 @@ func TestCreateAlert(t *testing.T) {
 			method: http.MethodPost,
 			requestBody: CreateAlertRequest{
 				Email:            "test@example.com",
-				Phone:            "1234567890",
+				Phone:            "3035550123",
 				NotificationDays: 3,
 				MinSnowAmount:    5.0,
 				ResortsUuids:     []string{testResortUUID1},
@@ -291,13 +369,13 @@ func TestCreateAlert(t *testing.T) {
 					CreateUserWithAlerts(
 						gomock.Any(),
 						"test@example.com",
-						"+11234567890",
+						"+13035550123",
 						5.0,
 						int32(3),
 						[]string{testResortUUID1},
 						db.Attribution{},
 					).
-					Return(errors.New("database error"))
+					Return(false, errors.New("database error"))
 			},
 			expectedStatus: http.StatusInternalServerError,
 			expectedError: &ErrorResponse{
