@@ -15,13 +15,14 @@ import { useCreateAlert } from '../shared/useCreateAlert.ts'
 import PageHeader from '../components/pageHeader.tsx'
 import ResortSelect from '../components/resortSelect.tsx'
 import AlertSettingsFields from '../components/alertSettingsFields.tsx'
+import { resortUuidsFromLink } from '../shared/resortSlug.ts'
 
 export default function SignUpPage() {
 	const navigate = useNavigate()
-	// A friend arriving from a shared alert lands here with that alert's resort
-	// and code in the URL.
+	// A friend arriving from a shared link lands here with resorts, and for a
+	// shared alert its code, in the URL.
 	const [searchParams] = useSearchParams()
-	const sharedResort = searchParams.get('resort') ?? ''
+	const sharedResorts = searchParams.get('resort') ?? ''
 	const referralCode = searchParams.get('ref') ?? ''
 	const prefilled = useRef(false)
 	const [formData, setFormData] = useState({
@@ -45,18 +46,21 @@ export default function SignUpPage() {
 
 	const { resorts = [], loading, error } = useResorts()
 
-	// Pick the shared resort once the list has loaded, and only once: doing it
-	// on every render would put it back each time the visitor unticked it.
+	// Pick the shared resorts once the list has loaded, and only once: doing it
+	// on every render would put them back each time the visitor unticked one.
+	// A link names resorts by uuid (shared alerts) or by name, as in
+	// /signup?resort=alta,snowbird.
 	useEffect(() => {
-		if (prefilled.current || !sharedResort) {
+		if (prefilled.current || !sharedResorts || resorts.length === 0) {
 			return
 		}
 
-		if (resorts.some((r) => r.uuid === sharedResort)) {
-			prefilled.current = true
-			setFormData((prev) => ({ ...prev, resorts: [sharedResort] }))
+		prefilled.current = true
+		const linked = resortUuidsFromLink(sharedResorts.split(','), resorts)
+		if (linked.length > 0) {
+			setFormData((prev) => ({ ...prev, resorts: linked }))
 		}
-	}, [resorts, sharedResort])
+	}, [resorts, sharedResorts])
 
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const { name, value } = e.target
@@ -148,7 +152,11 @@ export default function SignUpPage() {
 			},
 			{
 				onSuccess: () => {
-					navigate('/success')
+					// The success page invites friends to the same resorts.
+					const resortNames = resorts
+						.filter((r) => resortsUuids.includes(r.uuid))
+						.map((r) => r.name)
+					navigate('/success', { state: { resortNames } })
 				},
 				onError: (error) => {
 					console.error('Failed to create alert:', error)

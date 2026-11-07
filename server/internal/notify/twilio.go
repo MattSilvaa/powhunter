@@ -57,14 +57,17 @@ func (t *TwilioClient) SendSMS(to, message string) error {
 	return nil
 }
 
-// FormatSnowAlertMessage formats a snow alert SMS message, ending with link
-// when one is given.
+// FormatSnowAlertMessage formats a snow alert SMS message. It adds link when
+// one is given, then a line inviting the reader to share shareHost (such as
+// "powhunter.app") when that is given.
 //
-// A link is long enough to push an alert into a second segment, which doubles
-// what that message costs. So with a link, the optional closing phrases are
-// dropped one at a time until the message fits in a single segment. Without a
-// link the wording is unchanged.
-func FormatSnowAlertMessage(alert db.AlertToSend, link string) string {
+// Extra text can push an alert into a second segment, which doubles what that
+// message costs. So the share line is only added when the message still fits
+// in one segment, trying the shorter share line and dropping the optional
+// closing phrases first. The link is kept either way: with a link, closing
+// phrases are dropped one at a time until it fits. With neither a link nor a
+// share line that fits, the wording is unchanged.
+func FormatSnowAlertMessage(alert db.AlertToSend, link, shareHost string) string {
 	forecastDate := alert.ForecastDate
 	resortName := alert.ResortName
 	snowAmount := alert.SnowAmount
@@ -101,6 +104,23 @@ func FormatSnowAlertMessage(alert db.AlertToSend, link string) string {
 		wordings = []string{
 			lead + " Time to hit the slopes!",
 			lead,
+		}
+	}
+
+	var withLink string
+	if link != "" {
+		withLink = " " + link
+	}
+
+	// Sharing beats the closing phrases: a friend signing up is worth more than
+	// "Time to hit the slopes!".
+	if shareHost != "" {
+		for _, share := range []string{" Send to your ski crew: ", " Share: "} {
+			for _, wording := range wordings {
+				if message := wording + withLink + share + shareHost; SMSSegments(message) == 1 {
+					return message
+				}
+			}
 		}
 	}
 
