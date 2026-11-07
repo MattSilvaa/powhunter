@@ -122,12 +122,17 @@ func New(deps Deps) (http.Handler, func()) {
 		Burst:             deps.Config.RateBurst,
 	}, deps.Config.TrustProxyHeaders)
 
+	corsConfig := middleware.NewCORSConfig(deps.Config.AllowedOrigins, true)
+
 	handler := middleware.Chain(mux,
 		middleware.RequestID,
 		middleware.Recover(deps.Logger),
 		middleware.Logging(deps.Logger),
 		middleware.SecurityHeaders(deps.Config.IsProduction()),
-		middleware.CORS(middleware.NewCORSConfig(deps.Config.AllowedOrigins, true)),
+		middleware.CORS(corsConfig),
+		// Runs after CORS so a rejected request still carries the CORS headers
+		// the browser needs to report the failure.
+		middleware.CrossOriginGuard(corsConfig),
 		readLimiter.Middleware,
 		middleware.MaxBytes(deps.Config.MaxBodyBytes),
 		// Runs after CORS so a rejected cross-origin request never reaches the

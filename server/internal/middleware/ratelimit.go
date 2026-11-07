@@ -15,6 +15,13 @@ const (
 	visitorTTL = 10 * time.Minute
 	// sweepInterval is how often expired visitors are discarded.
 	sweepInterval = time.Minute
+	// defaultMaxVisitors bounds how many clients are tracked at once, so a flood
+	// of distinct addresses cannot grow the table without limit.
+	defaultMaxVisitors = 100_000
+	// overflowKey is the shared bucket used once the table is full. Sharing it
+	// means a flood of new addresses throttles itself rather than escaping
+	// limits altogether.
+	overflowKey = "\x00overflow"
 )
 
 // RateLimitConfig describes one bucket of allowance.
@@ -39,18 +46,23 @@ type RateLimiter struct {
 	config     RateLimitConfig
 	trustProxy bool
 
-	mu       sync.Mutex
-	visitors map[string]*visitor
-	stop     chan struct{}
+	mu          sync.Mutex
+	visitors    map[string]*visitor
+	maxVisitors int
+	// lastFullSweep throttles the sweep a full table triggers, so a flood
+	// cannot make every request walk the whole table.
+	lastFullSweep time.Time
+	stop          chan struct{}
 }
 
 // NewRateLimiter creates a limiter and starts its cleanup goroutine.
 func NewRateLimiter(config RateLimitConfig, trustProxy bool) *RateLimiter {
 	limiter := &RateLimiter{
-		config:     config,
-		trustProxy: trustProxy,
-		visitors:   make(map[string]*visitor),
-		stop:       make(chan struct{}),
+		config:      config,
+		trustProxy:  trustProxy,
+		visitors:    make(map[string]*visitor),
+		maxVisitors: defaultMaxVisitors,
+		stop:        make(chan struct{}),
 	}
 
 	go limiter.sweep()
@@ -85,11 +97,32 @@ func (l *RateLimiter) sweep() {
 	}
 }
 
+// evictExpired drops idle visitors. The caller holds l.mu.
+func (l *RateLimiter) evictExpired(now time.Time) {
+	for key, v := range l.visitors {
+		if now.Sub(v.lastSeen) > visitorTTL {
+			delete(l.visitors, key)
+		}
+	}
+}
+
 func (l *RateLimiter) allow(key string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
 	v, ok := l.visitors[key]
+	if !ok && len(l.visitors) >= l.maxVisitors {
+		if now := time.Now(); now.Sub(l.lastFullSweep) > time.Second {
+			l.lastFullSweep = now
+			l.evictExpired(now)
+		}
+
+		if len(l.visitors) >= l.maxVisitors {
+			key = overflowKey
+			v, ok = l.visitors[key]
+		}
+	}
+
 	if !ok {
 		v = &visitor{limiter: rate.NewLimiter(rate.Limit(l.config.RequestsPerSecond), l.config.Burst)}
 		l.visitors[key] = v
