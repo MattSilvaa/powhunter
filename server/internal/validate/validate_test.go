@@ -1,6 +1,7 @@
 package validate_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/MattSilvaa/powhunter/internal/validate"
@@ -78,4 +79,22 @@ func TestNumericBounds(t *testing.T) {
 	require.Error(t, validate.SnowAmount(0))
 	require.Error(t, validate.SnowAmount(-5))
 	require.Error(t, validate.SnowAmount(1000))
+}
+
+func TestTag(t *testing.T) {
+	tests := map[string]string{
+		"Reddit":                "reddit",
+		" cosnow ":              "cosnow",
+		"tiktok_2026-nov.":      "tiktok_2026-nov.",
+		"":                      "",
+		"two words":             "",
+		"<script>":              "",
+		strings.Repeat("a", 41): "",
+	}
+
+	for raw, want := range tests {
+		if got := validate.Tag(raw); got != want {
+			t.Errorf("Tag(%q) = %q, want %q", raw, got, want)
+		}
+	}
 }

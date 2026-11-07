@@ -87,6 +87,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getSessionByTokenHashStmt, err = db.PrepareContext(ctx, getSessionByTokenHash); err != nil {
 		return nil, fmt.Errorf("error preparing query GetSessionByTokenHash: %w", err)
 	}
+	if q.getSignupsBySourceStmt, err = db.PrepareContext(ctx, getSignupsBySource); err != nil {
+		return nil, fmt.Errorf("error preparing query GetSignupsBySource: %w", err)
+	}
 	if q.getUsageSinceStmt, err = db.PrepareContext(ctx, getUsageSince); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUsageSince: %w", err)
 	}
@@ -254,6 +257,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getSessionByTokenHashStmt: %w", cerr)
 		}
 	}
+	if q.getSignupsBySourceStmt != nil {
+		if cerr := q.getSignupsBySourceStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getSignupsBySourceStmt: %w", cerr)
+		}
+	}
 	if q.getUsageSinceStmt != nil {
 		if cerr := q.getUsageSinceStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getUsageSinceStmt: %w", cerr)
@@ -409,6 +417,7 @@ type Queries struct {
 	getResortAlertsStmt                   *sql.Stmt
 	getResortByUUIDStmt                   *sql.Stmt
 	getSessionByTokenHashStmt             *sql.Stmt
+	getSignupsBySourceStmt                *sql.Stmt
 	getUsageSinceStmt                     *sql.Stmt
 	getUsageTotalsStmt                    *sql.Stmt
 	getUserAlertStmt                      *sql.Stmt
@@ -455,6 +464,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getResortAlertsStmt:                   q.getResortAlertsStmt,
 		getResortByUUIDStmt:                   q.getResortByUUIDStmt,
 		getSessionByTokenHashStmt:             q.getSessionByTokenHashStmt,
+		getSignupsBySourceStmt:                q.getSignupsBySourceStmt,
 		getUsageSinceStmt:                     q.getUsageSinceStmt,
 		getUsageTotalsStmt:                    q.getUsageTotalsStmt,
 		getUserAlertStmt:                      q.getUserAlertStmt,

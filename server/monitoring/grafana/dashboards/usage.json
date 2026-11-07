@@ -356,7 +356,7 @@
           "refId": "A"
         }
       ],
-      "description": "Segments \u00d7 the sms_price variable at the top of the dashboard.",
+      "description": "Segments × the sms_price variable at the top of the dashboard.",
       "options": {
         "colorMode": "none",
         "graphMode": "none"
@@ -669,6 +669,52 @@
       ]
     },
     {
+      "id": 20,
+      "title": "Signups by source (30d)",
+      "type": "bargauge",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(max by (source) (powhunter_usage_signups_by_source{window=\"30d\"}))",
+          "legendFormat": "{{source}}",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "description": "New users in the last 30 days by the utm_source tag on the link they first arrived by. \"direct\" means an untagged link; \"alert_share\" means a storm a subscriber shared; \"share\" means the share button after signup.",
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
       "id": 15,
       "title": "Active alerts by resort",
       "type": "bargauge",
@@ -676,7 +722,7 @@
         "h": 20,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 28
       },
       "datasource": {
         "type": "prometheus",

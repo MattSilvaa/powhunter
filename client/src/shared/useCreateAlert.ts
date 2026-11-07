@@ -13,6 +13,9 @@ type AlertData = {
 	resortsUuids: string[]
 	// The shared alert link the visitor arrived from, if any.
 	referralCode?: string
+	// The utm_source and utm_campaign of the link the visitor first arrived by.
+	source?: string
+	campaign?: string
 }
 
 const createAlert = (data: AlertData): Promise<void> =>

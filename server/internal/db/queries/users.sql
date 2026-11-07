@@ -34,10 +34,11 @@ RETURNING *;
 -- address redirect that person's SMS alerts to themselves; changing the
 -- number is done signed in, through UpdateUserPhone.
 --
--- The referral code is only recorded for a new account: someone who already
--- signed up was not brought in by the link they used this time.
-INSERT INTO users (email, phone, referral_code)
-VALUES ($1, $2, $3)
+-- The referral code and signup source are only recorded for a new account:
+-- someone who already signed up was not brought in by the link they used this
+-- time.
+INSERT INTO users (email, phone, referral_code, signup_source, signup_campaign)
+VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (email) DO UPDATE
     SET phone = COALESCE(users.phone, EXCLUDED.phone)
 RETURNING *;

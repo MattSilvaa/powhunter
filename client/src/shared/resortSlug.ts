@@ -29,13 +29,22 @@ export function resortUuidsFromLink(
 		.map((resort) => resort.uuid)
 }
 
-// The signup link that opens with these resorts already picked.
-export function signupLink(origin: string, resortNames: string[]): string {
-	if (resortNames.length === 0) {
-		return `${origin}/signup`
+// The signup link that opens with these resorts already picked, tagged with
+// the source the signup will be counted under, such as "share".
+export function signupLink(
+	origin: string,
+	resortNames: string[],
+	source?: string
+): string {
+	const params = []
+	if (resortNames.length > 0) {
+		params.push(`resort=${resortNames.map(resortSlug).join(',')}`)
+	}
+	if (source) {
+		params.push(`utm_source=${encodeURIComponent(source)}`)
 	}
 
-	const slugs = resortNames.map(resortSlug).join(',')
-
-	return `${origin}/signup?resort=${slugs}`
+	return params.length > 0
+		? `${origin}/signup?${params.join('&')}`
+		: `${origin}/signup`
 }
