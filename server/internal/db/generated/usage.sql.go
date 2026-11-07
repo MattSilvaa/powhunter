@@ -50,6 +50,47 @@ func (q *Queries) GetActiveAlertsByResort(ctx context.Context) ([]GetActiveAlert
 	return items, nil
 }
 
+const getSignupsBySource = `-- name: GetSignupsBySource :many
+SELECT COALESCE(signup_source,
+                CASE WHEN referral_code IS NOT NULL THEN 'alert_share' ELSE 'direct' END)::text AS source,
+       COUNT(*)::bigint AS signups
+FROM users
+WHERE created_at >= $1::timestamptz
+GROUP BY 1
+ORDER BY signups DESC, source
+`
+
+type GetSignupsBySourceRow struct {
+	Source  string `json:"source"`
+	Signups int64  `json:"signups"`
+}
+
+// New accounts since a cutoff, per signup source. Accounts with no tagged
+// source are counted as "direct", and those from a shared alert link as
+// "alert_share" unless the link was also tagged.
+func (q *Queries) GetSignupsBySource(ctx context.Context, since time.Time) ([]GetSignupsBySourceRow, error) {
+	rows, err := q.query(ctx, q.getSignupsBySourceStmt, getSignupsBySource, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetSignupsBySourceRow{}
+	for rows.Next() {
+		var i GetSignupsBySourceRow
+		if err := rows.Scan(&i.Source, &i.Signups); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUsageSince = `-- name: GetUsageSince :one
 WITH window_start AS (SELECT $1::timestamptz AS since)
 SELECT (SELECT COUNT(*)

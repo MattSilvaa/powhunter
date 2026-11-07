@@ -38,6 +38,10 @@ func (f *fakeUsage) GetUsageSince(_ context.Context, since time.Time) (dbgen.Get
 	}, nil
 }
 
+func (f *fakeUsage) GetSignupsBySource(context.Context, time.Time) ([]dbgen.GetSignupsBySourceRow, error) {
+	return []dbgen.GetSignupsBySourceRow{{Source: "reddit", Signups: 3}, {Source: "direct", Signups: 2}}, nil
+}
+
 func (f *fakeUsage) GetActiveAlertsByResort(context.Context) ([]dbgen.GetActiveAlertsByResortRow, error) {
 	return []dbgen.GetActiveAlertsByResortRow{{Name: "Alta", ActiveAlerts: 4}}, nil
 }
@@ -65,6 +69,14 @@ powhunter_usage_sms_segments{window="30d"} 5
 powhunter_usage_signups_referred{window="1d"} 1
 powhunter_usage_signups_referred{window="7d"} 1
 powhunter_usage_signups_referred{window="30d"} 1
+# HELP powhunter_usage_signups_by_source Users created in the trailing window, by the utm_source of the link they arrived by.
+# TYPE powhunter_usage_signups_by_source gauge
+powhunter_usage_signups_by_source{source="direct",window="1d"} 2
+powhunter_usage_signups_by_source{source="direct",window="7d"} 2
+powhunter_usage_signups_by_source{source="direct",window="30d"} 2
+powhunter_usage_signups_by_source{source="reddit",window="1d"} 3
+powhunter_usage_signups_by_source{source="reddit",window="7d"} 3
+powhunter_usage_signups_by_source{source="reddit",window="30d"} 3
 # HELP powhunter_usage_links_clicked Tracked links sent in the trailing window that were opened at least once.
 # TYPE powhunter_usage_links_clicked gauge
 powhunter_usage_links_clicked{window="1d"} 1
@@ -79,7 +91,7 @@ powhunter_usage_refresh_success 1
 `
 	require.NoError(t, testutil.CollectAndCompare(newCollector(q, &now), strings.NewReader(expected),
 		"powhunter_usage_subscribers", "powhunter_usage_sms_segments", "powhunter_usage_links_clicked",
-		"powhunter_usage_signups_referred",
+		"powhunter_usage_signups_referred", "powhunter_usage_signups_by_source",
 		"powhunter_usage_resort_active_alerts", "powhunter_usage_refresh_success"))
 
 	assert.Equal(t, []time.Time{

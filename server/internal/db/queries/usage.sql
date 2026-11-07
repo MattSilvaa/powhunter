@@ -48,3 +48,15 @@ FROM resorts r
          LEFT JOIN user_alerts a ON a.resort_uuid = r.uuid AND a.active
 GROUP BY r.name
 ORDER BY r.name;
+
+-- name: GetSignupsBySource :many
+-- New accounts since a cutoff, per signup source. Accounts with no tagged
+-- source are counted as "direct", and those from a shared alert link as
+-- "alert_share" unless the link was also tagged.
+SELECT COALESCE(signup_source,
+                CASE WHEN referral_code IS NOT NULL THEN 'alert_share' ELSE 'direct' END)::text AS source,
+       COUNT(*)::bigint AS signups
+FROM users
+WHERE created_at >= sqlc.arg(since)::timestamptz
+GROUP BY 1
+ORDER BY signups DESC, source;

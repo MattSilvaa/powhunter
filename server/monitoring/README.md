@@ -113,6 +113,11 @@ as `powhunter_usage_*`.
 - **Signups from shares** counts new users who arrived through an alert a
   subscriber shared from its alert page ("Text your crew"). Divided by
   signups, it shows how much of the growth sharing brings in.
+- **Signups by source** splits new users by the `utm_source` tag on the link
+  they first arrived by, such as `?utm_source=reddit&utm_campaign=cosnow`.
+  Untagged visits count as `direct`, shared storms as `alert_share`, and the
+  share button after signup as `share`. The campaign is stored on the user
+  (`users.signup_campaign`) but not graphed, to keep the series count small.
 - If **Usage refresh** reads 0, the API could not query the database and every
   other usage panel is missing data, not zero.
 

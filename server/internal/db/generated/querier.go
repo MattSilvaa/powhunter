@@ -47,6 +47,10 @@ type Querier interface {
 	// single round trip. Expired rows never match, so a stale cookie reads as
 	// signed out even before the reaper removes it.
 	GetSessionByTokenHash(ctx context.Context, tokenHash string) (GetSessionByTokenHashRow, error)
+	// New accounts since a cutoff, per signup source. Accounts with no tagged
+	// source are counted as "direct", and those from a shared alert link as
+	// "alert_share" unless the link was also tagged.
+	GetSignupsBySource(ctx context.Context, since time.Time) ([]GetSignupsBySourceRow, error)
 	// Activity since a cutoff. Called once per reporting window.
 	GetUsageSince(ctx context.Context, since time.Time) (GetUsageSinceRow, error)
 	// Point-in-time counts for the usage metrics. A subscriber is a user with at
@@ -85,8 +89,9 @@ type Querier interface {
 	// address redirect that person's SMS alerts to themselves; changing the
 	// number is done signed in, through UpdateUserPhone.
 	//
-	// The referral code is only recorded for a new account: someone who already
-	// signed up was not brought in by the link they used this time.
+	// The referral code and signup source are only recorded for a new account:
+	// someone who already signed up was not brought in by the link they used this
+	// time.
 	UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error)
 }
 

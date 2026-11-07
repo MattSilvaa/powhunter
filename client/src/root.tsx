@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import '@fontsource-variable/inter'
 import appStylesHref from './app.css?url'
 import {
@@ -16,6 +16,7 @@ import Footer from './components/footer'
 import Header from './components/header'
 import theme from './theme'
 import { pageMeta } from './shared/seo.ts'
+import { captureAttribution } from './shared/attribution.ts'
 
 const queryClient = new QueryClient()
 
@@ -25,6 +26,12 @@ export function meta() {
 }
 
 export default function Root() {
+	// Runs once, on the page the visitor lands on, before any navigation
+	// drops the link's tags.
+	useEffect(() => {
+		captureAttribution(window.location.search)
+	}, [])
+
 	return (
 		<Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
 			<Header />

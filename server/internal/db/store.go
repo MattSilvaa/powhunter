@@ -33,14 +33,14 @@ type StoreService interface {
 	RecordAlertSent(ctx context.Context, alert AlertToSend, sent SentAlert) error
 
 	// CreateUserWithAlerts creates a new user with alert preferences.
-	// referralCode is the shared alert link that brought them in, or empty.
+	// attribution says what brought them in; any part of it may be empty.
 	CreateUserWithAlerts(
 		ctx context.Context,
 		email, phone string,
 		minSnowAmount float64,
 		notificationDays int32,
 		resortUUIDs []string,
-		referralCode string,
+		attribution Attribution,
 	) error
 
 	// GetUserAlertsByEmail returns all alerts for a user by email
@@ -132,8 +132,19 @@ func (s *Store) ListAllResorts(ctx context.Context) ([]dbgen.Resort, error) {
 	return resorts, nil
 }
 
+// Attribution is what brought a new account in. Each field is empty when
+// unknown, and none is recorded for an account that already exists.
+type Attribution struct {
+	// ReferralCode is the shared alert link the visitor arrived from.
+	ReferralCode string
+	// Source and Campaign come from the utm_source and utm_campaign tags on
+	// the link the visitor first arrived by, such as "reddit" and "cosnow".
+	Source   string
+	Campaign string
+}
+
 func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
-	minSnowAmount float64, notificationDays int32, resortUUIDs []string, referralCode string) error {
+	minSnowAmount float64, notificationDays int32, resortUUIDs []string, attribution Attribution) error {
 	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
 		phoneParam := sql.NullString{
 			String: phone,
@@ -144,9 +155,11 @@ func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
 		// two concurrent signups with the same email both saw no row, both
 		// inserted, and one failed on the unique constraint as a 500.
 		user, err := q.UpsertUser(ctx, dbgen.UpsertUserParams{
-			Email:        email,
-			Phone:        phoneParam,
-			ReferralCode: sql.NullString{String: referralCode, Valid: referralCode != ""},
+			Email:          email,
+			Phone:          phoneParam,
+			ReferralCode:   nullString(attribution.ReferralCode),
+			SignupSource:   nullString(attribution.Source),
+			SignupCampaign: nullString(attribution.Campaign),
 		})
 		if err != nil {
 			return fmt.Errorf("error creating user: %w", err)
@@ -470,4 +483,9 @@ func (s *Store) UpdateUserPhone(ctx context.Context, userUUID uuid.UUID, phone s
 	}
 
 	return nil
+}
+
+// nullString stores an empty string as NULL.
+func nullString(s string) sql.NullString {
+	return sql.NullString{String: s, Valid: s != ""}
 }

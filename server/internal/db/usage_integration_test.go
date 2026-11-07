@@ -32,7 +32,7 @@ func TestUsageQueries(t *testing.T) {
 
 	// A friend who signed up from the shared alert link.
 	require.NoError(t, store.CreateUserWithAlerts(ctx, "friend@example.com", "", 6, 3,
-		[]string{alta.Uuid.String()}, "Ab12Cd34"))
+		[]string{alta.Uuid.String()}, db.Attribution{ReferralCode: "Ab12Cd34"}))
 
 	// An old signup with no phone and no alerts counts as a user only.
 	lapsed := testutil.SeedTestUser(t, queries, "lapsed@example.com", "")
@@ -84,4 +84,16 @@ func TestUsageQueries(t *testing.T) {
 		{Name: "Alta", ActiveAlerts: 2},
 		{Name: "Unfollowed", ActiveAlerts: 0},
 	}, byResort)
+
+	// A signup from a tagged Reddit post, counted under its source.
+	require.NoError(t, store.CreateUserWithAlerts(ctx, "redditor@example.com", "", 6, 3,
+		[]string{alta.Uuid.String()}, db.Attribution{Source: "reddit", Campaign: "cosnow"}))
+
+	bySource, err := queries.GetSignupsBySource(ctx, time.Now().Add(-30*24*time.Hour))
+	require.NoError(t, err)
+	assert.Equal(t, []dbgen.GetSignupsBySourceRow{
+		{Source: "alert_share", Signups: 1},
+		{Source: "direct", Signups: 1},
+		{Source: "reddit", Signups: 1},
+	}, bySource, "untagged signups count as direct, shared alerts as alert_share")
 }

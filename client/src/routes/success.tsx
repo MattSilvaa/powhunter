@@ -18,7 +18,7 @@ export function meta() {
 export default function SuccessPage() {
 	const state = useLocation().state as SuccessState
 	const resortNames = state?.resortNames ?? []
-	const shareUrl = signupLink(window.location.origin, resortNames)
+	const shareUrl = signupLink(window.location.origin, resortNames, 'share')
 	const shareText =
 		resortNames.length === 1
 			? `Get a text when ${resortNames[0]} gets fresh snow:`

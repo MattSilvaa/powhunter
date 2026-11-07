@@ -16,6 +16,7 @@ import PageHeader from '../components/pageHeader.tsx'
 import ResortSelect from '../components/resortSelect.tsx'
 import AlertSettingsFields from '../components/alertSettingsFields.tsx'
 import { resortUuidsFromLink } from '../shared/resortSlug.ts'
+import { readAttribution } from '../shared/attribution.ts'
 import { pageMeta } from '../shared/seo.ts'
 
 export function meta() {
@@ -159,6 +160,7 @@ export default function SignUpPage() {
 				notificationDays: formData.notificationDays,
 				resortsUuids,
 				...(referralCode && { referralCode }),
+				...readAttribution(),
 			},
 			{
 				onSuccess: () => {

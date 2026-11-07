@@ -18,7 +18,7 @@ INSERT INTO users (
 ) VALUES (
   $1, $2
 )
-RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code
+RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code, signup_source, signup_campaign
 `
 
 type CreateUserParams struct {
@@ -39,6 +39,8 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.EmailVerifiedAt,
 		&i.UpdatedAt,
 		&i.ReferralCode,
+		&i.SignupSource,
+		&i.SignupCampaign,
 	)
 	return i, err
 }
@@ -48,7 +50,7 @@ INSERT INTO users (email)
 VALUES ($1)
 ON CONFLICT (email) DO UPDATE
     SET updated_at = NOW()
-RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code
+RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code, signup_source, signup_campaign
 `
 
 // Requesting a login link for an address that has no account creates one, so
@@ -67,12 +69,14 @@ func (q *Queries) GetOrCreateUserByEmail(ctx context.Context, email string) (Use
 		&i.EmailVerifiedAt,
 		&i.UpdatedAt,
 		&i.ReferralCode,
+		&i.SignupSource,
+		&i.SignupCampaign,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code FROM users
+SELECT id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code, signup_source, signup_campaign FROM users
 WHERE email = $1 LIMIT 1
 `
 
@@ -89,12 +93,14 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.EmailVerifiedAt,
 		&i.UpdatedAt,
 		&i.ReferralCode,
+		&i.SignupSource,
+		&i.SignupCampaign,
 	)
 	return i, err
 }
 
 const getUserByUUID = `-- name: GetUserByUUID :one
-SELECT id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code FROM users
+SELECT id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code, signup_source, signup_campaign FROM users
 WHERE uuid = $1 LIMIT 1
 `
 
@@ -111,6 +117,8 @@ func (q *Queries) GetUserByUUID(ctx context.Context, argUuid uuid.UUID) (User, e
 		&i.EmailVerifiedAt,
 		&i.UpdatedAt,
 		&i.ReferralCode,
+		&i.SignupSource,
+		&i.SignupCampaign,
 	)
 	return i, err
 }
@@ -120,7 +128,7 @@ UPDATE users
 SET phone      = $2,
     updated_at = NOW()
 WHERE uuid = $1
-RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code
+RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code, signup_source, signup_campaign
 `
 
 type UpdateUserPhoneParams struct {
@@ -141,22 +149,26 @@ func (q *Queries) UpdateUserPhone(ctx context.Context, arg UpdateUserPhoneParams
 		&i.EmailVerifiedAt,
 		&i.UpdatedAt,
 		&i.ReferralCode,
+		&i.SignupSource,
+		&i.SignupCampaign,
 	)
 	return i, err
 }
 
 const upsertUser = `-- name: UpsertUser :one
-INSERT INTO users (email, phone, referral_code)
-VALUES ($1, $2, $3)
+INSERT INTO users (email, phone, referral_code, signup_source, signup_campaign)
+VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (email) DO UPDATE
     SET phone = COALESCE(users.phone, EXCLUDED.phone)
-RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code
+RETURNING id, uuid, email, phone, created_at, password_hash, email_verified_at, updated_at, referral_code, signup_source, signup_campaign
 `
 
 type UpsertUserParams struct {
-	Email        string         `json:"email"`
-	Phone        sql.NullString `json:"phone"`
-	ReferralCode sql.NullString `json:"referral_code"`
+	Email          string         `json:"email"`
+	Phone          sql.NullString `json:"phone"`
+	ReferralCode   sql.NullString `json:"referral_code"`
+	SignupSource   sql.NullString `json:"signup_source"`
+	SignupCampaign sql.NullString `json:"signup_campaign"`
 }
 
 // Get-or-create in a single statement. A read-then-write race meant two
@@ -168,10 +180,17 @@ type UpsertUserParams struct {
 // address redirect that person's SMS alerts to themselves; changing the
 // number is done signed in, through UpdateUserPhone.
 //
-// The referral code is only recorded for a new account: someone who already
-// signed up was not brought in by the link they used this time.
+// The referral code and signup source are only recorded for a new account:
+// someone who already signed up was not brought in by the link they used this
+// time.
 func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error) {
-	row := q.queryRow(ctx, q.upsertUserStmt, upsertUser, arg.Email, arg.Phone, arg.ReferralCode)
+	row := q.queryRow(ctx, q.upsertUserStmt, upsertUser,
+		arg.Email,
+		arg.Phone,
+		arg.ReferralCode,
+		arg.SignupSource,
+		arg.SignupCampaign,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -183,6 +202,8 @@ func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, e
 		&i.EmailVerifiedAt,
 		&i.UpdatedAt,
 		&i.ReferralCode,
+		&i.SignupSource,
+		&i.SignupCampaign,
 	)
 	return i, err
 }

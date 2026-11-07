@@ -19,6 +19,10 @@ const (
 	// scrape open.
 	usageQueryTimeout = 5 * time.Second
 	hoursPerDay       = 24
+	// maxSourceLabels caps how many signup sources get their own series. The
+	// source comes from a link anyone can type, so the rest are summed into
+	// "other" rather than letting junk tags grow the metric without bound.
+	maxSourceLabels = 20
 )
 
 // usageWindow is a trailing period activity is reported over.
@@ -41,6 +45,7 @@ type UsageQuerier interface {
 	GetUsageTotals(ctx context.Context) (dbgen.GetUsageTotalsRow, error)
 	GetUsageSince(ctx context.Context, since time.Time) (dbgen.GetUsageSinceRow, error)
 	GetActiveAlertsByResort(ctx context.Context) ([]dbgen.GetActiveAlertsByResortRow, error)
+	GetSignupsBySource(ctx context.Context, since time.Time) ([]dbgen.GetSignupsBySourceRow, error)
 }
 
 // UsageCollector publishes product usage read from the database: who is
@@ -63,6 +68,7 @@ type UsageCollector struct {
 	resortAlerts   *prometheus.Desc
 	signups        *prometheus.Desc
 	referred       *prometheus.Desc
+	bySource       *prometheus.Desc
 	activeUsers    *prometheus.Desc
 	alertsSent     *prometheus.Desc
 	usersAlerted   *prometheus.Desc
@@ -96,6 +102,9 @@ func NewUsageCollector(querier UsageQuerier, logger *slog.Logger, now func() tim
 		signups:        desc("signups", "Users created in the trailing window.", "window"),
 		referred: desc("signups_referred",
 			"Users created in the trailing window from a shared alert link.", "window"),
+		bySource: desc("signups_by_source",
+			"Users created in the trailing window, by the utm_source of the link they arrived by.",
+			"window", "source"),
 		activeUsers:  desc("active_users", "Users who used the web app in the trailing window.", "window"),
 		alertsSent:   desc("alerts_sent", "Alerts delivered in the trailing window.", "window"),
 		usersAlerted: desc("users_alerted", "Distinct users alerted in the trailing window.", "window"),
@@ -111,7 +120,7 @@ func NewUsageCollector(querier UsageQuerier, logger *slog.Logger, now func() tim
 func (c *UsageCollector) Describe(ch chan<- *prometheus.Desc) {
 	for _, d := range []*prometheus.Desc{
 		c.users, c.usersWithPhone, c.subscribers, c.activeAlerts, c.resortAlerts,
-		c.signups, c.referred, c.activeUsers, c.alertsSent, c.usersAlerted, c.smsSegments,
+		c.signups, c.referred, c.bySource, c.activeUsers, c.alertsSent, c.usersAlerted, c.smsSegments,
 		c.linksSent, c.linksClicked, c.refreshSuccess,
 	} {
 		ch <- d
@@ -181,6 +190,15 @@ func (c *UsageCollector) read(ctx context.Context) ([]prometheus.Metric, error) 
 			gauge(c.linksSent, since.LinksSent, window.label),
 			gauge(c.linksClicked, since.LinksClicked, window.label),
 		)
+
+		sources, sourcesErr := c.querier.GetSignupsBySource(ctx, c.now().Add(-window.length))
+		if sourcesErr != nil {
+			return nil, sourcesErr //nolint:wrapcheck // logged by the caller with context
+		}
+
+		for source, count := range capSources(sources) {
+			metrics = append(metrics, gauge(c.bySource, count, window.label, source))
+		}
 	}
 
 	resorts, err := c.querier.GetActiveAlertsByResort(ctx)
@@ -193,4 +211,21 @@ func (c *UsageCollector) read(ctx context.Context) ([]prometheus.Metric, error) 
 	}
 
 	return append(metrics, gauge(c.refreshSuccess, 1)), nil
+}
+
+// capSources keeps the largest sources, which the query returns first, and
+// sums the rest into "other".
+func capSources(rows []dbgen.GetSignupsBySourceRow) map[string]int64 {
+	counts := make(map[string]int64, min(len(rows), maxSourceLabels+1))
+
+	for i, row := range rows {
+		source := row.Source
+		if i >= maxSourceLabels {
+			source = "other"
+		}
+
+		counts[source] += row.Signups
+	}
+
+	return counts
 }

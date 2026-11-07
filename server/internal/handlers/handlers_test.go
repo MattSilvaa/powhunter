@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/MattSilvaa/powhunter/internal/db"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -70,7 +71,28 @@ func TestCreateAlert(t *testing.T) {
 			setupMock: func(m *mocks.MockStoreService) {
 				m.EXPECT().
 					CreateUserWithAlerts(gomock.Any(), "friend@example.com", "+11234567890", 5.0, int32(3),
-						[]string{testResortUUID1}, "Ab12Cd34").
+						[]string{testResortUUID1}, db.Attribution{ReferralCode: "Ab12Cd34"}).
+					Return(nil)
+			},
+			expectedStatus: http.StatusCreated,
+			expectedBody:   map[string]string{"status": "success", "message": "Alert created successfully"},
+		},
+		{
+			name:   "Signup records the link's marketing tags, dropping malformed ones",
+			method: http.MethodPost,
+			requestBody: CreateAlertRequest{
+				Email:            "friend@example.com",
+				Phone:            "1234567890",
+				NotificationDays: 3,
+				MinSnowAmount:    5.0,
+				ResortsUuids:     []string{testResortUUID1},
+				Source:           "Reddit",
+				Campaign:         "<script>",
+			},
+			setupMock: func(m *mocks.MockStoreService) {
+				m.EXPECT().
+					CreateUserWithAlerts(gomock.Any(), "friend@example.com", "+11234567890", 5.0, int32(3),
+						[]string{testResortUUID1}, db.Attribution{Source: "reddit"}).
 					Return(nil)
 			},
 			expectedStatus: http.StatusCreated,
@@ -90,7 +112,7 @@ func TestCreateAlert(t *testing.T) {
 			setupMock: func(m *mocks.MockStoreService) {
 				m.EXPECT().
 					CreateUserWithAlerts(gomock.Any(), "friend@example.com", "+11234567890", 5.0, int32(3),
-						[]string{testResortUUID1}, "").
+						[]string{testResortUUID1}, db.Attribution{}).
 					Return(nil)
 			},
 			expectedStatus: http.StatusCreated,
@@ -115,7 +137,7 @@ func TestCreateAlert(t *testing.T) {
 						5.0,
 						int32(3),
 						[]string{testResortUUID1, testResortUUID2},
-						"",
+						db.Attribution{},
 					).
 					Return(nil)
 			},
@@ -244,7 +266,7 @@ func TestCreateAlert(t *testing.T) {
 						5.0,
 						int32(3),
 						[]string{testResortUUID1},
-						"",
+						db.Attribution{},
 					).
 					Return(pqErr)
 			},
@@ -273,7 +295,7 @@ func TestCreateAlert(t *testing.T) {
 						5.0,
 						int32(3),
 						[]string{testResortUUID1},
-						"",
+						db.Attribution{},
 					).
 					Return(errors.New("database error"))
 			},

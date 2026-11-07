@@ -36,6 +36,9 @@ describe('signupLink', () => {
 		expect(signupLink('https://powhunter.app', ['Alta', 'Mt. Bachelor'])).toBe(
 			'https://powhunter.app/signup?resort=alta,mt-bachelor'
 		)
+		expect(signupLink('https://powhunter.app', ['Alta'], 'share')).toBe(
+			'https://powhunter.app/signup?resort=alta&utm_source=share'
+		)
 	})
 
 	test('is the plain signup page without resorts', () => {

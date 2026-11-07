@@ -144,3 +144,25 @@ func Text(field, raw string, maxLength int) (string, error) {
 
 	return trimmed, nil
 }
+
+// maxTagLength bounds a marketing tag such as utm_source.
+const maxTagLength = 40
+
+// Tag normalizes a marketing link tag such as utm_source=Reddit to "reddit".
+// It returns "" for anything that is not a short run of letters, digits, dots,
+// dashes and underscores: a tag is only a label for counting signups, so an
+// odd one is dropped rather than rejected.
+func Tag(raw string) string {
+	tag := strings.ToLower(strings.TrimSpace(raw))
+	if tag == "" || len(tag) > maxTagLength {
+		return ""
+	}
+
+	for _, r := range tag {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '.' && r != '-' && r != '_' {
+			return ""
+		}
+	}
+
+	return tag
+}

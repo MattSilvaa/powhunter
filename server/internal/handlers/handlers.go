@@ -220,6 +220,10 @@ type CreateAlertRequest struct {
 	// ReferralCode is the code of the shared alert link the visitor arrived
 	// from. Optional, and ignored unless it has the shape of a link code.
 	ReferralCode string `json:"referralCode,omitempty"`
+	// Source and Campaign are the utm_source and utm_campaign tags on the link
+	// the visitor first arrived by. Optional; malformed values are ignored.
+	Source   string `json:"source,omitempty"`
+	Campaign string `json:"campaign,omitempty"`
 }
 
 // The three handlers below take the account from the session established by
@@ -328,11 +332,14 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// A malformed code is dropped rather than rejected: attribution is a
-	// bonus, and a signup must never fail over it.
-	referralCode := ""
+	// Malformed attribution is dropped rather than rejected: it is a bonus,
+	// and a signup must never fail over it.
+	attribution := db.Attribution{
+		Source:   validate.Tag(req.Source),
+		Campaign: validate.Tag(req.Campaign),
+	}
 	if notify.IsLinkCode(req.ReferralCode) {
-		referralCode = req.ReferralCode
+		attribution.ReferralCode = req.ReferralCode
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), handlerTimeout)
@@ -345,7 +352,7 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		req.MinSnowAmount,
 		int32(req.NotificationDays),
 		req.ResortsUuids,
-		referralCode,
+		attribution,
 	)
 	if err != nil {
 		log.Printf("Failed to create alert: %v", err)
