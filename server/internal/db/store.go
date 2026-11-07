@@ -32,8 +32,13 @@ type StoreService interface {
 	// tracked link it carried.
 	RecordAlertSent(ctx context.Context, alert AlertToSend, sent SentAlert) error
 
-	// CreateUserWithAlerts creates a new user with alert preferences.
-	// attribution says what brought them in; any part of it may be empty.
+	// CreateUserWithAlerts is the anonymous signup: it creates the account if
+	// needed and adds alert preferences to it. attribution says what brought
+	// them in; any part of it may be empty.
+	//
+	// It reports whether the address already belonged to a confirmed account.
+	// Such an account is left untouched, since the caller has not proved they
+	// own it; they have to sign in to change it.
 	CreateUserWithAlerts(
 		ctx context.Context,
 		email, phone string,
@@ -41,16 +46,7 @@ type StoreService interface {
 		notificationDays int32,
 		resortUUIDs []string,
 		attribution Attribution,
-	) error
-
-	// GetUserAlertsByEmail returns all alerts for a user by email
-	GetUserAlertsByEmail(ctx context.Context, email string) ([]dbgen.GetUserAlertsByEmailRow, error)
-
-	// DeleteUserAlert deletes a specific alert for a user
-	DeleteUserAlert(ctx context.Context, email, resortUuid string) error
-
-	// DeleteAllUserAlerts deletes all alerts for a user
-	DeleteAllUserAlerts(ctx context.Context, email string) error
+	) (alreadyConfirmed bool, err error)
 
 	// GetUserAlerts returns all alerts belonging to the given user.
 	GetUserAlerts(ctx context.Context, userUUID uuid.UUID) ([]dbgen.GetUserAlertsByUserUUIDRow, error)
@@ -144,8 +140,10 @@ type Attribution struct {
 }
 
 func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
-	minSnowAmount float64, notificationDays int32, resortUUIDs []string, attribution Attribution) error {
-	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
+	minSnowAmount float64, notificationDays int32, resortUUIDs []string, attribution Attribution) (bool, error) {
+	alreadyConfirmed := false
+
+	err := s.ExecTx(ctx, func(q *dbgen.Queries) error {
 		phoneParam := sql.NullString{
 			String: phone,
 			Valid:  phone != "",
@@ -165,8 +163,20 @@ func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
 			return fmt.Errorf("error creating user: %w", err)
 		}
 
+		// A confirmed account belongs to whoever confirmed it. An anonymous
+		// caller who only knows the address must not add alerts to it.
+		if user.EmailVerifiedAt.Valid {
+			alreadyConfirmed = true
+			return nil
+		}
+
 		return createAlerts(ctx, q, user.Uuid, minSnowAmount, notificationDays, resortUUIDs)
 	})
+	if err != nil {
+		return false, err
+	}
+
+	return alreadyConfirmed, nil
 }
 
 // CreateAlertsForUser adds alerts to an existing account, all or nothing.
@@ -361,41 +371,6 @@ func (s *Store) RecordAlertSent(ctx context.Context, alert AlertToSend, sent Sen
 
 		return nil
 	})
-}
-
-// GetUserAlertsByEmail returns all alerts for a user by email.
-func (s *Store) GetUserAlertsByEmail(ctx context.Context, email string) ([]dbgen.GetUserAlertsByEmailRow, error) {
-	alerts, err := s.queries.GetUserAlertsByEmail(ctx, email)
-	if err != nil {
-		return nil, fmt.Errorf("error getting user alerts by email: %w", err)
-	}
-	return alerts, nil
-}
-
-// DeleteUserAlert deletes a specific alert for a user.
-func (s *Store) DeleteUserAlert(ctx context.Context, email, resortUuid string) error {
-	resortUUID, err := uuid.Parse(resortUuid)
-	if err != nil {
-		return fmt.Errorf("error parsing resort UUID: %w", err)
-	}
-
-	err = s.queries.DeleteUserAlert(ctx, dbgen.DeleteUserAlertParams{
-		Email:      email,
-		ResortUuid: uuid.NullUUID{UUID: resortUUID, Valid: true},
-	})
-	if err != nil {
-		return fmt.Errorf("error deleting user alert: %w", err)
-	}
-	return nil
-}
-
-// DeleteAllUserAlerts deletes all alerts for a user.
-func (s *Store) DeleteAllUserAlerts(ctx context.Context, email string) error {
-	err := s.queries.DeleteAllUserAlerts(ctx, email)
-	if err != nil {
-		return fmt.Errorf("error deleting all user alerts: %w", err)
-	}
-	return nil
 }
 
 // Queries exposes the generated query set for packages that need it directly.

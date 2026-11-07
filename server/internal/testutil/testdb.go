@@ -173,8 +173,28 @@ func SeedTestResort(t *testing.T, queries *dbgen.Queries, name string, lat, lon 
 	return resort
 }
 
-// SeedTestUser creates a test user in the database
+// SeedTestUser creates a test user whose email is confirmed, as every account
+// that receives alerts must be.
 func SeedTestUser(t *testing.T, queries *dbgen.Queries, email, phone string) dbgen.User {
+	t.Helper()
+
+	user := SeedUnconfirmedTestUser(t, queries, email, phone)
+
+	if err := queries.MarkEmailVerified(context.Background(), user.Uuid); err != nil {
+		t.Fatalf("Failed to confirm test user: %v", err)
+	}
+
+	confirmed, err := queries.GetUserByUUID(context.Background(), user.Uuid)
+	if err != nil {
+		t.Fatalf("Failed to reload test user: %v", err)
+	}
+
+	return confirmed
+}
+
+// SeedUnconfirmedTestUser creates a test user who has not clicked their
+// confirmation link.
+func SeedUnconfirmedTestUser(t *testing.T, queries *dbgen.Queries, email, phone string) dbgen.User {
 	t.Helper()
 
 	user, err := queries.CreateUser(context.Background(), dbgen.CreateUserParams{

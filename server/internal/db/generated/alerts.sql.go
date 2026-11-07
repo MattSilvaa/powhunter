@@ -44,16 +44,6 @@ func (q *Queries) CreateUserAlert(ctx context.Context, arg CreateUserAlertParams
 	return i, err
 }
 
-const deleteAllUserAlerts = `-- name: DeleteAllUserAlerts :exec
-DELETE FROM user_alerts
-WHERE user_uuid = (SELECT uuid FROM users WHERE email = $1)
-`
-
-func (q *Queries) DeleteAllUserAlerts(ctx context.Context, email string) error {
-	_, err := q.exec(ctx, q.deleteAllUserAlertsStmt, deleteAllUserAlerts, email)
-	return err
-}
-
 const deleteAllUserAlertsByUserUUID = `-- name: DeleteAllUserAlertsByUserUUID :exec
 DELETE FROM user_alerts
 WHERE user_uuid = $1
@@ -61,22 +51,6 @@ WHERE user_uuid = $1
 
 func (q *Queries) DeleteAllUserAlertsByUserUUID(ctx context.Context, userUuid uuid.NullUUID) error {
 	_, err := q.exec(ctx, q.deleteAllUserAlertsByUserUUIDStmt, deleteAllUserAlertsByUserUUID, userUuid)
-	return err
-}
-
-const deleteUserAlert = `-- name: DeleteUserAlert :exec
-DELETE FROM user_alerts
-WHERE user_uuid = (SELECT uuid FROM users WHERE email = $1)
-  AND resort_uuid = $2
-`
-
-type DeleteUserAlertParams struct {
-	Email      string        `json:"email"`
-	ResortUuid uuid.NullUUID `json:"resort_uuid"`
-}
-
-func (q *Queries) DeleteUserAlert(ctx context.Context, arg DeleteUserAlertParams) error {
-	_, err := q.exec(ctx, q.deleteUserAlertStmt, deleteUserAlert, arg.Email, arg.ResortUuid)
 	return err
 }
 
@@ -100,9 +74,12 @@ const getResortAlerts = `-- name: GetResortAlerts :many
 SELECT id, user_uuid, resort_uuid, min_snow_amount, notification_days, active, created_at
 FROM user_alerts
 WHERE resort_uuid = $1
-  and active = true
+  AND active = true
+  AND user_uuid IN (SELECT uuid FROM users WHERE email_verified_at IS NOT NULL)
 `
 
+// Only accounts with a confirmed email are alerted. Signup is anonymous, so an
+// unconfirmed account may carry a phone number its owner never agreed to text.
 func (q *Queries) GetResortAlerts(ctx context.Context, resortUuid uuid.NullUUID) ([]UserAlert, error) {
 	rows, err := q.query(ctx, q.getResortAlertsStmt, getResortAlerts, resortUuid)
 	if err != nil {
@@ -159,64 +136,6 @@ func (q *Queries) GetUserAlert(ctx context.Context, arg GetUserAlertParams) (Use
 		&i.CreatedAt,
 	)
 	return i, err
-}
-
-const getUserAlertsByEmail = `-- name: GetUserAlertsByEmail :many
-SELECT ua.id,
-       ua.user_uuid,
-       ua.resort_uuid,
-       r.name as resort_name,
-       ua.min_snow_amount,
-       ua.notification_days,
-       ua.active,
-       ua.created_at
-FROM user_alerts ua
-         JOIN users u ON ua.user_uuid = u.uuid
-         JOIN resorts r ON ua.resort_uuid = r.uuid
-WHERE u.email = $1 AND ua.active = true
-`
-
-type GetUserAlertsByEmailRow struct {
-	ID               int32         `json:"id"`
-	UserUuid         uuid.NullUUID `json:"user_uuid"`
-	ResortUuid       uuid.NullUUID `json:"resort_uuid"`
-	ResortName       string        `json:"resort_name"`
-	MinSnowAmount    float64       `json:"min_snow_amount"`
-	NotificationDays int32         `json:"notification_days"`
-	Active           sql.NullBool  `json:"active"`
-	CreatedAt        sql.NullTime  `json:"created_at"`
-}
-
-func (q *Queries) GetUserAlertsByEmail(ctx context.Context, email string) ([]GetUserAlertsByEmailRow, error) {
-	rows, err := q.query(ctx, q.getUserAlertsByEmailStmt, getUserAlertsByEmail, email)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []GetUserAlertsByEmailRow{}
-	for rows.Next() {
-		var i GetUserAlertsByEmailRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserUuid,
-			&i.ResortUuid,
-			&i.ResortName,
-			&i.MinSnowAmount,
-			&i.NotificationDays,
-			&i.Active,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const getUserAlertsByUserUUID = `-- name: GetUserAlertsByUserUUID :many

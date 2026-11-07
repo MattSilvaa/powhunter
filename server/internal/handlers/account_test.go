@@ -226,17 +226,17 @@ func TestUpdateProfile(t *testing.T) {
 
 	t.Run("stores the normalized number and returns the account", func(t *testing.T) {
 		handler, store := testAccountHandler(t)
-		store.EXPECT().UpdateUserPhone(gomock.Any(), signedIn.UUID, "+11234567890").Return(nil)
+		store.EXPECT().UpdateUserPhone(gomock.Any(), signedIn.UUID, "+13035550123").Return(nil)
 
 		recorder := httptest.NewRecorder()
 		handler.UpdateProfile(recorder, requestAsUserWithBody(t, http.MethodPatch,
-			"/api/user/profile", strings.NewReader(`{"phone":"(123) 456-7890"}`), signedIn))
+			"/api/user/profile", strings.NewReader(`{"phone":"(303) 555-0123"}`), signedIn))
 
 		require.Equal(t, http.StatusOK, recorder.Code)
 
 		var body userResponse
 		require.NoError(t, json.NewDecoder(recorder.Body).Decode(&body))
-		assert.Equal(t, userResponse{Email: "rider@example.com", Phone: "+11234567890", EmailVerified: true}, body)
+		assert.Equal(t, userResponse{Email: "rider@example.com", Phone: "+13035550123", EmailVerified: true}, body)
 	})
 
 	t.Run("rejects an invalid number", func(t *testing.T) {
@@ -252,11 +252,11 @@ func TestUpdateProfile(t *testing.T) {
 
 	t.Run("reports a store failure", func(t *testing.T) {
 		handler, store := testAccountHandler(t)
-		store.EXPECT().UpdateUserPhone(gomock.Any(), signedIn.UUID, "+11234567890").Return(errors.New("database error"))
+		store.EXPECT().UpdateUserPhone(gomock.Any(), signedIn.UUID, "+13035550123").Return(errors.New("database error"))
 
 		recorder := httptest.NewRecorder()
 		handler.UpdateProfile(recorder, requestAsUserWithBody(t, http.MethodPatch,
-			"/api/user/profile", strings.NewReader(`{"phone":"1234567890"}`), signedIn))
+			"/api/user/profile", strings.NewReader(`{"phone":"3035550123"}`), signedIn))
 
 		assert.Equal(t, http.StatusInternalServerError, recorder.Code)
 	})

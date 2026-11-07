@@ -87,7 +87,10 @@ func postJSON(t *testing.T, path string, body any) *http.Request {
 	encoded, err := json.Marshal(body)
 	require.NoError(t, err)
 
-	return httptest.NewRequest(http.MethodPost, path, bytes.NewReader(encoded))
+	req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(encoded))
+	req.Header.Set("Content-Type", "application/json")
+
+	return req
 }
 
 func TestRequestLinkEmailsASignInLink(t *testing.T) {
@@ -191,6 +194,7 @@ func requestAsUserWithBody(t *testing.T, method, target string, body io.Reader, 
 	t.Helper()
 
 	req := httptest.NewRequest(method, target, body)
+	req.Header.Set("Content-Type", "application/json")
 
 	var authenticated *http.Request
 

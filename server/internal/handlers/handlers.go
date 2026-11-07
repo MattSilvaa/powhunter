@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
+	"mime"
 	"net/http"
 	"time"
 
@@ -43,6 +45,9 @@ type ResortHandler struct {
 
 type AlertHandler struct {
 	store db.StoreService
+	// links emails the confirmation link a signup must click before any alert
+	// is texted.
+	links linkMailer
 }
 
 type Handlers struct {
@@ -62,14 +67,41 @@ var METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
 // connection. The pool is small, so a long timeout here starves the API.
 const handlerTimeout = 10 * time.Second
 
+// errNotJSON reports a body sent with a content type other than JSON.
+var errNotJSON = errors.New("request body must be application/json")
+
+// errTrailingData reports a body with more after its JSON value.
+var errTrailingData = errors.New("unexpected data after JSON body")
+
 // decodeJSON reads a JSON body, rejecting unknown fields so a typo in a client
 // payload is reported rather than silently ignored.
+//
+// It insists on an application/json content type. A browser sends that type
+// cross-origin only after a CORS preflight, which the allowlist then decides.
+// A text/plain body skips the preflight, so accepting one let any site post
+// JSON-shaped forms with the visitor's session cookie. Trailing data is refused
+// for the same reason: a form encodes "name=value", and ignoring what followed
+// the JSON value is what made such a body decode.
 func decodeJSON(r *http.Request, target any) error {
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || mediaType != "application/json" {
+		return errNotJSON
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 
-	if err := decoder.Decode(target); err != nil {
-		return fmt.Errorf("decoding request body: %w", err)
+	if decodeErr := decoder.Decode(target); decodeErr != nil {
+		return fmt.Errorf("decoding request body: %w", decodeErr)
+	}
+
+	if extraErr := decoder.Decode(&struct{}{}); !errors.Is(extraErr, io.EOF) {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(extraErr, &maxBytesErr) {
+			return fmt.Errorf("decoding request body: %w", extraErr)
+		}
+
+		return errTrailingData
 	}
 
 	return nil
@@ -81,6 +113,11 @@ func sendDecodeError(w http.ResponseWriter, err error) {
 	var maxBytesErr *http.MaxBytesError
 	if errors.As(err, &maxBytesErr) {
 		sendErrorResponse(w, "REQUEST_TOO_LARGE", "Request body is too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+
+	if errors.Is(err, errNotJSON) {
+		sendErrorResponse(w, "UNSUPPORTED_MEDIA_TYPE", "Request body must be JSON", http.StatusUnsupportedMediaType)
 		return
 	}
 
@@ -131,11 +168,6 @@ func NewHandlers(cfg config.Config, logger *slog.Logger) (*Handlers, error) {
 		return nil, err
 	}
 
-	alertHandler, err := NewAlertHandler(store)
-	if err != nil {
-		return nil, err
-	}
-
 	// Without an API key mail is logged rather than sent, so local development
 	// works without a Resend account. config.Load makes the key mandatory in
 	// production, where that fallback would strand every user at the login screen.
@@ -150,6 +182,11 @@ func NewHandlers(cfg config.Config, logger *slog.Logger) (*Handlers, error) {
 	}
 
 	authService := auth.NewService(store.Queries(), cfg.IsProduction(), cfg.CookieCrossSite)
+
+	alertHandler, err := NewAlertHandler(store, authService, mailer, cfg.AppBaseURL)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Handlers{
 		Resort:  resortHandler,
@@ -205,9 +242,15 @@ func (h *ResortHandler) ListAllResorts(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func NewAlertHandler(store db.StoreService) (*AlertHandler, error) {
+func NewAlertHandler(
+	store db.StoreService,
+	issuer LinkIssuer,
+	mailer notify.Mailer,
+	appBaseURL string,
+) (*AlertHandler, error) {
 	return &AlertHandler{
 		store: store,
+		links: linkMailer{issuer: issuer, mailer: mailer, baseURL: appBaseURL},
 	}, nil
 }
 
@@ -323,7 +366,7 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 
 	phone, err := validate.Phone(req.Phone)
 	if err != nil {
-		sendErrorResponse(w, "MISSING_PHONE", "Please enter a valid phone number", http.StatusBadRequest)
+		sendErrorResponse(w, "MISSING_PHONE", "Please enter a US or Canadian phone number", http.StatusBadRequest)
 		return
 	}
 
@@ -345,7 +388,7 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), handlerTimeout)
 	defer cancel()
 
-	err = h.store.CreateUserWithAlerts(
+	alreadyConfirmed, err := h.store.CreateUserWithAlerts(
 		ctx,
 		email,
 		phone,
@@ -361,10 +404,47 @@ func (h *AlertHandler) CreateAlert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Signup is anonymous, so nothing is texted until the address is confirmed
+	// by clicking this link. An address that already has a confirmed account is
+	// left untouched and sent a sign-in link instead. Either way the response is
+	// the same, so it does not reveal which addresses have accounts, and a mail
+	// failure only means the person has to request a link from the sign-in page.
+	content := confirmSignupEmail()
+	if alreadyConfirmed {
+		content = existingAccountEmail()
+	}
+
+	if sendErr := h.links.send(ctx, email, content); sendErr != nil {
+		log.Printf("Failed to send signup confirmation: %v", sendErr)
+	}
+
 	writeJSON(w, http.StatusCreated, map[string]string{
 		"status":  "success",
 		"message": "Alert created successfully",
 	})
+}
+
+// confirmSignupEmail asks a new subscriber to confirm their address.
+func confirmSignupEmail() linkEmail {
+	return linkEmail{
+		Subject: "Confirm your Powhunter alerts",
+		Heading: "Confirm your powder alerts",
+		Intro:   "Click the link below to confirm your email. Your alerts start once you do.",
+		Action:  "Confirm my alerts",
+	}
+}
+
+// existingAccountEmail answers a signup for an address that already has a
+// confirmed account. The anonymous signup changed nothing, so the owner signs
+// in to add the resorts themselves.
+func existingAccountEmail() linkEmail {
+	return linkEmail{
+		Subject: "Sign in to update your Powhunter alerts",
+		Heading: "You already have a Powhunter account",
+		Intro: "Someone, hopefully you, just tried to sign up with this address. " +
+			"Nothing was changed. Sign in to add resorts or update your alerts.",
+		Action: "Sign in to Powhunter",
+	}
 }
 
 // validateResorts reports, and writes the error for, a resort selection that

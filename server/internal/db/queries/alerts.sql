@@ -9,10 +9,13 @@ WHERE user_uuid = $1
   AND resort_uuid = $2 LIMIT 1;
 
 -- name: GetResortAlerts :many
+-- Only accounts with a confirmed email are alerted. Signup is anonymous, so an
+-- unconfirmed account may carry a phone number its owner never agreed to text.
 SELECT *
 FROM user_alerts
 WHERE resort_uuid = $1
-  and active = true;
+  AND active = true
+  AND user_uuid IN (SELECT uuid FROM users WHERE email_verified_at IS NOT NULL);
 
 -- name: UpdateUserAlert :one
 UPDATE user_alerts
@@ -35,29 +38,6 @@ FROM user_alerts ua
          JOIN users u ON ua.user_uuid = u.uuid
          JOIN resorts r ON ua.resort_uuid = r.uuid
 WHERE ua.active = true;
-
--- name: GetUserAlertsByEmail :many
-SELECT ua.id,
-       ua.user_uuid,
-       ua.resort_uuid,
-       r.name as resort_name,
-       ua.min_snow_amount,
-       ua.notification_days,
-       ua.active,
-       ua.created_at
-FROM user_alerts ua
-         JOIN users u ON ua.user_uuid = u.uuid
-         JOIN resorts r ON ua.resort_uuid = r.uuid
-WHERE u.email = $1 AND ua.active = true;
-
--- name: DeleteUserAlert :exec
-DELETE FROM user_alerts
-WHERE user_uuid = (SELECT uuid FROM users WHERE email = $1)
-  AND resort_uuid = $2;
-
--- name: DeleteAllUserAlerts :exec
-DELETE FROM user_alerts
-WHERE user_uuid = (SELECT uuid FROM users WHERE email = $1);
 
 -- The three queries below key off the authenticated user's UUID rather than an
 -- email supplied by the caller. Taking the identity from the session is what

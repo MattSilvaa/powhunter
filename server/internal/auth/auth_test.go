@@ -50,10 +50,26 @@ func (f *fakeQueries) CreateLoginToken(
 		UserUuid:  arg.UserUuid,
 		TokenHash: arg.TokenHash,
 		ExpiresAt: arg.ExpiresAt,
+		CreatedAt: time.Now(),
 	}
 	f.loginTokens[arg.TokenHash] = token
 
 	return token, nil
+}
+
+func (f *fakeQueries) CountRecentLoginTokens(
+	_ context.Context,
+	arg dbgen.CountRecentLoginTokensParams,
+) (int64, error) {
+	var count int64
+
+	for _, token := range f.loginTokens {
+		if token.UserUuid == arg.UserUuid && token.CreatedAt.After(arg.CreatedAt) {
+			count++
+		}
+	}
+
+	return count, nil
 }
 
 func (f *fakeQueries) ConsumeLoginToken(_ context.Context, tokenHash string) (uuid.UUID, error) {
@@ -260,4 +276,17 @@ func sessionCookie(t *testing.T, cookies []*http.Cookie) *http.Cookie {
 	require.FailNow(t, "no session cookie was written")
 
 	return nil
+}
+
+// Requests from many addresses could otherwise flood one inbox with links.
+func TestIssueLoginTokenLimitsLinksPerAccount(t *testing.T) {
+	service := auth.NewService(newFakeQueries(), false, false)
+
+	for range auth.MaxLinksPerWindow {
+		_, err := service.IssueLoginToken(context.Background(), "rider@example.com")
+		require.NoError(t, err)
+	}
+
+	_, err := service.IssueLoginToken(context.Background(), "rider@example.com")
+	require.ErrorIs(t, err, auth.ErrTooManyLinks)
 }
