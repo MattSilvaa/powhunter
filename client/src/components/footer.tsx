@@ -39,6 +39,9 @@ export default function Footer() {
 					<MuiLink component={Link} to="/" sx={linkSx}>
 						Home
 					</MuiLink>
+					<MuiLink component={Link} to="/resorts" sx={linkSx}>
+						Resorts
+					</MuiLink>
 					<MuiLink component={Link} to="/contact" sx={linkSx}>
 						Contact
 					</MuiLink>

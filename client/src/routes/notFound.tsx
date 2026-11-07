@@ -1,9 +1,18 @@
 import { Box, Button, Container, Typography } from '@mui/material'
 import { Link } from 'react-router'
 import { tabularNums } from '../theme.ts'
+import { pageMeta } from '../shared/seo.ts'
 
 // Without a catch-all, an unmatched URL fell through to the root error
 // boundary, which renders an unstyled page with no way back into the app.
+export function meta() {
+	return pageMeta({
+		title: 'Page not found | Pow Hunter',
+		path: '/',
+		noindex: true,
+	})
+}
+
 export default function NotFound() {
 	return (
 		<Container maxWidth="sm" sx={{ py: { xs: 8, md: 12 } }}>

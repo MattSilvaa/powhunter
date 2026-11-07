@@ -23,7 +23,10 @@ var catalog []byte
 // Resort is one entry in the resort catalog.
 type Resort struct {
 	Name string `json:"name"`
-	URL  struct {
+	// Region is the state or province. Only the web app's resort pages use
+	// it, reading this same file at build time.
+	Region string `json:"region"`
+	URL    struct {
 		Host     string `json:"host"`
 		PathName string `json:"pathname"`
 	} `json:"url"`

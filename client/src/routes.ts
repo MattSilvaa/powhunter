@@ -7,6 +7,8 @@ export default [
 	route('/manage', './routes/manage.tsx'),
 	route('/login', './routes/login.tsx'),
 	route('/contact', './routes/contactUs.tsx'),
+	route('/resorts', './routes/resorts.tsx'),
+	route('/resorts/:slug', './routes/resort.tsx'),
 	route('/alert/:code', './routes/alertLink.tsx'),
 	route('*', './routes/notFound.tsx'),
 ] satisfies RouteConfig

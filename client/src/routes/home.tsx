@@ -10,6 +10,7 @@ import {
 } from '@mui/material'
 import { ArrowForward, Check } from '@mui/icons-material'
 import { tabularNums } from '../theme.ts'
+import { pageMeta } from '../shared/seo.ts'
 
 // Illustrative forecast for the hero card. It is labelled as an example so it
 // never reads as a live report.
@@ -158,6 +159,15 @@ function ExampleForecast() {
 			</Box>
 		</Paper>
 	)
+}
+
+export function meta() {
+	return pageMeta({
+		title: 'Pow Hunter: powder alerts by text for your ski resorts',
+		description:
+			'Never miss a powder day. Pick your resorts and the snowfall worth chasing, and Pow Hunter texts you when the forecast delivers. Free.',
+		path: '/',
+	})
 }
 
 export default function Home() {

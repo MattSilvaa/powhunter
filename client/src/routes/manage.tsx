@@ -28,6 +28,7 @@ import { tabularNums } from '../theme.ts'
 import AddAlertsDialog from '../components/addAlertsDialog.tsx'
 import EditAlertDialog from '../components/editAlertDialog.tsx'
 import PhoneDialog from '../components/phoneDialog.tsx'
+import { pageMeta } from '../shared/seo.ts'
 
 // created_at arrives from Go as a nullable timestamp, so guard both the null
 // case and an unparseable value rather than rendering "Invalid Date".
@@ -42,6 +43,14 @@ function formatCreatedAt(createdAt: UserAlert['created_at']): string {
 	}
 
 	return parsed.toLocaleDateString()
+}
+
+export function meta() {
+	return pageMeta({
+		title: 'Manage alerts | Pow Hunter',
+		path: '/manage',
+		noindex: true,
+	})
 }
 
 export default function ManageSubscriptionsPage() {

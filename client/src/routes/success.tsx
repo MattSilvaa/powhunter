@@ -3,8 +3,17 @@ import { Check } from '@mui/icons-material'
 import { Link, useLocation } from 'react-router'
 import ShareButton from '../components/shareButton.tsx'
 import { signupLink } from '../shared/resortSlug.ts'
+import { pageMeta } from '../shared/seo.ts'
 
 type SuccessState = { resortNames?: string[] } | null
+
+export function meta() {
+	return pageMeta({
+		title: "You're all set | Pow Hunter",
+		path: '/success',
+		noindex: true,
+	})
+}
 
 export default function SuccessPage() {
 	const state = useLocation().state as SuccessState

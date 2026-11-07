@@ -3,6 +3,8 @@ import '@fontsource-variable/inter'
 import appStylesHref from './app.css?url'
 import {
 	isRouteErrorResponse,
+	Links,
+	Meta,
 	Outlet,
 	Scripts,
 	ScrollRestoration,
@@ -13,8 +15,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Footer from './components/footer'
 import Header from './components/header'
 import theme from './theme'
+import { pageMeta } from './shared/seo.ts'
 
 const queryClient = new QueryClient()
+
+// Used by any page that does not set its own.
+export function meta() {
+	return pageMeta({ title: 'Pow Hunter', path: '/' })
+}
 
 export default function Root() {
 	return (
@@ -36,7 +44,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 				<meta name="viewport" content="width=device-width, initial-scale=1" />
 				<meta name="theme-color" content="#ffffff" />
 				<link rel="stylesheet" href={appStylesHref} />
-				<title>Pow Hunter</title>
+				<Meta />
+				<Links />
 			</head>
 			<body style={{ height: '100%', margin: 0, padding: 0 }}>
 				<QueryClientProvider client={queryClient}>

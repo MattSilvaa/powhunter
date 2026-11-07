@@ -10,11 +10,16 @@ import {
 } from '@mui/material'
 import { apiRequest } from '../shared/apiClient.ts'
 import PageHeader from '../components/pageHeader.tsx'
+import { pageMeta } from '../shared/seo.ts'
 
 interface ContactFormData {
 	name: string
 	email: string
 	message: string
+}
+
+export function meta() {
+	return pageMeta({ title: 'Contact | Pow Hunter', path: '/contact' })
 }
 
 export default function ContactUs() {

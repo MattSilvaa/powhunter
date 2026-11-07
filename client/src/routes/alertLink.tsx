@@ -21,6 +21,7 @@ import {
 	useAlertLink,
 } from '../shared/useAlertLink.ts'
 import { ApiError } from '../shared/apiClient.ts'
+import { pageMeta } from '../shared/seo.ts'
 
 type ShareState = 'idle' | 'copied' | 'failed'
 
@@ -127,6 +128,19 @@ function AlertCard({
 			</Typography>
 		</Paper>
 	)
+}
+
+// Each link belongs to one alert, so it stays out of search. This page is
+// rendered in the browser, so link previews show the site-wide defaults from
+// root.tsx rather than this title.
+export function meta() {
+	return pageMeta({
+		title: 'Fresh snow is in the forecast | Pow Hunter',
+		description:
+			'See the storm, then get your own powder alerts by text. Pick your resorts and the snowfall worth chasing.',
+		path: '/',
+		noindex: true,
+	})
 }
 
 export default function AlertLinkPage(): React.ReactElement {

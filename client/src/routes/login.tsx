@@ -17,6 +17,15 @@ import {
 	useRequestLoginLink,
 } from '../shared/useAuth.ts'
 import PageHeader from '../components/pageHeader.tsx'
+import { pageMeta } from '../shared/seo.ts'
+
+export function meta() {
+	return pageMeta({
+		title: 'Sign in | Pow Hunter',
+		path: '/login',
+		noindex: true,
+	})
+}
 
 export default function LoginPage() {
 	const [searchParams] = useSearchParams()

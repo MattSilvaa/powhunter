@@ -16,6 +16,16 @@ import PageHeader from '../components/pageHeader.tsx'
 import ResortSelect from '../components/resortSelect.tsx'
 import AlertSettingsFields from '../components/alertSettingsFields.tsx'
 import { resortUuidsFromLink } from '../shared/resortSlug.ts'
+import { pageMeta } from '../shared/seo.ts'
+
+export function meta() {
+	return pageMeta({
+		title: 'Create a powder alert | Pow Hunter',
+		description:
+			'Choose your resorts and how much fresh snow it takes. We text you when the forecast meets your number.',
+		path: '/signup',
+	})
+}
 
 export default function SignUpPage() {
 	const navigate = useNavigate()
