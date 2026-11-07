@@ -27,7 +27,7 @@ export default function PhoneDialog({
 		e.preventDefault()
 
 		if (phone.replace(/\D/g, '').length < 10) {
-			setPhoneError('Please enter a valid phone number')
+			setPhoneError('Please enter a US or Canadian phone number')
 			return
 		}
 

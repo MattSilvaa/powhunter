@@ -126,7 +126,7 @@ export default function SignUpPage() {
 		if (!formData.phone.trim()) {
 			errors.phone = 'Phone number is required'
 		} else if (formData.phone.replace(/\D/g, '').length < 10) {
-			errors.phone = 'Please enter a valid phone number'
+			errors.phone = 'Please enter a US or Canadian phone number'
 		}
 
 		if (formData.resorts.length === 0) {

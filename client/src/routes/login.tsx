@@ -62,6 +62,18 @@ export default function LoginPage() {
 
 		redeemedToken.current = token
 
+		// The token is a one-time credential. Take it out of the address bar and
+		// history straight away, so a failed sign-in does not leave it behind.
+		const url = new URL(window.location.href)
+		if (url.searchParams.has('token')) {
+			url.searchParams.delete('token')
+			window.history.replaceState(
+				window.history.state,
+				'',
+				url.pathname + url.search + url.hash
+			)
+		}
+
 		void completeLogin(token).then((signedIn) => {
 			if (signedIn) {
 				navigate('/manage', { replace: true })
