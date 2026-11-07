@@ -90,7 +90,7 @@ jobs:
       # version outright and the step never runs a single check.
       - uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.1.6
+          version: v2.15.0
           working-directory: server
           args: --timeout=5m --new-from-rev=origin/main
 
