@@ -78,7 +78,10 @@ func run(logger *slog.Logger) error {
 		notify.NewTwilioClient(fromNumber),
 		logger,
 		time.Now,
-		forecast.Options{LinkBaseURL: linkBaseURL(logger, os.Getenv("LINK_BASE_URL"))},
+		forecast.Options{
+			LinkBaseURL: linkBaseURL(logger, os.Getenv("LINK_BASE_URL")),
+			ShareHost:   shareHost(logger, cfg.AppBaseURL),
+		},
 	)
 
 	summary, runErr := runner.Run(ctx)
@@ -131,6 +134,23 @@ func linkBaseURL(logger *slog.Logger, raw string) string {
 	}
 
 	return parsed.String()
+}
+
+// shareHost is the web app address alerts invite readers to share, written
+// without its scheme ("powhunter.app") because every character costs room in
+// the SMS and phones link a bare domain anyway. A local or invalid address
+// turns the share line off: a friend cannot open localhost.
+func shareHost(logger *slog.Logger, appBaseURL string) string {
+	parsed, err := url.Parse(appBaseURL)
+	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" ||
+		parsed.Hostname() == "localhost" || parsed.Hostname() == "127.0.0.1" {
+		logger.Info("APP_BASE_URL is not a public address; alerts are sent without a share line",
+			"value", appBaseURL)
+
+		return ""
+	}
+
+	return strings.TrimPrefix(parsed.Host, "www.") + strings.TrimRight(parsed.Path, "/")
 }
 
 // publishMetrics reports the run to a Pushgateway when one is configured.

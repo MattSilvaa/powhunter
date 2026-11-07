@@ -1,8 +1,20 @@
 import { Box, Button, Container, Paper, Typography } from '@mui/material'
 import { Check } from '@mui/icons-material'
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
+import ShareButton from '../components/shareButton.tsx'
+import { signupLink } from '../shared/resortSlug.ts'
+
+type SuccessState = { resortNames?: string[] } | null
 
 export default function SuccessPage() {
+	const state = useLocation().state as SuccessState
+	const resortNames = state?.resortNames ?? []
+	const shareUrl = signupLink(window.location.origin, resortNames)
+	const shareText =
+		resortNames.length === 1
+			? `Get a text when ${resortNames[0]} gets fresh snow:`
+			: 'Get a text when our mountains get fresh snow:'
+
 	return (
 		<Container maxWidth="sm" sx={{ py: { xs: 6, md: 10 } }}>
 			<Paper
@@ -50,6 +62,25 @@ export default function SuccessPage() {
 					<Button component={Link} to="/" variant="contained" size="large">
 						Back to Home
 					</Button>
+				</Box>
+
+				<Box sx={{ mt: 4, pt: 4, borderTop: 1, borderColor: 'divider' }}>
+					<Typography variant="overline" color="text.secondary">
+						Ski with friends
+					</Typography>
+					<Typography
+						color="text.secondary"
+						sx={{ mb: 2, maxWidth: 420, mx: 'auto' }}
+					>
+						{resortNames.length > 0
+							? 'Send your crew a link with your resorts already picked.'
+							: 'Send your crew a link so they hear about powder days too.'}
+					</Typography>
+					<ShareButton
+						url={shareUrl}
+						text={shareText}
+						label="Share with your ski crew"
+					/>
 				</Box>
 			</Paper>
 		</Container>

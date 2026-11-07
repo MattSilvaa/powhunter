@@ -82,3 +82,23 @@ func TestLinkBaseURL(t *testing.T) {
 		}
 	}
 }
+
+func TestShareHost(t *testing.T) {
+	tests := []struct {
+		raw  string
+		want string
+	}{
+		{"https://powhunter.app", "powhunter.app"},
+		{"https://www.powhunter.app/", "powhunter.app"},
+		{"http://localhost:3000", ""},
+		{"powhunter.app", ""},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		var out bytes.Buffer
+		if got := shareHost(newTestLogger(&out), tt.raw); got != tt.want {
+			t.Errorf("shareHost(%q) = %q, want %q", tt.raw, got, tt.want)
+		}
+	}
+}

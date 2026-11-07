@@ -48,7 +48,10 @@ type resortRow = dbgen.Resort
 type Options struct {
 	// LinkBaseURL is the public address of the API's /go redirect, such as
 	// "https://api.example.com". Empty sends alerts without a tracked link.
-	LinkBaseURL      string
+	LinkBaseURL string
+	// ShareHost is the web app address alerts invite readers to share, such as
+	// "powhunter.app". Empty sends alerts without a share line.
+	ShareHost        string
 	Concurrency      int
 	ResortTimeout    time.Duration
 	Attempts         int
@@ -237,7 +240,7 @@ func (r *Runner) deliver(
 	}
 
 	sent, link := r.newLink(ctx, destination, logger)
-	message := notify.FormatSnowAlertMessage(alert, link)
+	message := notify.FormatSnowAlertMessage(alert, link, r.opts.ShareHost)
 	sent.SMSSegments = notify.SMSSegments(message)
 
 	if err := r.notifier.SendSMS(alert.UserPhone, message); err != nil {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
 	Alert,
 	Box,
@@ -9,15 +9,17 @@ import {
 	Paper,
 	TextField,
 } from '@mui/material'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import { useResorts } from '../shared/useResorts.ts'
 import { useCreateAlert } from '../shared/useCreateAlert.ts'
 import PageHeader from '../components/pageHeader.tsx'
 import ResortSelect from '../components/resortSelect.tsx'
 import AlertSettingsFields from '../components/alertSettingsFields.tsx'
+import { resortUuidsFromSlugs } from '../shared/resortSlug.ts'
 
 export default function SignUpPage() {
 	const navigate = useNavigate()
+	const [searchParams] = useSearchParams()
 	const [formData, setFormData] = useState({
 		email: '',
 		phone: '',
@@ -38,6 +40,20 @@ export default function SignUpPage() {
 	} = useCreateAlert()
 
 	const { resorts = [], loading, error } = useResorts()
+
+	// A shared link such as /signup?resort=alta,snowbird opens with those
+	// resorts picked. Applied once, so it never undoes the visitor's own picks.
+	const appliedLinkedResorts = useRef(false)
+	useEffect(() => {
+		if (appliedLinkedResorts.current || resorts.length === 0) return
+		appliedLinkedResorts.current = true
+
+		const slugs = (searchParams.get('resort') ?? '').split(',')
+		const linked = resortUuidsFromSlugs(slugs, resorts)
+		if (linked.length > 0) {
+			setFormData((prev) => ({ ...prev, resorts: linked }))
+		}
+	}, [resorts, searchParams])
 
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const { name, value } = e.target
@@ -128,7 +144,11 @@ export default function SignUpPage() {
 			},
 			{
 				onSuccess: () => {
-					navigate('/success')
+					// The success page invites friends to the same resorts.
+					const resortNames = resorts
+						.filter((r) => resortsUuids.includes(r.uuid))
+						.map((r) => r.name)
+					navigate('/success', { state: { resortNames } })
 				},
 				onError: (error) => {
 					console.error('Failed to create alert:', error)
