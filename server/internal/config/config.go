@@ -58,9 +58,16 @@ func (d Database) DSN() string {
 
 // Config is the resolved runtime configuration.
 type Config struct {
-	Environment       string
-	Port              string
-	AllowedOrigins    string
+	Environment    string
+	Port           string
+	AllowedOrigins string
+	// TrustProxyHeaders makes rate limiting read the client address from proxy
+	// headers instead of the connection. Only enable it where the API cannot
+	// be reached except through the edge, as on Render: CF-Connecting-IP and
+	// True-Client-IP are only trustworthy because Cloudflare overwrites them,
+	// and the right-most X-Forwarded-For entry is only the client when exactly
+	// one trusted proxy appended to it. A second proxy in front would make
+	// every client share that proxy's address.
 	TrustProxyHeaders bool
 	MaxBodyBytes      int64
 	ReadTimeout       time.Duration

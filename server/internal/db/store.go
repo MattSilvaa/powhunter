@@ -170,7 +170,23 @@ func (s *Store) CreateUserWithAlerts(ctx context.Context, email, phone string,
 			return nil
 		}
 
-		return createAlerts(ctx, q, user.Uuid, minSnowAmount, notificationDays, resortUUIDs)
+		for _, resortUUID := range resortUUIDs {
+			parsedUUID, parseErr := uuid.Parse(resortUUID)
+			if parseErr != nil {
+				return fmt.Errorf("error parsing resort UUID %s: %w", resortUUID, parseErr)
+			}
+
+			if upsertErr := q.UpsertUnconfirmedUserAlert(ctx, dbgen.UpsertUnconfirmedUserAlertParams{
+				UserUuid:         uuid.NullUUID{UUID: user.Uuid, Valid: true},
+				ResortUuid:       uuid.NullUUID{UUID: parsedUUID, Valid: true},
+				MinSnowAmount:    minSnowAmount,
+				NotificationDays: notificationDays,
+			}); upsertErr != nil {
+				return fmt.Errorf("error creating alert for resort %s: %w", resortUUID, upsertErr)
+			}
+		}
+
+		return nil
 	})
 	if err != nil {
 		return false, err

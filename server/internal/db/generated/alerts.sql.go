@@ -332,3 +332,33 @@ func (q *Queries) UpdateUserAlertSettingsByUserUUID(ctx context.Context, arg Upd
 	)
 	return i, err
 }
+
+const upsertUnconfirmedUserAlert = `-- name: UpsertUnconfirmedUserAlert :exec
+INSERT INTO user_alerts (user_uuid, resort_uuid, min_snow_amount, notification_days)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (user_uuid, resort_uuid) DO UPDATE
+    SET min_snow_amount   = EXCLUDED.min_snow_amount,
+        notification_days = EXCLUDED.notification_days
+`
+
+type UpsertUnconfirmedUserAlertParams struct {
+	UserUuid         uuid.NullUUID `json:"user_uuid"`
+	ResortUuid       uuid.NullUUID `json:"resort_uuid"`
+	MinSnowAmount    float64       `json:"min_snow_amount"`
+	NotificationDays int32         `json:"notification_days"`
+}
+
+// Anonymous signup for an unconfirmed account. Signing up again for the same
+// resort must not fail: the first confirmation email may never have arrived,
+// and a 409 would both block a fresh link and roll back the phone update that
+// stops a squatter keeping their number on someone else's address. The latest
+// thresholds win, as the latest phone does.
+func (q *Queries) UpsertUnconfirmedUserAlert(ctx context.Context, arg UpsertUnconfirmedUserAlertParams) error {
+	_, err := q.exec(ctx, q.upsertUnconfirmedUserAlertStmt, upsertUnconfirmedUserAlert,
+		arg.UserUuid,
+		arg.ResortUuid,
+		arg.MinSnowAmount,
+		arg.NotificationDays,
+	)
+	return err
+}

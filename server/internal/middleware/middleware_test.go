@@ -196,7 +196,9 @@ func TestClientIPBehindAProxyCannotBeSpoofed(t *testing.T) {
 // A flood of distinct addresses must neither grow the table without bound nor
 // escape limiting: once full, newcomers share one bucket.
 func TestRateLimiterStaysBoundedUnderManyClients(t *testing.T) {
-	limiter := middleware.NewRateLimiter(middleware.RateLimitConfig{RequestsPerSecond: 1, Burst: 1}, false)
+	// Slow enough that no bucket refills during the test, however loaded the
+	// machine running it is.
+	limiter := middleware.NewRateLimiter(middleware.RateLimitConfig{RequestsPerSecond: 0.001, Burst: 1}, false)
 	defer limiter.Close()
 
 	limiter.SetMaxVisitors(3)

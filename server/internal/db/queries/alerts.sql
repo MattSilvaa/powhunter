@@ -2,6 +2,18 @@
 INSERT INTO user_alerts (user_uuid, resort_uuid, min_snow_amount, notification_days)
 VALUES ($1, $2, $3, $4) RETURNING *;
 
+-- name: UpsertUnconfirmedUserAlert :exec
+-- Anonymous signup for an unconfirmed account. Signing up again for the same
+-- resort must not fail: the first confirmation email may never have arrived,
+-- and a 409 would both block a fresh link and roll back the phone update that
+-- stops a squatter keeping their number on someone else's address. The latest
+-- thresholds win, as the latest phone does.
+INSERT INTO user_alerts (user_uuid, resort_uuid, min_snow_amount, notification_days)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (user_uuid, resort_uuid) DO UPDATE
+    SET min_snow_amount   = EXCLUDED.min_snow_amount,
+        notification_days = EXCLUDED.notification_days;
+
 -- name: GetUserAlert :one
 SELECT *
 FROM user_alerts

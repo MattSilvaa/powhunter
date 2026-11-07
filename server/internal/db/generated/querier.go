@@ -82,14 +82,20 @@ type Querier interface {
 	// Keyed on name so re-seeding keeps existing UUIDs and the alerts that
 	// reference them, rather than deleting and recreating every resort.
 	UpsertResort(ctx context.Context, arg UpsertResortParams) (Resort, error)
+	// Anonymous signup for an unconfirmed account. Signing up again for the same
+	// resort must not fail: the first confirmation email may never have arrived,
+	// and a 409 would both block a fresh link and roll back the phone update that
+	// stops a squatter keeping their number on someone else's address. The latest
+	// thresholds win, as the latest phone does.
+	UpsertUnconfirmedUserAlert(ctx context.Context, arg UpsertUnconfirmedUserAlertParams) error
 	// Get-or-create in a single statement. A read-then-write race meant two
 	// concurrent signups with the same email both attempted an insert, and one
 	// failed on the unique constraint as a 500.
 	//
-	// Signup is anonymous, so the phone supplied here never replaces the number on
-	// a confirmed account: that would let anyone who knows an address redirect the
-	// owner's SMS alerts to themselves. Changing it is done signed in, through
-	// UpdateUserPhone. An unconfirmed account does take the new number, or someone
+	// Signup is anonymous, so the phone supplied here never touches a confirmed
+	// account, not even one with no number yet: that would let anyone who knows an
+	// address point the owner's SMS alerts at themselves. Changing it is done
+	// signed in, through UpdateUserPhone. An unconfirmed account does take the new number, or someone
 	// who signed up first with a victim's address would keep their own phone on it
 	// after the victim signed up and confirmed.
 	//

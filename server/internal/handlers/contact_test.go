@@ -224,3 +224,26 @@ func TestContactHandlerNeutralizesNewlines(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 }
+
+// OpenFile applies its mode only when it creates the file, so a log an older
+// release left world-readable must be tightened, not just appended to.
+func TestContactHandlerRestrictsAnExistingLog(t *testing.T) {
+	logPath := filepath.Join(t.TempDir(), "contacts.log")
+	// The insecure starting state under test.
+	require.NoError(t, os.WriteFile(logPath, []byte("old entry\n"), 0o644))
+	t.Setenv("CONTACT_LOG_PATH", logPath)
+
+	handler := &ContactHandler{mailer: &captureMailer{}, support: "support@powhunter.app"}
+
+	rr := httptest.NewRecorder()
+	handler.HandleContact(rr, postJSON(t, "/api/contact", ContactRequest{
+		Name:    "Ann",
+		Email:   "ann@example.com",
+		Message: "hi",
+	}))
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	info, err := os.Stat(logPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+}

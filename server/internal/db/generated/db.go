@@ -138,6 +138,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.upsertResortStmt, err = db.PrepareContext(ctx, upsertResort); err != nil {
 		return nil, fmt.Errorf("error preparing query UpsertResort: %w", err)
 	}
+	if q.upsertUnconfirmedUserAlertStmt, err = db.PrepareContext(ctx, upsertUnconfirmedUserAlert); err != nil {
+		return nil, fmt.Errorf("error preparing query UpsertUnconfirmedUserAlert: %w", err)
+	}
 	if q.upsertUserStmt, err = db.PrepareContext(ctx, upsertUser); err != nil {
 		return nil, fmt.Errorf("error preparing query UpsertUser: %w", err)
 	}
@@ -336,6 +339,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing upsertResortStmt: %w", cerr)
 		}
 	}
+	if q.upsertUnconfirmedUserAlertStmt != nil {
+		if cerr := q.upsertUnconfirmedUserAlertStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing upsertUnconfirmedUserAlertStmt: %w", cerr)
+		}
+	}
 	if q.upsertUserStmt != nil {
 		if cerr := q.upsertUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing upsertUserStmt: %w", cerr)
@@ -418,6 +426,7 @@ type Queries struct {
 	updateUserAlertSettingsByUserUUIDStmt *sql.Stmt
 	updateUserPhoneStmt                   *sql.Stmt
 	upsertResortStmt                      *sql.Stmt
+	upsertUnconfirmedUserAlertStmt        *sql.Stmt
 	upsertUserStmt                        *sql.Stmt
 }
 
@@ -463,6 +472,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		updateUserAlertSettingsByUserUUIDStmt: q.updateUserAlertSettingsByUserUUIDStmt,
 		updateUserPhoneStmt:                   q.updateUserPhoneStmt,
 		upsertResortStmt:                      q.upsertResortStmt,
+		upsertUnconfirmedUserAlertStmt:        q.upsertUnconfirmedUserAlertStmt,
 		upsertUserStmt:                        q.upsertUserStmt,
 	}
 }

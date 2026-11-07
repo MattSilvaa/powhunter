@@ -61,13 +61,13 @@ func TestStoreIntegration_CreateUserWithAlerts(t *testing.T) {
 		}
 	})
 
-	t.Run("Existing email reuses the user and rejects a duplicate alert", func(t *testing.T) {
+	// Signing up again before confirming must not fail: the first confirmation
+	// email may never have arrived. The same user is reused, and the latest
+	// thresholds replace the old ones.
+	t.Run("Unconfirmed signup for the same resort again updates the alert", func(t *testing.T) {
 		ctx := context.Background()
 
-		// The same email must not create a second user; it reuses the existing one
-		// and then fails on the (user_uuid, resort_uuid) uniqueness constraint,
-		// which the handler maps to a 409 DUPLICATE_ALERT.
-		_, err := store.CreateUserWithAlerts(
+		alreadyConfirmed, err := store.CreateUserWithAlerts(
 			ctx,
 			"test@example.com", // Same email
 			"+15559876543",
@@ -76,8 +76,20 @@ func TestStoreIntegration_CreateUserWithAlerts(t *testing.T) {
 			[]string{resort1.Uuid.String()},
 			db.Attribution{},
 		)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "user_alerts_user_uuid_resort_uuid_key")
+		require.NoError(t, err)
+		assert.False(t, alreadyConfirmed)
+
+		user, err := queries.GetUserByEmail(ctx, "test@example.com")
+		require.NoError(t, err)
+		assert.Equal(t, "+15559876543", user.Phone.String)
+
+		alert, err := queries.GetUserAlert(ctx, dbgen.GetUserAlertParams{
+			UserUuid:   uuid.NullUUID{UUID: user.Uuid, Valid: true},
+			ResortUuid: uuid.NullUUID{UUID: resort1.Uuid, Valid: true},
+		})
+		require.NoError(t, err)
+		assert.InDelta(t, 10.0, alert.MinSnowAmount, 0.001)
+		assert.Equal(t, int32(5), alert.NotificationDays)
 	})
 }
 
@@ -115,6 +127,26 @@ func TestStoreIntegration_SignupDoesNotChangeAConfirmedAccount(t *testing.T) {
 
 // Someone who signs up first with another person's address must not keep their
 // own phone on it once the real owner signs up.
+// A confirmed account with no phone yet, from someone who only ever signed in,
+// must not take a number from an anonymous signup either.
+func TestStoreIntegration_SignupDoesNotFillThePhoneOfAConfirmedAccount(t *testing.T) {
+	testDB, store, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+
+	ctx := t.Context()
+	queries := dbgen.New(testDB)
+	resort := testutil.SeedTestResort(t, queries, "Test Resort", 39.6403, -106.3742)
+	owner := testutil.SeedTestUser(t, queries, "owner@example.com", "")
+
+	_, err := store.CreateUserWithAlerts(ctx, "owner@example.com", "+15559999999", 6.0, 3,
+		[]string{resort.Uuid.String()}, db.Attribution{})
+	require.NoError(t, err)
+
+	stored, err := queries.GetUserByUUID(ctx, owner.Uuid)
+	require.NoError(t, err)
+	assert.False(t, stored.Phone.Valid)
+}
+
 func TestStoreIntegration_SignupReplacesThePhoneOnAnUnconfirmedAccount(t *testing.T) {
 	testDB, store, cleanup := testutil.SetupTestDB(t)
 	defer cleanup()
@@ -123,6 +155,9 @@ func TestStoreIntegration_SignupReplacesThePhoneOnAnUnconfirmedAccount(t *testin
 	queries := dbgen.New(testDB)
 	resort := testutil.SeedTestResort(t, queries, "Test Resort", 39.6403, -106.3742)
 	squatter := testutil.SeedUnconfirmedTestUser(t, queries, "owner@example.com", "+15559999999")
+	// The squatter picked the same resort the owner then picks, which used to
+	// fail the owner's signup and roll back the phone replacement.
+	testutil.SeedTestAlert(t, queries, squatter.Uuid, resort.Uuid, 5.0, 3)
 
 	_, err := store.CreateUserWithAlerts(ctx, "owner@example.com", "+15551234567", 6.0, 3,
 		[]string{resort.Uuid.String()}, db.Attribution{})

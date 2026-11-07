@@ -71,8 +71,14 @@ func TestAlertHandlerIntegration_CreateAlert(t *testing.T) {
 		assert.Len(t, alerts, 2)
 	})
 
-	t.Run("Duplicate email returns conflict", func(t *testing.T) {
-		// First request
+	// A lost or filtered confirmation email must not strand someone: signing up
+	// again before confirming succeeds and sends a fresh link.
+	t.Run("Repeat unconfirmed signup succeeds and sends a fresh link", func(t *testing.T) {
+		mailer := &captureMailer{}
+		retryHandler, handlerErr := NewAlertHandler(store, auth.NewService(queries, false, false), mailer,
+			"https://powhunter.app")
+		require.NoError(t, handlerErr)
+
 		requestBody := CreateAlertRequest{
 			Email:            "duplicate@test.com",
 			Phone:            "+15559876543",
@@ -84,25 +90,16 @@ func TestAlertHandlerIntegration_CreateAlert(t *testing.T) {
 		body, err := json.Marshal(requestBody)
 		require.NoError(t, err)
 
-		req := httptest.NewRequest(http.MethodPost, "/api/alert", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		rr := httptest.NewRecorder()
+		for range 2 {
+			req := httptest.NewRequest(http.MethodPost, "/api/alert", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			rr := httptest.NewRecorder()
 
-		handler.CreateAlert(rr, req)
-		assert.Equal(t, http.StatusCreated, rr.Code)
+			retryHandler.CreateAlert(rr, req)
+			assert.Equal(t, http.StatusCreated, rr.Code)
+		}
 
-		// Duplicate request
-		req2 := httptest.NewRequest(http.MethodPost, "/api/alert", bytes.NewReader(body))
-		req2.Header.Set("Content-Type", "application/json")
-		rr2 := httptest.NewRecorder()
-
-		handler.CreateAlert(rr2, req2)
-		assert.Equal(t, http.StatusConflict, rr2.Code)
-
-		var errorResponse ErrorResponse
-		err = json.NewDecoder(rr2.Body).Decode(&errorResponse)
-		require.NoError(t, err)
-		assert.Equal(t, "DUPLICATE_ALERT", errorResponse.Error)
+		assert.Len(t, mailer.sent, 2)
 	})
 
 	// A malformed resort identifier is a client mistake. It previously reached

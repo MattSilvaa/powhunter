@@ -113,7 +113,44 @@ func Phone(raw string) (string, error) {
 		return "", invalid("phone", "must be a US or Canadian number")
 	}
 
+	if _, blocked := nonNorthAmericanAreaCodes[number[:3]]; blocked {
+		return "", invalid("phone", "must be a US or Canadian number")
+	}
+
 	return "+1" + number, nil
+}
+
+// nonNorthAmericanAreaCodes are +1 area codes that are not the United States
+// or Canada: the Caribbean and Atlantic countries that share the North
+// American Numbering Plan, plus premium-rate 900. Texting them is
+// international SMS at international prices, and they are a well-known
+// target for SMS pumping fraud. US territories such as Puerto Rico and Guam
+// are the US and stay allowed.
+//
+//nolint:gochecknoglobals // a fixed lookup table
+var nonNorthAmericanAreaCodes = map[string]struct{}{
+	"242": {}, // Bahamas
+	"246": {}, // Barbados
+	"264": {}, // Anguilla
+	"268": {}, // Antigua and Barbuda
+	"284": {}, // British Virgin Islands
+	"345": {}, // Cayman Islands
+	"441": {}, // Bermuda
+	"473": {}, // Grenada
+	"649": {}, // Turks and Caicos
+	"658": {}, // Jamaica
+	"664": {}, // Montserrat
+	"721": {}, // Sint Maarten
+	"758": {}, // Saint Lucia
+	"767": {}, // Dominica
+	"784": {}, // Saint Vincent and the Grenadines
+	"809": {}, // Dominican Republic
+	"829": {}, // Dominican Republic
+	"849": {}, // Dominican Republic
+	"868": {}, // Trinidad and Tobago
+	"869": {}, // Saint Kitts and Nevis
+	"876": {}, // Jamaica
+	"900": {}, // premium rate
 }
 
 // SingleLine trims a value and removes control characters such as CR and LF.

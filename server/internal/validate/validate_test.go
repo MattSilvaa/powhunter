@@ -57,6 +57,11 @@ func TestPhone(t *testing.T) {
 		{name: "eleven digits not starting with one", input: "26195733405", wantErr: true},
 		{name: "area code starting with one", input: "(123) 456-7890", wantErr: true},
 		{name: "exchange starting with zero", input: "619-073-3405", wantErr: true},
+		// +1 but not the US or Canada: the Caribbean numbers SMS pumping targets.
+		{name: "bahamas", input: "+1 242 555 0123", wantErr: true},
+		{name: "jamaica", input: "(876) 555-0123", wantErr: true},
+		{name: "premium rate", input: "900-555-0123", wantErr: true},
+		{name: "us territory", input: "787-555-0123", want: "+17875550123"},
 		{name: "non-ascii digits", input: "٦١٩٥٧٣٣٤٠٥", wantErr: true},
 		{name: "letters", input: "555-CALL-NOW", wantErr: true},
 		{name: "empty", input: "", wantErr: true},
