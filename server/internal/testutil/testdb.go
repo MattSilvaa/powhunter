@@ -180,11 +180,11 @@ func SeedTestUser(t *testing.T, queries *dbgen.Queries, email, phone string) dbg
 
 	user := SeedUnconfirmedTestUser(t, queries, email, phone)
 
-	if err := queries.MarkEmailVerified(context.Background(), user.Uuid); err != nil {
+	if err := queries.MarkEmailVerified(t.Context(), user.Uuid); err != nil {
 		t.Fatalf("Failed to confirm test user: %v", err)
 	}
 
-	confirmed, err := queries.GetUserByUUID(context.Background(), user.Uuid)
+	confirmed, err := queries.GetUserByUUID(t.Context(), user.Uuid)
 	if err != nil {
 		t.Fatalf("Failed to reload test user: %v", err)
 	}

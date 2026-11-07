@@ -283,10 +283,10 @@ func TestIssueLoginTokenLimitsLinksPerAccount(t *testing.T) {
 	service := auth.NewService(newFakeQueries(), false, false)
 
 	for range auth.MaxLinksPerWindow {
-		_, err := service.IssueLoginToken(context.Background(), "rider@example.com")
+		_, err := service.IssueLoginToken(t.Context(), "rider@example.com")
 		require.NoError(t, err)
 	}
 
-	_, err := service.IssueLoginToken(context.Background(), "rider@example.com")
+	_, err := service.IssueLoginToken(t.Context(), "rider@example.com")
 	require.ErrorIs(t, err, auth.ErrTooManyLinks)
 }
