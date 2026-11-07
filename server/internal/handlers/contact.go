@@ -44,7 +44,9 @@ func (h *ContactHandler) HandleContact(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	name, err := validate.Text("name", req.Name, validate.MaxNameLength)
+	// The name goes into the email Subject, where a newline would let the
+	// submitter add headers of their own.
+	name, err := validate.Text("name", validate.SingleLine(req.Name), validate.MaxNameLength)
 	if err != nil {
 		sendErrorResponse(w, "MISSING_NAME", "Please enter your name", http.StatusBadRequest)
 		return
@@ -97,14 +99,16 @@ func (h *ContactHandler) recordContactMessage(ctx context.Context, req ContactRe
 		contactLogPath = "/tmp/powhunter_contacts.log"
 	}
 
-	f, err := os.OpenFile(contactLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	// Owner-only: every entry is a stranger's name, email and message.
+	f, err := os.OpenFile(contactLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to open contact log file: %w", err)
 	}
 	defer f.Close()
 
 	timestamp := time.Now().Format(time.RFC3339)
-	logEntry := fmt.Sprintf("[%s] Name: %s | Email: %s | Message: %s\n",
+	// Quoted, so a newline in the message cannot forge a log entry of its own.
+	logEntry := fmt.Sprintf("[%s] Name: %q | Email: %q | Message: %q\n",
 		timestamp, req.Name, req.Email, req.Message)
 
 	if _, err := f.WriteString(logEntry); err != nil {
