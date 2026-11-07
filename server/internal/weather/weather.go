@@ -53,8 +53,9 @@ func parseRetryAfter(value string) time.Duration {
 
 // OpenMeteoClient provides access to the Open-Meteo API.
 type OpenMeteoClient struct {
-	client  *http.Client
-	baseURL string
+	client         *http.Client
+	baseURL        string
+	archiveBaseURL string
 }
 
 // NewOpenMeteoClient creates a new Open-Meteo API client.
@@ -63,7 +64,8 @@ func NewOpenMeteoClient() *OpenMeteoClient {
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		baseURL: "https://api.open-meteo.com/v1",
+		baseURL:        "https://api.open-meteo.com/v1",
+		archiveBaseURL: "https://archive-api.open-meteo.com/v1",
 	}
 }
 
@@ -132,9 +134,20 @@ func (c *OpenMeteoClient) GetForecast(ctx context.Context, lat, lon float64) (*O
 		lon,
 	)
 
+	var forecastResp OpenMeteoResponse
+	if err := c.getJSON(ctx, url, &forecastResp); err != nil {
+		return nil, fmt.Errorf("error getting forecast data: %w", err)
+	}
+
+	return &forecastResp, nil
+}
+
+// getJSON fetches url and decodes its JSON body into target. A 429 comes back
+// as a RateLimitError so callers can back off.
+func (c *OpenMeteoClient) getJSON(ctx context.Context, url string, target any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return fmt.Errorf("error creating request: %w", err)
 	}
 
 	req.Header.Set("User-Agent", "Powhunter/1.0 (Language=Go 1.24)")
@@ -142,24 +155,23 @@ func (c *OpenMeteoClient) GetForecast(ctx context.Context, lat, lon float64) (*O
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error getting forecast data: %w", err)
+		return fmt.Errorf("error sending request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusTooManyRequests {
-		return nil, &RateLimitError{RetryAfter: parseRetryAfter(resp.Header.Get("Retry-After"))}
+		return &RateLimitError{RetryAfter: parseRetryAfter(resp.Header.Get("Retry-After"))}
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("error from Open-Meteo API: %s", resp.Status)
+		return fmt.Errorf("error from Open-Meteo API: %s", resp.Status)
 	}
 
-	var forecastResp OpenMeteoResponse
-	if err := json.NewDecoder(resp.Body).Decode(&forecastResp); err != nil {
-		return nil, fmt.Errorf("error decoding forecast response: %w", err)
+	if decodeErr := json.NewDecoder(resp.Body).Decode(target); decodeErr != nil {
+		return fmt.Errorf("error decoding response: %w", decodeErr)
 	}
 
-	return &forecastResp, nil
+	return nil
 }
 
 func (c *OpenMeteoClient) GetSnowForecast(ctx context.Context, lat, lon float64) ([]WeatherPrediction, error) {

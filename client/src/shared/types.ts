@@ -49,3 +49,26 @@ export type AlertSettings = {
 	notificationDays: number
 	minSnowAmount: number
 }
+
+export type SeasonSnowfall = {
+	label: string
+	startYear: number
+	partial: boolean
+	totalInches: number
+	daysAtOrAbove: number | null
+}
+
+export type MonthlySnowfall = {
+	month: number
+	inches: number
+}
+
+export type SnowHistory = {
+	resortUuid: string
+	resortName: string
+	threshold: number | null
+	seasons: SeasonSnowfall[]
+	monthlyAverages: MonthlySnowfall[]
+	averageSeasonInches: number
+	averageDaysAtOrAbove: number | null
+}

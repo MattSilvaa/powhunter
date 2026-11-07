@@ -15,7 +15,9 @@ import (
 	"github.com/MattSilvaa/powhunter/internal/db"
 	"github.com/MattSilvaa/powhunter/internal/middleware"
 	"github.com/MattSilvaa/powhunter/internal/notify"
+	"github.com/MattSilvaa/powhunter/internal/snowhistory"
 	"github.com/MattSilvaa/powhunter/internal/validate"
+	"github.com/MattSilvaa/powhunter/internal/weather"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
@@ -52,6 +54,7 @@ type Handlers struct {
 	Contact *ContactHandler
 	Auth    *AuthHandler
 	Link    *LinkHandler
+	History *HistoryHandler
 	auth    *auth.Service
 	store   *db.Store
 }
@@ -151,6 +154,10 @@ func NewHandlers(cfg config.Config, logger *slog.Logger) (*Handlers, error) {
 
 	authService := auth.NewService(store.Queries(), cfg.IsProduction(), cfg.CookieCrossSite)
 
+	// Past snowfall comes from the same provider as the forecaster's forecasts,
+	// cached in memory because it barely changes.
+	snowHistory := snowhistory.NewService(weather.NewOpenMeteoClient())
+
 	return &Handlers{
 		Resort:  resortHandler,
 		Alert:   alertHandler,
@@ -158,6 +165,7 @@ func NewHandlers(cfg config.Config, logger *slog.Logger) (*Handlers, error) {
 		Contact: contactHandler,
 		Auth:    NewAuthHandler(authService, mailer, cfg.AppBaseURL, logger),
 		Link:    NewLinkHandler(store.Queries(), cfg.AppBaseURL, logger),
+		History: NewHistoryHandler(store.Queries(), snowHistory, logger),
 		auth:    authService,
 		store:   store,
 	}, nil

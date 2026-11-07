@@ -48,6 +48,9 @@ const ERROR_MESSAGES: Record<string, string> = {
 	UNAUTHENTICATED: 'Please sign in to continue.',
 	ALERT_NOT_FOUND:
 		'That subscription no longer exists. Refresh the page to see your current subscriptions.',
+	RESORT_NOT_FOUND: 'We could not find that resort.',
+	HISTORY_UNAVAILABLE:
+		'Snowfall history is busy right now. Please try again in a minute.',
 	INVALID_TOKEN:
 		'That sign-in link has expired or has already been used. Request a new one.',
 	INTERNAL_ERROR:
