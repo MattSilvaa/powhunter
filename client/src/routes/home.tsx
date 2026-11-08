@@ -10,7 +10,6 @@ import {
 } from '@mui/material'
 import SnowBoard from '../components/snowBoard.tsx'
 import SeasonRecap from '../components/seasonRecap.tsx'
-import { CATALOG } from '../shared/catalog.ts'
 import { pageMeta } from '../shared/seo.ts'
 import { SnowReport, useSnowReport } from '../shared/snowReport.ts'
 
@@ -121,7 +120,7 @@ export default function Home({
 	return (
 		<Container maxWidth="md" sx={{ py: { xs: 5, md: 7 } }}>
 			<Typography variant="h3" component="h1">
-				Snow alerts by text for {CATALOG.length} ski resorts
+				Powder alerts by text
 			</Typography>
 			<Typography color="text.secondary" sx={{ mt: 1.5, maxWidth: 600 }}>
 				{offSeason

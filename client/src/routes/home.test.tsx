@@ -140,7 +140,7 @@ describe('Home', () => {
 		renderHome()
 
 		expect(
-			screen.getByRole('heading', { level: 1, name: /snow alerts by text/i })
+			screen.getByRole('heading', { level: 1, name: /powder alerts by text/i })
 		).toBeTruthy()
 		expect(
 			screen.getByRole('link', { name: 'Get snow alerts' }).getAttribute('href')
