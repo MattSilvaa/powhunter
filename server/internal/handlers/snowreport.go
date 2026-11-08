@@ -23,13 +23,15 @@ const (
 	// freshness and caps the database at one read per five minutes, however
 	// much traffic arrives.
 	snowReportTTL = 5 * time.Minute
-	// snowReportCacheControl lets browsers and any CDN in front absorb repeat
-	// requests too. The body is the same for every visitor, so public caching
-	// is safe.
-	snowReportCacheControl = "public, max-age=300, stale-while-revalidate=600"
+	// snowReportCacheControl lets browsers and any CDN in front absorb rapid
+	// repeat requests. It is kept short: the in-memory cache above already
+	// caps database reads, and a long browser cache kept showing an empty
+	// report for up to 15 minutes after the forecaster stored new data. The
+	// body is the same for every visitor, so public caching is safe.
+	snowReportCacheControl = "public, max-age=60"
 	// snowReportStaleCacheControl is sent with a stale copy served because a
 	// rebuild failed, so caches come back soon rather than holding it.
-	snowReportStaleCacheControl = "public, max-age=60"
+	snowReportStaleCacheControl = "public, max-age=30"
 	// snowReportRetryAfter is how long after a failed rebuild requests keep
 	// getting the stale copy (or a 503) without trying the database again.
 	// Without it, every search keystroke during an outage would start another
