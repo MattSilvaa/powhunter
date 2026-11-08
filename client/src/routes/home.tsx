@@ -10,7 +10,6 @@ import {
 } from '@mui/material'
 import SnowBoard from '../components/snowBoard.tsx'
 import SeasonRecap from '../components/seasonRecap.tsx'
-import { CATALOG } from '../shared/catalog.ts'
 import { pageMeta } from '../shared/seo.ts'
 import { SnowReport, useSnowReport } from '../shared/snowReport.ts'
 
@@ -85,7 +84,7 @@ function Board({
 }: {
 	report: SnowReport
 	now: Date
-}): React.ReactElement {
+}): React.ReactElement | null {
 	if (report.mode === 'live' && report.live?.resorts.length) {
 		return (
 			<SnowBoard
@@ -102,12 +101,9 @@ function Board({
 		return <SeasonRecap recap={report.recap} />
 	}
 
-	return (
-		<BoardMessage
-			title="No snow numbers yet"
-			body="The report fills in after the next forecast check, which runs twice a day."
-		/>
-	)
+	// Nothing to show yet, such as right after a deploy. The intro and the
+	// signup button above already explain the product, so show no board.
+	return null
 }
 
 export default function Home({
@@ -116,12 +112,14 @@ export default function Home({
 	now?: Date
 }): React.ReactElement {
 	const { data, isPending, isError, refetch } = useSnowReport()
-	const offSeason = data?.mode === 'recap'
+	// Off-season copy only with a recap to back it up: with no data at all,
+	// the page can't say no storm is coming.
+	const offSeason = data?.mode === 'recap' && !!data.recap?.resorts.length
 
 	return (
 		<Container maxWidth="md" sx={{ py: { xs: 5, md: 7 } }}>
 			<Typography variant="h3" component="h1">
-				Snow alerts by text for {CATALOG.length} ski resorts
+				Powder alerts by text
 			</Typography>
 			<Typography color="text.secondary" sx={{ mt: 1.5, maxWidth: 600 }}>
 				{offSeason

@@ -140,7 +140,7 @@ describe('Home', () => {
 		renderHome()
 
 		expect(
-			screen.getByRole('heading', { level: 1, name: /snow alerts by text/i })
+			screen.getByRole('heading', { level: 1, name: /powder alerts by text/i })
 		).toBeTruthy()
 		expect(
 			screen.getByRole('link', { name: 'Get snow alerts' }).getAttribute('href')
@@ -312,5 +312,39 @@ describe('Home', () => {
 		expect(screen.getByText('Searching…')).toBeTruthy()
 		expect(screen.queryByText('No resort matches')).toBeNull()
 		expect(await screen.findByRole('option', { name: 'Alta' })).toBeTruthy()
+	})
+
+	// Before the first forecast run there is no data. Show no board and no
+	// message about how the report works; the intro already explains it.
+	test('shows no board when the report is empty', async () => {
+		const calls: string[] = []
+		fetchStub.fetch = (url: string) => {
+			calls.push(url)
+			return Promise.resolve(
+				new Response(
+					JSON.stringify({
+						...RECAP,
+						recap: {
+							...RECAP.recap!,
+							resort_count: 0,
+							resorts: [],
+							biggest_storm: null,
+						},
+					})
+				)
+			)
+		}
+		renderHome()
+
+		await waitFor(() => expect(calls).toHaveLength(1))
+		await waitFor(() =>
+			expect(screen.queryByLabelText('Loading snow report')).toBeNull()
+		)
+		expect(screen.queryByRole('region', { name: 'Season recap' })).toBeNull()
+		expect(screen.queryByText(/forecast check/i)).toBeNull()
+		expect(screen.queryByText(/no resort has a storm/i)).toBeNull()
+		expect(
+			screen.getByRole('link', { name: 'Get snow alerts' }).getAttribute('href')
+		).toBe('/signup')
 	})
 })
