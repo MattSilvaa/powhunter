@@ -15,9 +15,11 @@ import (
 
 	"github.com/MattSilvaa/powhunter/internal/config"
 	"github.com/MattSilvaa/powhunter/internal/db"
+	dbgen "github.com/MattSilvaa/powhunter/internal/db/generated"
 	"github.com/MattSilvaa/powhunter/internal/forecast"
 	"github.com/MattSilvaa/powhunter/internal/metrics"
 	"github.com/MattSilvaa/powhunter/internal/notify"
+	"github.com/MattSilvaa/powhunter/internal/snowreport"
 	"github.com/MattSilvaa/powhunter/internal/weather"
 
 	_ "github.com/lib/pq"
@@ -26,6 +28,14 @@ import (
 // runTimeout is a generous ceiling for the whole job. Per-resort deadlines do
 // the real work; this only stops a wedged process from running forever.
 const runTimeout = 30 * time.Minute
+
+// snowReportTimeout bounds the snow report upkeep after the alerts. The recap
+// backfill is at most one archive call per resort, once a season.
+const snowReportTimeout = 5 * time.Minute
+
+// dailySnowfallRetentionDays is how long stored daily snowfall is kept. The
+// report only reads the last three weeks; the rest is slack for debugging.
+const dailySnowfallRetentionDays = 60
 
 // These live here rather than in a sibling file because the deploy builds this
 // command as a single file (`go build cmd/forecaster/main.go`), which silently
@@ -72,9 +82,12 @@ func run(logger *slog.Logger) error {
 	ctx, timeoutCancel := context.WithTimeout(ctx, runTimeout)
 	defer timeoutCancel()
 
+	store := db.NewStore(conn)
+	weatherClient := weather.NewOpenMeteoClient()
+
 	runner := forecast.NewRunner(
-		db.NewStore(conn),
-		weather.NewOpenMeteoClient(),
+		store,
+		weatherClient,
 		notify.NewTwilioClient(fromNumber),
 		logger,
 		time.Now,
@@ -99,6 +112,10 @@ func run(logger *slog.Logger) error {
 
 	publishMetrics(logger, summary)
 
+	// After the alerts, so nothing here can delay a text. Failures are logged
+	// and retried next run; they never change the exit code.
+	updateSnowReport(ctx, logger, store.Queries(), weatherClient)
+
 	if runErr != nil {
 		return runErr
 	}
@@ -110,6 +127,31 @@ func run(logger *slog.Logger) error {
 	}
 
 	return nil
+}
+
+// updateSnowReport prunes old daily snowfall and fills in last season's recap
+// for any resort that does not have it yet.
+func updateSnowReport(
+	ctx context.Context,
+	logger *slog.Logger,
+	queries *dbgen.Queries,
+	archive weather.ArchiveService,
+) {
+	ctx, cancel := context.WithTimeout(ctx, snowReportTimeout)
+	defer cancel()
+
+	now := time.Now().UTC()
+
+	cutoff := now.AddDate(0, 0, -dailySnowfallRetentionDays)
+	if pruned, err := queries.PruneDailySnowfall(ctx, cutoff); err != nil {
+		logger.WarnContext(ctx, "failed to prune daily snowfall", "error", err)
+	} else if pruned > 0 {
+		logger.InfoContext(ctx, "pruned daily snowfall", "rows", pruned)
+	}
+
+	if err := snowreport.Backfill(ctx, queries, archive, now, logger); err != nil {
+		logger.WarnContext(ctx, "season recap backfill incomplete; it will retry next run", "error", err)
+	}
 }
 
 // linkBaseURL validates where alert links point. A bad value logs and turns

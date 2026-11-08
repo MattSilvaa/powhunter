@@ -51,6 +51,26 @@ type Resort struct {
 	Longitude   sql.NullFloat64 `json:"longitude"`
 }
 
+type ResortDailySnowfall struct {
+	ResortUuid uuid.UUID `json:"resort_uuid"`
+	Date       time.Time `json:"date"`
+	SnowfallIn float64   `json:"snowfall_in"`
+	FetchedAt  time.Time `json:"fetched_at"`
+}
+
+type ResortSeasonStat struct {
+	ResortUuid        uuid.UUID    `json:"resort_uuid"`
+	Season            string       `json:"season"`
+	SeasonStart       time.Time    `json:"season_start"`
+	SeasonEnd         time.Time    `json:"season_end"`
+	TotalSnowfallIn   float64      `json:"total_snowfall_in"`
+	Days6inPlus       int32        `json:"days_6in_plus"`
+	BiggestStormIn    float64      `json:"biggest_storm_in"`
+	BiggestStormStart sql.NullTime `json:"biggest_storm_start"`
+	BiggestStormEnd   sql.NullTime `json:"biggest_storm_end"`
+	ComputedAt        time.Time    `json:"computed_at"`
+}
+
 type Session struct {
 	ID         int32     `json:"id"`
 	Uuid       uuid.UUID `json:"uuid"`

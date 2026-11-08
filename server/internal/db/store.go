@@ -78,6 +78,16 @@ type StoreService interface {
 
 	// UpdateUserPhone replaces the phone number SMS alerts are sent to.
 	UpdateUserPhone(ctx context.Context, userUUID uuid.UUID, phone string) error
+
+	// SaveDailySnowfall stores one resort's daily snowfall totals, replacing
+	// any earlier values for the same days.
+	SaveDailySnowfall(ctx context.Context, resortUUID uuid.UUID, days []DailySnowfall, fetchedAt time.Time) error
+}
+
+// DailySnowfall is one day's snowfall at a resort, in inches.
+type DailySnowfall struct {
+	Date       time.Time
+	SnowfallIn float64
 }
 
 type Store struct {
@@ -126,6 +136,30 @@ func (s *Store) ListAllResorts(ctx context.Context) ([]dbgen.Resort, error) {
 	}
 
 	return resorts, nil
+}
+
+// SaveDailySnowfall writes a resort's days in one transaction, so the report
+// never reads a half-written run for a resort.
+func (s *Store) SaveDailySnowfall(
+	ctx context.Context,
+	resortUUID uuid.UUID,
+	days []DailySnowfall,
+	fetchedAt time.Time,
+) error {
+	return s.ExecTx(ctx, func(q *dbgen.Queries) error {
+		for _, day := range days {
+			if err := q.UpsertDailySnowfall(ctx, dbgen.UpsertDailySnowfallParams{
+				ResortUuid: resortUUID,
+				Date:       day.Date,
+				SnowfallIn: day.SnowfallIn,
+				FetchedAt:  fetchedAt,
+			}); err != nil {
+				return fmt.Errorf("saving snowfall for %s: %w", day.Date.Format(time.DateOnly), err)
+			}
+		}
+
+		return nil
+	})
 }
 
 // Attribution is what brought a new account in. Each field is empty when

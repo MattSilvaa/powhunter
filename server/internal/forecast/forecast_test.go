@@ -108,7 +108,7 @@ func (h *harness) expectOneMatchingAlertAt(resort dbgen.Resort, alert db.AlertTo
 	h.store.EXPECT().ListAllResorts(gomock.Any()).Return([]dbgen.Resort{resort}, nil)
 	h.weather.EXPECT().
 		GetSnowForecast(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return([]weather.WeatherPrediction{{Date: forecastDate(), SnowAmount: 8}}, nil)
+		Return(&weather.Forecast{Predictions: []weather.WeatherPrediction{{Date: forecastDate(), SnowAmount: 8}}}, nil)
 	h.store.EXPECT().
 		GetAlertMatches(gomock.Any(), resortUUID().String(), forecastDate(), 8.0, int32(2)).
 		Return([]db.AlertToSend{alert}, nil)
@@ -219,7 +219,7 @@ func TestATransientForecastFailureIsRetried(t *testing.T) {
 			Return(nil, errors.New("temporary failure")),
 		h.weather.EXPECT().
 			GetSnowForecast(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return([]weather.WeatherPrediction{{Date: forecastDate(), SnowAmount: 8}}, nil),
+			Return(&weather.Forecast{Predictions: []weather.WeatherPrediction{{Date: forecastDate(), SnowAmount: 8}}}, nil),
 	)
 
 	h.store.EXPECT().
@@ -244,7 +244,7 @@ func TestARateLimitedForecastIsRetried(t *testing.T) {
 			Return(nil, fmt.Errorf("error getting forecast: %w", &weather.RateLimitError{})),
 		h.weather.EXPECT().
 			GetSnowForecast(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return([]weather.WeatherPrediction{{Date: forecastDate(), SnowAmount: 8}}, nil),
+			Return(&weather.Forecast{Predictions: []weather.WeatherPrediction{{Date: forecastDate(), SnowAmount: 8}}}, nil),
 	)
 
 	h.store.EXPECT().
@@ -273,7 +273,7 @@ func TestOneFailingResortDoesNotStopTheOthers(t *testing.T) {
 		Return(nil, errors.New("upstream down")).Times(2)
 	h.weather.EXPECT().
 		GetSnowForecast(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return([]weather.WeatherPrediction{{Date: forecastDate(), SnowAmount: 8}}, nil)
+		Return(&weather.Forecast{Predictions: []weather.WeatherPrediction{{Date: forecastDate(), SnowAmount: 8}}}, nil)
 
 	h.store.EXPECT().
 		GetAlertMatches(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
@@ -300,4 +300,65 @@ func TestResortsWithoutCoordinatesAreSkipped(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Zero(t, run.ResortsChecked)
+}
+
+func TestDailySnowfallIsSavedForTheSnowReport(t *testing.T) {
+	h := newHarness(t)
+
+	daily := []weather.DailySnowfall{{Date: forecastDate(), SnowfallIn: 8}}
+
+	h.store.EXPECT().ListAllResorts(gomock.Any()).Return([]dbgen.Resort{testResort()}, nil)
+	h.weather.EXPECT().GetSnowForecast(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&weather.Forecast{Daily: daily}, nil)
+	h.store.EXPECT().
+		SaveDailySnowfall(gomock.Any(), resortUUID(), []db.DailySnowfall{{Date: forecastDate(), SnowfallIn: 8}}, fixedNow()).
+		Return(nil)
+
+	run, err := h.runner.Run(t.Context())
+
+	require.NoError(t, err)
+	assert.True(t, run.Succeeded)
+}
+
+// The report is a nice-to-have; alerts are the product.
+func TestAFailedSnowfallSaveDoesNotStopAlerts(t *testing.T) {
+	h := newHarness(t)
+	alert := testAlert()
+
+	h.store.EXPECT().ListAllResorts(gomock.Any()).Return([]dbgen.Resort{testResort()}, nil)
+	h.weather.EXPECT().GetSnowForecast(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&weather.Forecast{
+			Predictions: []weather.WeatherPrediction{{Date: forecastDate(), SnowAmount: 8}},
+			Daily:       []weather.DailySnowfall{{Date: forecastDate(), SnowfallIn: 8}},
+		}, nil)
+	h.store.EXPECT().SaveDailySnowfall(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(errors.New("db down"))
+	h.store.EXPECT().
+		GetAlertMatches(gomock.Any(), resortUUID().String(), forecastDate(), 8.0, int32(2)).
+		Return([]db.AlertToSend{alert}, nil)
+	h.notifier.EXPECT().SendSMS(alert.UserPhone, gomock.Any()).Return(nil)
+	h.store.EXPECT().RecordAlertSent(gomock.Any(), alert, gomock.Any()).Return(nil)
+
+	run, err := h.runner.Run(t.Context())
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, run.AlertsSent)
+}
+
+// The forecast request also returns the past three weeks. Snow that already
+// fell must never be matched against alerts.
+func TestPastSnowIsNeverAlerted(t *testing.T) {
+	h := newHarness(t)
+
+	yesterday := fixedNow().AddDate(0, 0, -1)
+
+	h.store.EXPECT().ListAllResorts(gomock.Any()).Return([]dbgen.Resort{testResort()}, nil)
+	h.weather.EXPECT().GetSnowForecast(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&weather.Forecast{Predictions: []weather.WeatherPrediction{{Date: yesterday, SnowAmount: 20}}}, nil)
+	h.store.EXPECT().GetAlertMatches(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	run, err := h.runner.Run(t.Context())
+
+	require.NoError(t, err)
+	assert.Zero(t, run.AlertsMatched)
 }

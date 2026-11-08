@@ -69,8 +69,13 @@ type Querier interface {
 	InsertAlertHistory(ctx context.Context, arg InsertAlertHistoryParams) (int32, error)
 	InsertAlertLink(ctx context.Context, arg InsertAlertLinkParams) error
 	ListActiveAlerts(ctx context.Context) ([]ListActiveAlertsRow, error)
+	ListDailySnowfallSince(ctx context.Context, date time.Time) ([]ListDailySnowfallSinceRow, error)
 	ListResorts(ctx context.Context) ([]Resort, error)
+	ListResortsMissingSeasonStats(ctx context.Context, season string) ([]Resort, error)
+	ListSeasonStats(ctx context.Context, season string) ([]ListSeasonStatsRow, error)
 	MarkEmailVerified(ctx context.Context, argUuid uuid.UUID) error
+	// Only the last few weeks matter to the report; older rows are dead weight.
+	PruneDailySnowfall(ctx context.Context, date time.Time) (int64, error)
 	// Counts a click and returns where to send the visitor, in one round trip.
 	RecordAlertLinkClick(ctx context.Context, code string) (string, error)
 	TouchSession(ctx context.Context, arg TouchSessionParams) error
@@ -79,9 +84,11 @@ type Querier interface {
 	// and it keys off the session's user so one account cannot edit another's.
 	UpdateUserAlertSettingsByUserUUID(ctx context.Context, arg UpdateUserAlertSettingsByUserUUIDParams) (UserAlert, error)
 	UpdateUserPhone(ctx context.Context, arg UpdateUserPhoneParams) (User, error)
+	UpsertDailySnowfall(ctx context.Context, arg UpsertDailySnowfallParams) error
 	// Keyed on name so re-seeding keeps existing UUIDs and the alerts that
 	// reference them, rather than deleting and recreating every resort.
 	UpsertResort(ctx context.Context, arg UpsertResortParams) (Resort, error)
+	UpsertSeasonStats(ctx context.Context, arg UpsertSeasonStatsParams) error
 	// Anonymous signup for an unconfirmed account. Signing up again for the same
 	// resort must not fail: the first confirmation email may never have arrived,
 	// and a 409 would both block a fresh link and roll back the phone update that

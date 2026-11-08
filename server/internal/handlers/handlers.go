@@ -57,8 +57,10 @@ type Handlers struct {
 	Contact *ContactHandler
 	Auth    *AuthHandler
 	Link    *LinkHandler
-	auth    *auth.Service
-	store   *db.Store
+	// SnowReport serves the home page's live report or season recap.
+	SnowReport *SnowReportHandler
+	auth       *auth.Service
+	store      *db.Store
 }
 
 var METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
@@ -189,14 +191,15 @@ func NewHandlers(cfg config.Config, logger *slog.Logger) (*Handlers, error) {
 	}
 
 	return &Handlers{
-		Resort:  resortHandler,
-		Alert:   alertHandler,
-		Account: NewAccountHandler(store, logger),
-		Contact: contactHandler,
-		Auth:    NewAuthHandler(authService, mailer, cfg.AppBaseURL, logger),
-		Link:    NewLinkHandler(store.Queries(), cfg.AppBaseURL, logger),
-		auth:    authService,
-		store:   store,
+		Resort:     resortHandler,
+		Alert:      alertHandler,
+		Account:    NewAccountHandler(store, logger),
+		Contact:    contactHandler,
+		Auth:       NewAuthHandler(authService, mailer, cfg.AppBaseURL, logger),
+		Link:       NewLinkHandler(store.Queries(), cfg.AppBaseURL, logger),
+		SnowReport: NewSnowReportHandler(store.Queries(), logger),
+		auth:       authService,
+		store:      store,
 	}, nil
 }
 

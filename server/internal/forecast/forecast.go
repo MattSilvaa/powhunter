@@ -182,7 +182,7 @@ func (r *Runner) processResort(ctx context.Context, resort resortRow, totals *su
 
 	totals.add(func(run *metrics.ForecastRun) { run.ResortsChecked++ })
 
-	predictions, err := r.fetchForecast(ctx, resort.Latitude.Float64, resort.Longitude.Float64)
+	forecast, err := r.fetchForecast(ctx, resort.Latitude.Float64, resort.Longitude.Float64)
 	if err != nil {
 		logger.ErrorContext(ctx, "failed to get forecast", "error", err)
 		totals.add(func(run *metrics.ForecastRun) { run.ResortsFailed++ })
@@ -190,8 +190,41 @@ func (r *Runner) processResort(ctx context.Context, resort resortRow, totals *su
 		return
 	}
 
-	for _, prediction := range predictions {
+	r.saveDailySnowfall(ctx, resort, forecast.Daily, logger)
+
+	today := truncateToDate(r.now().UTC())
+
+	for _, prediction := range forecast.Predictions {
+		// The request also returns the past few weeks for the snow report.
+		// Snow that already fell is not a forecast and must never be texted.
+		if truncateToDate(prediction.Date.UTC()).Before(today) {
+			continue
+		}
+
 		r.processPrediction(ctx, resort, prediction, logger, totals)
+	}
+}
+
+// saveDailySnowfall stores the resort's daily totals for the home page's snow
+// report. A failure is logged and does not hold up alerts: a stale report is
+// far less costly than a missed powder day.
+func (r *Runner) saveDailySnowfall(
+	ctx context.Context,
+	resort resortRow,
+	daily []weather.DailySnowfall,
+	logger *slog.Logger,
+) {
+	if len(daily) == 0 {
+		return
+	}
+
+	days := make([]db.DailySnowfall, len(daily))
+	for i, day := range daily {
+		days[i] = db.DailySnowfall{Date: day.Date, SnowfallIn: day.SnowfallIn}
+	}
+
+	if err := r.store.SaveDailySnowfall(ctx, resort.Uuid, days, r.now().UTC()); err != nil {
+		logger.ErrorContext(ctx, "failed to save daily snowfall for the snow report", "error", err)
 	}
 }
 
@@ -305,13 +338,17 @@ func resortReportURL(resort resortRow) string {
 func (r *Runner) fetchForecast(
 	ctx context.Context,
 	lat, lon float64,
-) ([]weather.WeatherPrediction, error) {
+) (*weather.Forecast, error) {
 	var lastErr error
 
 	for attempt := 1; attempt <= r.opts.Attempts; attempt++ {
-		predictions, err := r.weather.GetSnowForecast(ctx, lat, lon)
+		forecast, err := r.weather.GetSnowForecast(ctx, lat, lon)
+		if err == nil && forecast != nil {
+			return forecast, nil
+		}
+
 		if err == nil {
-			return predictions, nil
+			err = errors.New("empty forecast")
 		}
 
 		lastErr = err
