@@ -8,7 +8,7 @@ Pow Hunter should feel like a clean snow report: quiet, flat, and precise. The n
 - **Flat.** Separate things with 1px borders, not shadows. No gradients, glass effects, glows, or lift-on-hover. Shadows are only for floating layers (menus, dialogs).
 - **Numbers are the hero.** Show snow amounts and day counts large, in tabular figures, like a weather readout (`12″`, `3 days`).
 - **Less on the page.** One clear primary action per screen. Don't add filler cards, decorative icons, or "coming soon" content.
-- **Honest.** Label example or illustrative data as such (see the "Example" chip on the home forecast card).
+- **Honest.** Show real data, and say where it comes from when it could be misread (see the "modeled snowfall" note under the season recap). Never show made-up numbers.
 
 ## Where things live
 
@@ -22,6 +22,8 @@ Pow Hunter should feel like a clean snow report: quiet, flat, and precise. The n
 | `src/components/sliderField.tsx`         | A slider with its label, hint and live value shown as a readout.                                  |
 | `src/components/alertSettingsFields.tsx` | The minimum-snowfall and advance-notice sliders every alert carries.                              |
 | `src/components/resortSelect.tsx`        | The checkbox resort picker that shows picks as chips.                                             |
+| `src/components/snowBoard.tsx`           | The home page's in-season board: the biggest storm on top, then every resort ranked by snow.      |
+| `src/components/seasonRecap.tsx`         | The home page's off-season board: last season's totals, 6″+ days and biggest storm per resort.    |
 
 ## Tokens (defined in `theme.ts`)
 
@@ -37,6 +39,8 @@ Use theme tokens (`'text.secondary'`, `'divider'`, `'primary.main'`). Don't hard
 
 - **Form or detail page:** `Container maxWidth="sm"` (or `"xs"` for sign in) with `py: { xs: 5, md: 8 }`, then `<PageHeader>`, then `<Paper variant="outlined">` holding the content.
 - **List:** a single outlined `Paper` with rows separated by `borderTop: 1, borderColor: 'divider'`, rather than a stack of separate cards.
+- **Snow board:** an outlined `Paper` with one big tabular figure on top (the biggest storm), then `component="ol"` rows on a fixed-width CSS grid so the header and every row line up. Numbers are right-aligned. Secondary columns (daily bars, extra stats) hide below `sm` or move under the resort name; nothing scrolls sideways.
+- **Loading and errors:** a `Skeleton` version of the same `Paper` while loading. If data fails, say so in one line, offer "Try again", and keep the page's primary action working.
 - **Empty state:** a centered outlined `Paper` with a muted icon, a short title, one line of copy, and one button.
 - **Section label:** `Typography variant="overline"`, for example "3 ACTIVE" or "SNOW ALERTS BY TEXT".
 - **Navigation:** the header handles it, so don't add "← Back to Home" buttons.
