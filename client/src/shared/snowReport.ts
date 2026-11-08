@@ -53,9 +53,17 @@ export type SnowReportSearch = {
 	recap: RecapResort[]
 }
 
-// The server rejects shorter searches, so the client never sends them.
+// The server accepts searches of this many characters (counted as Unicode
+// characters, like the server does), so the client never sends others.
 export const SEARCH_MIN_LENGTH = 2
-const SEARCH_DEBOUNCE_MS = 250
+export const SEARCH_MAX_LENGTH = 64
+export const SEARCH_DEBOUNCE_MS = 250
+
+// The length of a search the way the server counts it: an emoji is one
+// character, not two.
+export function searchLength(query: string): number {
+	return [...query].length
+}
 
 const SNOW_REPORT_RETRIES = 2
 // The server rebuilds the report at most every five minutes and the forecast
@@ -84,11 +92,12 @@ export function useDebouncedValue<T>(value: T, delayMs: number): T {
 }
 
 // Searches the whole board on the server, so it works the same with 28
-// resorts or thousands. Typing is debounced, and short queries never run.
+// resorts or thousands. Pass an already debounced, trimmed query; one outside
+// the server's length limits never runs.
 export function useSnowReportSearch(
-	query: string
+	q: string
 ): UseQueryResult<SnowReportSearch> {
-	const q = useDebouncedValue(query.trim(), SEARCH_DEBOUNCE_MS)
+	const length = searchLength(q)
 
 	return useQuery<SnowReportSearch>({
 		queryKey: ['snow-report-search', q.toLowerCase()],
@@ -96,7 +105,7 @@ export function useSnowReportSearch(
 			apiRequest<SnowReportSearch>(
 				`/api/snow-report/search?q=${encodeURIComponent(q)}`
 			),
-		enabled: q.length >= SEARCH_MIN_LENGTH,
+		enabled: length >= SEARCH_MIN_LENGTH && length <= SEARCH_MAX_LENGTH,
 		staleTime: SNOW_REPORT_STALE_TIME_MS,
 		retry: retryOnlyTransport(SNOW_REPORT_RETRIES),
 	})

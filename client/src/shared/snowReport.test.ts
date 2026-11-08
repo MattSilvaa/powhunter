@@ -6,6 +6,7 @@ import {
 	formatInches,
 	resortRef,
 	seasonLabel,
+	searchLength,
 	updatedAgo,
 	useDebouncedValue,
 } from './snowReport.ts'
@@ -67,4 +68,11 @@ test('debounces a changing value', async () => {
 
 	await act(() => new Promise((resolve) => setTimeout(resolve, 40)))
 	expect(result.current).toBe('alt')
+})
+
+// Counted like the server counts, so an emoji is one character, not two.
+test('measures searches in characters', () => {
+	expect(searchLength('alta')).toBe(4)
+	expect(searchLength('⛷')).toBe(1)
+	expect(searchLength('🏔')).toBe(1)
 })

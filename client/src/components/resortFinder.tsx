@@ -1,8 +1,12 @@
 import React, { useState } from 'react'
 import { Autocomplete, Box, TextField } from '@mui/material'
 import {
+	SEARCH_DEBOUNCE_MS,
+	SEARCH_MAX_LENGTH,
 	SEARCH_MIN_LENGTH,
+	searchLength,
 	SnowReportSearch,
+	useDebouncedValue,
 	useSnowReportSearch,
 } from '../shared/snowReport.ts'
 
@@ -20,11 +24,25 @@ export default function ResortFinder<T extends { name: string }>({
 	select,
 	renderRow,
 }: ResortFinderProps<T>): React.ReactElement {
+	// input is what the box shows; term is what was typed. They differ after
+	// a pick, when the box shows the resort's name, which is not a search.
 	const [input, setInput] = useState('')
+	const [term, setTerm] = useState('')
 	const [picked, setPicked] = useState<T | null>(null)
-	const search = useSnowReportSearch(input)
-	const options = search.data ? select(search.data) : []
-	const tooShort = input.trim().length < SEARCH_MIN_LENGTH
+
+	const typed = term.trim()
+	const debounced = useDebouncedValue(typed, SEARCH_DEBOUNCE_MS)
+	const search = useSnowReportSearch(debounced)
+	const tooShort = searchLength(typed) < SEARCH_MIN_LENGTH
+	// Until the debounce catches up, the last results are for another term,
+	// so show "Searching…" rather than them or "No resort matches".
+	const pending = typed !== debounced
+	const results = !pending && search.data ? select(search.data) : []
+	// Keep the picked resort among the options so the box can show it.
+	const options =
+		picked && !results.some((resort) => resort.name === picked.name)
+			? [picked, ...results]
+			: results
 
 	return (
 		<Box sx={{ borderTop: 1, borderColor: 'divider' }}>
@@ -34,12 +52,16 @@ export default function ResortFinder<T extends { name: string }>({
 					value={picked}
 					onChange={(_, value) => setPicked(value)}
 					inputValue={input}
-					onInputChange={(_, value) => setInput(value)}
+					onInputChange={(_, value, reason) => {
+						setInput(value)
+						if (reason === 'input' || reason === 'clear') setTerm(value)
+					}}
 					getOptionLabel={(resort) => resort.name}
 					isOptionEqualToValue={(a, b) => a.name === b.name}
 					// The server already filtered the options.
 					filterOptions={(resorts) => resorts}
-					loading={search.isFetching}
+					loading={!tooShort && (pending || search.isFetching)}
+					loadingText="Searching…"
 					noOptionsText={
 						tooShort
 							? `Type ${SEARCH_MIN_LENGTH} or more letters`
@@ -53,6 +75,10 @@ export default function ResortFinder<T extends { name: string }>({
 							{...params}
 							label="Find your resort"
 							placeholder="Resort name"
+							inputProps={{
+								...params.inputProps,
+								maxLength: SEARCH_MAX_LENGTH,
+							}}
 						/>
 					)}
 				/>

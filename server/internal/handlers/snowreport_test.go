@@ -243,3 +243,41 @@ func TestSnowReportSearchUnavailableWithNothingCached(t *testing.T) {
 
 	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
 }
+
+// During an outage, requests keep getting the last good copy without each one
+// trying the database again. Search is called on every keystroke, so without
+// this backoff an outage would multiply database attempts.
+func TestAFailedRebuildIsNotRetriedOnEveryRequest(t *testing.T) {
+	builder := &countingBuilder{}
+	handler, clock := newSnowReportTest(builder)
+
+	getSnowReport(handler, "")
+	builder.fail.Store(true)
+	clock.advance(2 * time.Minute)
+
+	for range 5 {
+		assert.Equal(t, http.StatusOK, searchSnowReport(handler, "?q=alta").Code)
+		assert.Equal(t, http.StatusOK, getSnowReport(handler, "").Code)
+	}
+
+	assert.Equal(t, int32(2), builder.calls.Load(), "one good build, then one failed attempt")
+
+	clock.advance(snowReportRetryAfter)
+	builder.fail.Store(false)
+	getSnowReport(handler, "")
+
+	assert.Equal(t, int32(3), builder.calls.Load(), "it tries again once the backoff has passed")
+	assert.Equal(t, snowReportCacheControl, getSnowReport(handler, "").Header().Get("Cache-Control"))
+}
+
+func TestAFailedFirstBuildBacksOffToo(t *testing.T) {
+	builder := &countingBuilder{}
+	builder.fail.Store(true)
+	handler, _ := newSnowReportTest(builder)
+
+	for range 5 {
+		assert.Equal(t, http.StatusServiceUnavailable, getSnowReport(handler, "").Code)
+	}
+
+	assert.Equal(t, int32(1), builder.calls.Load())
+}

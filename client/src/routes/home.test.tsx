@@ -259,6 +259,8 @@ describe('Home', () => {
 		typeInto(within(board).getByLabelText('Find your resort'), 'alt')
 		fireEvent.click(await screen.findByRole('option', { name: 'Alta' }))
 
+		// Showing the picked name in the box is not a new search.
+		await new Promise((resolve) => setTimeout(resolve, 400))
 		expect(searches).toEqual(['alt'])
 		const rows = within(board).getAllByRole('listitem')
 		expect(rows).toHaveLength(6)
@@ -293,5 +295,22 @@ describe('Home', () => {
 		fireEvent.click(await screen.findByRole('option', { name: 'Vail' }))
 
 		expect(within(recap).getByText('188″')).toBeTruthy()
+	})
+
+	// While typing settles, the menu must not claim there are no matches.
+	test('says it is searching while the search is pending', async () => {
+		respondWithReportAndSearch(LIVE_TOP_5, {
+			mode: 'live',
+			live: [ALTA_14],
+			recap: [],
+		})
+		renderHome()
+
+		const board = await screen.findByRole('region', { name: 'Snow report' })
+		typeInto(within(board).getByLabelText('Find your resort'), 'al')
+
+		expect(screen.getByText('Searching…')).toBeTruthy()
+		expect(screen.queryByText('No resort matches')).toBeNull()
+		expect(await screen.findByRole('option', { name: 'Alta' })).toBeTruthy()
 	})
 })

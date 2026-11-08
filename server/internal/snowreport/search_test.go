@@ -74,3 +74,13 @@ func TestSearchUsesTheRecapOffSeason(t *testing.T) {
 	require.Len(t, result.Recap, 1)
 	assert.Equal(t, 2, result.Recap[0].Rank)
 }
+
+// An index answers the same as a one-off search, and is built once per report.
+func TestSearchIndexMatchesReportSearch(t *testing.T) {
+	report := liveReport("Palisades Tahoe", "Mt. Bachelor", "Alta")
+	index := snowreport.NewSearchIndex(report)
+
+	for _, query := range []string{"mt bach", "ALTA", "tahoe", "zzz"} {
+		assert.Equal(t, report.Search(query), index.Search(query), query)
+	}
+}

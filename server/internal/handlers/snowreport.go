@@ -30,13 +30,18 @@ const (
 	// snowReportStaleCacheControl is sent with a stale copy served because a
 	// rebuild failed, so caches come back soon rather than holding it.
 	snowReportStaleCacheControl = "public, max-age=60"
+	// snowReportRetryAfter is how long after a failed rebuild requests keep
+	// getting the stale copy (or a 503) without trying the database again.
+	// Without it, every search keystroke during an outage would start another
+	// rebuild once the previous one gave up.
+	snowReportRetryAfter = 30 * time.Second
 )
 
-// snowReportCache is one built report: the full report, which search reads,
-// and the encoded top of it, which the home page reads.
+// snowReportCache is one built report: a search index over the full report,
+// which search reads, and the encoded top of it, which the home page reads.
 type snowReportCache struct {
-	report snowreport.Report
-	body   []byte
+	index *snowreport.SearchIndex
+	body  []byte
 }
 
 // SnowReportBuilder assembles the report. It is a function so tests can count
@@ -64,9 +69,10 @@ type SnowReportHandler struct {
 
 	group singleflight.Group
 
-	mu      sync.RWMutex
-	cached  *snowReportCache
-	builtAt time.Time
+	mu       sync.RWMutex
+	cached   *snowReportCache
+	builtAt  time.Time
+	failedAt time.Time
 }
 
 // NewSnowReportHandler builds a handler that reads from store.
@@ -129,7 +135,7 @@ func (h *SnowReportHandler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(cached.report.Search(query)); err != nil {
+	if err := json.NewEncoder(&buf).Encode(cached.index.Search(query)); err != nil {
 		h.logger.ErrorContext(r.Context(), "failed to encode snow report search", "error", err)
 		sendErrorResponse(w, "INTERNAL_ERROR", "Something went wrong", http.StatusInternalServerError)
 
@@ -145,6 +151,10 @@ func (h *SnowReportHandler) Search(w http.ResponseWriter, r *http.Request) {
 func (h *SnowReportHandler) load(r *http.Request) (*snowReportCache, bool) {
 	if cached, ok := h.fresh(); ok {
 		return cached, false
+	}
+
+	if cached, backingOff := h.backingOff(); backingOff {
+		return cached, cached != nil
 	}
 
 	// A detached context: one visitor closing the tab must not fail the
@@ -169,6 +179,19 @@ func (h *SnowReportHandler) load(r *http.Request) (*snowReportCache, bool) {
 	return h.cached, h.cached != nil
 }
 
+// backingOff reports whether a rebuild failed too recently to try again, and
+// returns the last good copy, if any, to serve meanwhile.
+func (h *SnowReportHandler) backingOff() (*snowReportCache, bool) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	if h.failedAt.IsZero() || h.now().Sub(h.failedAt) >= snowReportRetryAfter {
+		return nil, false
+	}
+
+	return h.cached, true
+}
+
 func (h *SnowReportHandler) fresh() (*snowReportCache, bool) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -190,6 +213,10 @@ func (h *SnowReportHandler) refresh(ctx context.Context) (*snowReportCache, erro
 
 	report, err := h.build(ctx, now)
 	if err != nil {
+		h.mu.Lock()
+		h.failedAt = now
+		h.mu.Unlock()
+
 		return nil, err
 	}
 
@@ -198,11 +225,12 @@ func (h *SnowReportHandler) refresh(ctx context.Context) (*snowReportCache, erro
 		return nil, fmt.Errorf("encoding snow report: %w", encodeErr)
 	}
 
-	cached := &snowReportCache{report: report, body: buf.Bytes()}
+	cached := &snowReportCache{index: snowreport.NewSearchIndex(report), body: buf.Bytes()}
 
 	h.mu.Lock()
 	h.cached = cached
 	h.builtAt = now
+	h.failedAt = time.Time{}
 	h.mu.Unlock()
 
 	return cached, nil
