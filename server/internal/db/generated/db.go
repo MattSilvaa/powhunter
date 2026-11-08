@@ -114,11 +114,23 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.listActiveAlertsStmt, err = db.PrepareContext(ctx, listActiveAlerts); err != nil {
 		return nil, fmt.Errorf("error preparing query ListActiveAlerts: %w", err)
 	}
+	if q.listDailySnowfallSinceStmt, err = db.PrepareContext(ctx, listDailySnowfallSince); err != nil {
+		return nil, fmt.Errorf("error preparing query ListDailySnowfallSince: %w", err)
+	}
 	if q.listResortsStmt, err = db.PrepareContext(ctx, listResorts); err != nil {
 		return nil, fmt.Errorf("error preparing query ListResorts: %w", err)
 	}
+	if q.listResortsMissingSeasonStatsStmt, err = db.PrepareContext(ctx, listResortsMissingSeasonStats); err != nil {
+		return nil, fmt.Errorf("error preparing query ListResortsMissingSeasonStats: %w", err)
+	}
+	if q.listSeasonStatsStmt, err = db.PrepareContext(ctx, listSeasonStats); err != nil {
+		return nil, fmt.Errorf("error preparing query ListSeasonStats: %w", err)
+	}
 	if q.markEmailVerifiedStmt, err = db.PrepareContext(ctx, markEmailVerified); err != nil {
 		return nil, fmt.Errorf("error preparing query MarkEmailVerified: %w", err)
+	}
+	if q.pruneDailySnowfallStmt, err = db.PrepareContext(ctx, pruneDailySnowfall); err != nil {
+		return nil, fmt.Errorf("error preparing query PruneDailySnowfall: %w", err)
 	}
 	if q.recordAlertLinkClickStmt, err = db.PrepareContext(ctx, recordAlertLinkClick); err != nil {
 		return nil, fmt.Errorf("error preparing query RecordAlertLinkClick: %w", err)
@@ -135,8 +147,14 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.updateUserPhoneStmt, err = db.PrepareContext(ctx, updateUserPhone); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateUserPhone: %w", err)
 	}
+	if q.upsertDailySnowfallStmt, err = db.PrepareContext(ctx, upsertDailySnowfall); err != nil {
+		return nil, fmt.Errorf("error preparing query UpsertDailySnowfall: %w", err)
+	}
 	if q.upsertResortStmt, err = db.PrepareContext(ctx, upsertResort); err != nil {
 		return nil, fmt.Errorf("error preparing query UpsertResort: %w", err)
+	}
+	if q.upsertSeasonStatsStmt, err = db.PrepareContext(ctx, upsertSeasonStats); err != nil {
+		return nil, fmt.Errorf("error preparing query UpsertSeasonStats: %w", err)
 	}
 	if q.upsertUnconfirmedUserAlertStmt, err = db.PrepareContext(ctx, upsertUnconfirmedUserAlert); err != nil {
 		return nil, fmt.Errorf("error preparing query UpsertUnconfirmedUserAlert: %w", err)
@@ -299,14 +317,34 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing listActiveAlertsStmt: %w", cerr)
 		}
 	}
+	if q.listDailySnowfallSinceStmt != nil {
+		if cerr := q.listDailySnowfallSinceStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listDailySnowfallSinceStmt: %w", cerr)
+		}
+	}
 	if q.listResortsStmt != nil {
 		if cerr := q.listResortsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing listResortsStmt: %w", cerr)
 		}
 	}
+	if q.listResortsMissingSeasonStatsStmt != nil {
+		if cerr := q.listResortsMissingSeasonStatsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listResortsMissingSeasonStatsStmt: %w", cerr)
+		}
+	}
+	if q.listSeasonStatsStmt != nil {
+		if cerr := q.listSeasonStatsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listSeasonStatsStmt: %w", cerr)
+		}
+	}
 	if q.markEmailVerifiedStmt != nil {
 		if cerr := q.markEmailVerifiedStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing markEmailVerifiedStmt: %w", cerr)
+		}
+	}
+	if q.pruneDailySnowfallStmt != nil {
+		if cerr := q.pruneDailySnowfallStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing pruneDailySnowfallStmt: %w", cerr)
 		}
 	}
 	if q.recordAlertLinkClickStmt != nil {
@@ -334,9 +372,19 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing updateUserPhoneStmt: %w", cerr)
 		}
 	}
+	if q.upsertDailySnowfallStmt != nil {
+		if cerr := q.upsertDailySnowfallStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing upsertDailySnowfallStmt: %w", cerr)
+		}
+	}
 	if q.upsertResortStmt != nil {
 		if cerr := q.upsertResortStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing upsertResortStmt: %w", cerr)
+		}
+	}
+	if q.upsertSeasonStatsStmt != nil {
+		if cerr := q.upsertSeasonStatsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing upsertSeasonStatsStmt: %w", cerr)
 		}
 	}
 	if q.upsertUnconfirmedUserAlertStmt != nil {
@@ -418,14 +466,20 @@ type Queries struct {
 	insertAlertHistoryStmt                *sql.Stmt
 	insertAlertLinkStmt                   *sql.Stmt
 	listActiveAlertsStmt                  *sql.Stmt
+	listDailySnowfallSinceStmt            *sql.Stmt
 	listResortsStmt                       *sql.Stmt
+	listResortsMissingSeasonStatsStmt     *sql.Stmt
+	listSeasonStatsStmt                   *sql.Stmt
 	markEmailVerifiedStmt                 *sql.Stmt
+	pruneDailySnowfallStmt                *sql.Stmt
 	recordAlertLinkClickStmt              *sql.Stmt
 	touchSessionStmt                      *sql.Stmt
 	updateUserAlertStmt                   *sql.Stmt
 	updateUserAlertSettingsByUserUUIDStmt *sql.Stmt
 	updateUserPhoneStmt                   *sql.Stmt
+	upsertDailySnowfallStmt               *sql.Stmt
 	upsertResortStmt                      *sql.Stmt
+	upsertSeasonStatsStmt                 *sql.Stmt
 	upsertUnconfirmedUserAlertStmt        *sql.Stmt
 	upsertUserStmt                        *sql.Stmt
 }
@@ -464,14 +518,20 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		insertAlertHistoryStmt:                q.insertAlertHistoryStmt,
 		insertAlertLinkStmt:                   q.insertAlertLinkStmt,
 		listActiveAlertsStmt:                  q.listActiveAlertsStmt,
+		listDailySnowfallSinceStmt:            q.listDailySnowfallSinceStmt,
 		listResortsStmt:                       q.listResortsStmt,
+		listResortsMissingSeasonStatsStmt:     q.listResortsMissingSeasonStatsStmt,
+		listSeasonStatsStmt:                   q.listSeasonStatsStmt,
 		markEmailVerifiedStmt:                 q.markEmailVerifiedStmt,
+		pruneDailySnowfallStmt:                q.pruneDailySnowfallStmt,
 		recordAlertLinkClickStmt:              q.recordAlertLinkClickStmt,
 		touchSessionStmt:                      q.touchSessionStmt,
 		updateUserAlertStmt:                   q.updateUserAlertStmt,
 		updateUserAlertSettingsByUserUUIDStmt: q.updateUserAlertSettingsByUserUUIDStmt,
 		updateUserPhoneStmt:                   q.updateUserPhoneStmt,
+		upsertDailySnowfallStmt:               q.upsertDailySnowfallStmt,
 		upsertResortStmt:                      q.upsertResortStmt,
+		upsertSeasonStatsStmt:                 q.upsertSeasonStatsStmt,
 		upsertUnconfirmedUserAlertStmt:        q.upsertUnconfirmedUserAlertStmt,
 		upsertUserStmt:                        q.upsertUserStmt,
 	}
