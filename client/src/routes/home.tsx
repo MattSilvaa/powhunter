@@ -141,7 +141,9 @@ export default function Home({
 
 			<Box sx={{ mt: { xs: 4, md: 5 } }}>
 				{isPending && <BoardSkeleton />}
-				{isError && (
+				{/* A failed background refetch keeps the last report, so only say it
+				failed when there is nothing to show. */}
+				{isError && !data && (
 					<BoardMessage
 						title="The snow report didn't load"
 						body="Alerts still go out on schedule. Try again in a minute."

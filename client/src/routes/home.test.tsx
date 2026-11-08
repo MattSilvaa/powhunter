@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Home from './home'
@@ -70,14 +70,12 @@ const respondWith = (status: number, body: unknown) => {
 		Promise.resolve(new Response(JSON.stringify(body), { status }))
 }
 
-const renderHome = () =>
+const renderHome = (
+	client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+) =>
 	render(
 		<MemoryRouter>
-			<QueryClientProvider
-				client={
-					new QueryClient({ defaultOptions: { queries: { retry: false } } })
-				}
-			>
+			<QueryClientProvider client={client}>
 				<Home now={now} />
 			</QueryClientProvider>
 		</MemoryRouter>
@@ -161,5 +159,27 @@ describe('Home', () => {
 		expect(
 			screen.getByRole('link', { name: 'Get snow alerts' }).getAttribute('href')
 		).toBe('/signup')
+	})
+
+	// React Query keeps the last report when a refetch fails, such as on
+	// returning to a tab later. The board stays, with no error over it.
+	test('keeps the board when a background refetch fails', async () => {
+		const client = new QueryClient({
+			defaultOptions: { queries: { retry: false } },
+		})
+		respondWith(200, LIVE)
+		renderHome(client)
+		await screen.findByRole('region', { name: 'Snow report' })
+
+		respondWith(429, { error: 'RATE_LIMITED', message: 'slow down' })
+		await client.refetchQueries({ queryKey: ['snow-report'] })
+		await waitFor(() =>
+			expect(client.getQueryState(['snow-report'])?.status).toBe('error')
+		)
+		// Let React render the error state before asserting it is not shown.
+		await new Promise((resolve) => setTimeout(resolve, 50))
+
+		expect(screen.getByRole('region', { name: 'Snow report' })).toBeTruthy()
+		expect(screen.queryByText("The snow report didn't load")).toBeNull()
 	})
 })

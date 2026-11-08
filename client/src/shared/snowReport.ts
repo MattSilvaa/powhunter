@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, UseQueryResult } from '@tanstack/react-query'
 import { apiRequest, retryOnlyTransport } from './apiClient.ts'
 import { CATALOG } from './catalog.ts'
 import { resortSlug } from './resortSlug.ts'
@@ -43,7 +43,7 @@ const SNOW_REPORT_RETRIES = 2
 // itself changes twice a day, so refetching more often gains nothing.
 const SNOW_REPORT_STALE_TIME_MS = 5 * 60 * 1000
 
-export function useSnowReport() {
+export function useSnowReport(): UseQueryResult<SnowReport> {
 	return useQuery<SnowReport>({
 		queryKey: ['snow-report'],
 		queryFn: () => apiRequest<SnowReport>('/api/snow-report'),
