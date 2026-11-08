@@ -144,13 +144,13 @@ func updateSnowReport(
 
 	cutoff := now.AddDate(0, 0, -dailySnowfallRetentionDays)
 	if pruned, err := queries.PruneDailySnowfall(ctx, cutoff); err != nil {
-		logger.Warn("failed to prune daily snowfall", "error", err)
+		logger.WarnContext(ctx, "failed to prune daily snowfall", "error", err)
 	} else if pruned > 0 {
-		logger.Info("pruned daily snowfall", "rows", pruned)
+		logger.InfoContext(ctx, "pruned daily snowfall", "rows", pruned)
 	}
 
 	if err := snowreport.Backfill(ctx, queries, archive, now, logger); err != nil {
-		logger.Warn("season recap backfill incomplete; it will retry next run", "error", err)
+		logger.WarnContext(ctx, "season recap backfill incomplete; it will retry next run", "error", err)
 	}
 }
 

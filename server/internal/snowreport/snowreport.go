@@ -38,6 +38,10 @@ const (
 	// treated as complete. Open-Meteo's archive trails real time by a few days.
 	archiveLagDays = 7
 	dateLayout     = time.DateOnly
+	// centuryYears turns 2026 into the "26" of "2025-26".
+	centuryYears = 100
+	// tenths rounds inches to one decimal place.
+	tenths = 10
 )
 
 // Mode is which report the home page shows.
@@ -172,7 +176,7 @@ func LastCompletedSeason(now time.Time) Season {
 	}
 
 	return Season{
-		Name:  fmt.Sprintf("%d-%02d", endYear-1, endYear%100),
+		Name:  fmt.Sprintf("%d-%02d", endYear-1, endYear%centuryYears),
 		Start: time.Date(endYear-1, time.November, 1, 0, 0, 0, 0, time.UTC),
 		End:   time.Date(endYear, time.April, 30, 0, 0, 0, 0, time.UTC),
 	}
@@ -352,5 +356,5 @@ func dateOf(t time.Time) time.Time {
 }
 
 func round1(value float64) float64 {
-	return math.Round(value*10) / 10
+	return math.Round(value*tenths) / tenths
 }

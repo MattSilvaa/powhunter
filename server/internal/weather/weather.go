@@ -239,8 +239,8 @@ func (c *OpenMeteoClient) getJSON(ctx context.Context, url string, target any) e
 		return fmt.Errorf("error from Open-Meteo API: %s", resp.Status)
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
-		return fmt.Errorf("error decoding Open-Meteo response: %w", err)
+	if decodeErr := json.NewDecoder(resp.Body).Decode(target); decodeErr != nil {
+		return fmt.Errorf("error decoding Open-Meteo response: %w", decodeErr)
 	}
 
 	return nil

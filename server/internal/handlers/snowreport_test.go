@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -63,7 +62,7 @@ func (c *testClock) advance(d time.Duration) {
 func newSnowReportTest(builder *countingBuilder) (*SnowReportHandler, *testClock) {
 	clock := &testClock{now: time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)}
 	handler := NewSnowReportHandlerWithBuilder(builder.build, clock.Now, time.Minute,
-		slog.New(slog.NewTextHandler(io.Discard, nil)))
+		slog.New(slog.DiscardHandler))
 
 	return handler, clock
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"io"
 	"log/slog"
 	"testing"
 	"time"
@@ -21,7 +20,9 @@ import (
 )
 
 // today is mid-afternoon so tests also cover reducing a time to its day.
-var today = time.Date(2026, 1, 15, 15, 30, 0, 0, time.UTC)
+func today() time.Time {
+	return time.Date(2026, 1, 15, 15, 30, 0, 0, time.UTC)
+}
 
 func day(offset int) time.Time {
 	return time.Date(2026, 1, 15+offset, 0, 0, 0, 0, time.UTC)
@@ -55,7 +56,7 @@ func TestDetermineMode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, snowreport.DetermineMode(tt.days, today))
+			assert.Equal(t, tt.want, snowreport.DetermineMode(tt.days, today()))
 		})
 	}
 }
@@ -70,7 +71,10 @@ func TestAnEarlySeasonStormFlipsBackToLive(t *testing.T) {
 	}
 	require.Equal(t, snowreport.ModeRecap, snowreport.DetermineMode(dry, october))
 
-	storm := append(dry, snowreport.ResortDay{ResortName: "Alta", Date: october.AddDate(0, 0, 7), SnowfallIn: 4})
+	storm := append(
+		append([]snowreport.ResortDay(nil), dry...),
+		snowreport.ResortDay{ResortName: "Alta", Date: october.AddDate(0, 0, 7), SnowfallIn: 4},
+	)
 	assert.Equal(t, snowreport.ModeLive, snowreport.DetermineMode(storm, october))
 }
 
@@ -86,7 +90,7 @@ func TestBuildLiveSortsByUpcomingSnow(t *testing.T) {
 		snow("Vail", 0, 1.4),
 	}
 
-	live := snowreport.BuildLive(days, today)
+	live := snowreport.BuildLive(days, today())
 
 	require.Len(t, live, 3)
 	assert.Equal(t, "Palisades Tahoe", live[0].Name)
@@ -169,7 +173,10 @@ type fakeStore struct {
 	season   string
 }
 
-func (f *fakeStore) ListDailySnowfallSince(_ context.Context, date time.Time) ([]dbgen.ListDailySnowfallSinceRow, error) {
+func (f *fakeStore) ListDailySnowfallSince(
+	_ context.Context,
+	date time.Time,
+) ([]dbgen.ListDailySnowfallSinceRow, error) {
 	f.sinceArg = date
 	return f.daily, nil
 }
@@ -195,7 +202,7 @@ func TestBuildLiveReport(t *testing.T) {
 		{ResortName: "Alta", Date: day(2), SnowfallIn: 9, FetchedAt: fetched},
 	}}
 
-	report, err := snowreport.Build(t.Context(), store, today)
+	report, err := snowreport.Build(t.Context(), store, today())
 
 	require.NoError(t, err)
 	assert.Equal(t, snowreport.ModeLive, report.Mode)
@@ -230,10 +237,16 @@ func TestBackfillStoresMissingSeasonsAndKeepsGoingAfterAFailure(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	archive := weathermocks.NewMockArchiveService(ctrl)
 
-	broken := dbgen.Resort{Uuid: uuid.New(), Name: "Broken",
-		Latitude: sql.NullFloat64{Float64: 1, Valid: true}, Longitude: sql.NullFloat64{Float64: 1, Valid: true}}
-	alta := dbgen.Resort{Uuid: uuid.New(), Name: "Alta",
-		Latitude: sql.NullFloat64{Float64: 40.58, Valid: true}, Longitude: sql.NullFloat64{Float64: -111.63, Valid: true}}
+	resortAt := func(name string, lat, lon float64) dbgen.Resort {
+		return dbgen.Resort{
+			Uuid:      uuid.New(),
+			Name:      name,
+			Latitude:  sql.NullFloat64{Float64: lat, Valid: true},
+			Longitude: sql.NullFloat64{Float64: lon, Valid: true},
+		}
+	}
+	broken := resortAt("Broken", 1, 1)
+	alta := resortAt("Alta", 40.58, -111.63)
 	store := &fakeStore{missing: []dbgen.Resort{broken, alta}}
 
 	start := time.Date(2025, 11, 1, 0, 0, 0, 0, time.UTC)
@@ -242,7 +255,7 @@ func TestBackfillStoresMissingSeasonsAndKeepsGoingAfterAFailure(t *testing.T) {
 	archive.EXPECT().GetSeasonSnowfall(gomock.Any(), 40.58, -111.63, start, end).Return(season(0, 8, 4), nil)
 
 	err := snowreport.Backfill(t.Context(), store, archive,
-		time.Date(2026, 11, 8, 0, 0, 0, 0, time.UTC), slog.New(slog.NewTextHandler(io.Discard, nil)))
+		time.Date(2026, 11, 8, 0, 0, 0, 0, time.UTC), slog.New(slog.DiscardHandler))
 
 	require.ErrorContains(t, err, "Broken")
 	require.Len(t, store.saved, 1)
