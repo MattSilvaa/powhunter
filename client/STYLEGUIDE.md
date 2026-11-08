@@ -24,6 +24,7 @@ Pow Hunter should feel like a clean snow report: quiet, flat, and precise. The n
 | `src/components/resortSelect.tsx`        | The checkbox resort picker that shows picks as chips.                                             |
 | `src/components/snowBoard.tsx`           | The home page's in-season board: the biggest storm on top, then every resort ranked by snow.      |
 | `src/components/seasonRecap.tsx`         | The home page's off-season board: last season's totals, 6″+ days and biggest storm per resort.    |
+| `src/components/resortFinder.tsx`        | "Find your resort" under a snow board: a server-side search that shows the picked resort's row.   |
 
 ## Tokens (defined in `theme.ts`)
 
@@ -39,7 +40,7 @@ Use theme tokens (`'text.secondary'`, `'divider'`, `'primary.main'`). Don't hard
 
 - **Form or detail page:** `Container maxWidth="sm"` (or `"xs"` for sign in) with `py: { xs: 5, md: 8 }`, then `<PageHeader>`, then `<Paper variant="outlined">` holding the content.
 - **List:** a single outlined `Paper` with rows separated by `borderTop: 1, borderColor: 'divider'`, rather than a stack of separate cards.
-- **Snow board:** an outlined `Paper` with one big tabular figure on top (the biggest storm), then `component="ol"` rows on a fixed-width CSS grid so the header and every row line up. Numbers are right-aligned. Secondary columns (daily bars, extra stats) hide below `sm` or move under the resort name; nothing scrolls sideways.
+- **Snow board:** an outlined `Paper` with one big tabular figure on top (the biggest storm), then `component="ol"` rows on a fixed-width CSS grid so the header and every row line up. Numbers are right-aligned. Secondary columns (daily bars, extra stats) hide below `sm` or move under the resort name; nothing scrolls sideways. The API sends only the top 5 (`snowreport.TopResorts` on the server); render those, then `ResortFinder` (`src/components/resortFinder.tsx`), which searches on the server. Never render an unbounded list of resorts: there will be more of them.
 - **Loading and errors:** a `Skeleton` version of the same `Paper` while loading. If data fails, say so in one line, offer "Try again", and keep the page's primary action working.
 - **Empty state:** a centered outlined `Paper` with a muted icon, a short title, one line of copy, and one button.
 - **Section label:** `Typography variant="overline"`, for example "3 ACTIVE" or "SNOW ALERTS BY TEXT".

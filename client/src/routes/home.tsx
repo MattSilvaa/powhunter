@@ -90,6 +90,7 @@ function Board({
 		return (
 			<SnowBoard
 				resorts={report.live.resorts}
+				resortCount={report.live.resort_count}
 				days={report.live.days}
 				updatedAt={report.updated_at}
 				now={now}

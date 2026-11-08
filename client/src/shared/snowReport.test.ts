@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { act, renderHook } from '@testing-library/react'
 import {
 	byDay,
 	dateRange,
@@ -6,6 +7,7 @@ import {
 	resortRef,
 	seasonLabel,
 	updatedAgo,
+	useDebouncedValue,
 } from './snowReport.ts'
 
 // A Thursday afternoon, UTC.
@@ -49,4 +51,20 @@ describe('snow report formatting', () => {
 			region: '',
 		})
 	})
+})
+
+// Search waits for typing to pause, so one word is one request, not one per
+// keystroke.
+test('debounces a changing value', async () => {
+	const { result, rerender } = renderHook(
+		({ value }: { value: string }) => useDebouncedValue(value, 20),
+		{ initialProps: { value: 'a' } }
+	)
+
+	rerender({ value: 'al' })
+	rerender({ value: 'alt' })
+	expect(result.current).toBe('a')
+
+	await act(() => new Promise((resolve) => setTimeout(resolve, 40)))
+	expect(result.current).toBe('alt')
 })

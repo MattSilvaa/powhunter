@@ -2,6 +2,7 @@ import React from 'react'
 import { Link } from 'react-router'
 import { Box, Button, Link as MuiLink, Paper, Typography } from '@mui/material'
 import { tabularNums } from '../theme.ts'
+import ResortFinder from './resortFinder.tsx'
 import {
 	byDay,
 	formatInches,
@@ -12,7 +13,9 @@ import {
 } from '../shared/snowReport.ts'
 
 type SnowBoardProps = {
+	// The top of the board; the full board has resortCount resorts.
 	resorts: LiveResort[]
+	resortCount: number
 	days: number
 	updatedAt: string | null
 	now: Date
@@ -140,13 +143,7 @@ function StormHeadline({
 	)
 }
 
-function BoardRow({
-	resort,
-	rank,
-}: {
-	resort: LiveResort
-	rank: number
-}): React.ReactElement {
+function BoardRow({ resort }: { resort: LiveResort }): React.ReactElement {
 	const ref = resortRef(resort.name)
 	const dry = resort.total_in < 1
 	return (
@@ -168,7 +165,7 @@ function BoardRow({
 				color="text.secondary"
 				sx={{ ...tabularNums }}
 			>
-				{rank}
+				{resort.rank}
 			</Typography>
 			<Box sx={{ minWidth: 0 }}>
 				<MuiLink
@@ -210,10 +207,11 @@ function BoardRow({
 	)
 }
 
-// The in-season board: every resort's snow over the coming days, most first,
-// with the biggest storm called out on top.
+// The in-season board: the resorts with the most snow coming, the biggest
+// storm called out on top, and a search for every other resort.
 export default function SnowBoard({
 	resorts,
+	resortCount,
 	days,
 	updatedAt,
 	now,
@@ -283,10 +281,17 @@ export default function SnowBoard({
 			</Box>
 
 			<Box component="ol" sx={{ listStyle: 'none', m: 0, p: 0 }}>
-				{resorts.map((resort, i) => (
-					<BoardRow key={resort.name} resort={resort} rank={i + 1} />
+				{resorts.map((resort) => (
+					<BoardRow key={resort.name} resort={resort} />
 				))}
 			</Box>
+
+			{resortCount > resorts.length && (
+				<ResortFinder<LiveResort>
+					select={(result) => result.live}
+					renderRow={(resort) => <BoardRow resort={resort} />}
+				/>
+			)}
 		</Paper>
 	)
 }

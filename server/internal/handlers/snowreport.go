@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/sync/singleflight"
 
@@ -30,6 +32,13 @@ const (
 	snowReportStaleCacheControl = "public, max-age=60"
 )
 
+// snowReportCache is one built report: the full report, which search reads,
+// and the encoded top of it, which the home page reads.
+type snowReportCache struct {
+	report snowreport.Report
+	body   []byte
+}
+
 // SnowReportBuilder assembles the report. It is a function so tests can count
 // and fail builds without a database.
 type SnowReportBuilder func(ctx context.Context, now time.Time) (snowreport.Report, error)
@@ -40,7 +49,10 @@ type SnowReportBuilder func(ctx context.Context, now time.Time) (snowreport.Repo
 //   - it never calls Open-Meteo; it reads what the forecaster stored,
 //   - the encoded response is cached in memory and shared by every visitor,
 //   - concurrent requests that find the cache expired share a single rebuild,
-//   - it takes no input, so there is nothing to vary the work or the cache on,
+//   - the home page route takes no input and always returns the top
+//     snowreport.TopResorts, however many resorts there are,
+//   - search reads that same in-memory report, with a bounded query and a
+//     bounded number of results, and never touches the database itself,
 //   - if a rebuild fails, the last good copy is served instead of an error.
 //
 // The global per-IP read limiter in front of every route still applies.
@@ -52,10 +64,9 @@ type SnowReportHandler struct {
 
 	group singleflight.Group
 
-	mu       sync.RWMutex
-	body     []byte
-	builtAt  time.Time
-	hasValue bool
+	mu      sync.RWMutex
+	cached  *snowReportCache
+	builtAt time.Time
 }
 
 // NewSnowReportHandler builds a handler that reads from store.
@@ -77,14 +88,63 @@ func NewSnowReportHandlerWithBuilder(
 	return &SnowReportHandler{build: build, now: now, ttl: ttl, logger: logger}
 }
 
-// ServeHTTP answers GET /api/snow-report. The query string is ignored.
+// ServeHTTP answers GET /api/snow-report with the top of the board. The query
+// string is ignored.
 func (h *SnowReportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	setSecurityHeaders(w)
 
-	if body, ok := h.fresh(); ok {
-		writeSnowReport(w, body, snowReportCacheControl)
+	cached, stale := h.load(r)
+	if cached == nil {
+		sendErrorResponse(w, "SNOW_REPORT_UNAVAILABLE",
+			"The snow report is unavailable right now", http.StatusServiceUnavailable)
 
 		return
+	}
+
+	writeSnowReport(w, cached.body, cacheControl(stale))
+}
+
+// Search answers GET /api/snow-report/search?q=… with the resorts whose name
+// matches, from the same in-memory report.
+func (h *SnowReportHandler) Search(w http.ResponseWriter, r *http.Request) {
+	setSecurityHeaders(w)
+
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if length := utf8.RuneCountInString(query); length < snowreport.SearchMinQueryLen ||
+		length > snowreport.SearchMaxQueryLen {
+		sendErrorResponse(w, "INVALID_QUERY",
+			fmt.Sprintf("Search needs %d to %d characters",
+				snowreport.SearchMinQueryLen, snowreport.SearchMaxQueryLen),
+			http.StatusBadRequest)
+
+		return
+	}
+
+	cached, stale := h.load(r)
+	if cached == nil {
+		sendErrorResponse(w, "SNOW_REPORT_UNAVAILABLE",
+			"The snow report is unavailable right now", http.StatusServiceUnavailable)
+
+		return
+	}
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(cached.report.Search(query)); err != nil {
+		h.logger.ErrorContext(r.Context(), "failed to encode snow report search", "error", err)
+		sendErrorResponse(w, "INTERNAL_ERROR", "Something went wrong", http.StatusInternalServerError)
+
+		return
+	}
+
+	writeSnowReport(w, buf.Bytes(), cacheControl(stale))
+}
+
+// load returns the cached report, rebuilding it when it has expired. If the
+// rebuild fails it falls back to the last good copy and reports it as stale;
+// it returns nil only when there has never been a good copy.
+func (h *SnowReportHandler) load(r *http.Request) (*snowReportCache, bool) {
+	if cached, ok := h.fresh(); ok {
+		return cached, false
 	}
 
 	// A detached context: one visitor closing the tab must not fail the
@@ -96,46 +156,34 @@ func (h *SnowReportHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return h.refresh(ctx)
 	})
 	if err == nil {
-		body, _ := result.([]byte)
-		writeSnowReport(w, body, snowReportCacheControl)
+		cached, _ := result.(*snowReportCache)
 
-		return
+		return cached, false
 	}
 
 	h.logger.ErrorContext(r.Context(), "failed to build snow report", "error", err)
 
-	if body, ok := h.stale(); ok {
-		writeSnowReport(w, body, snowReportStaleCacheControl)
-
-		return
-	}
-
-	sendErrorResponse(w, "SNOW_REPORT_UNAVAILABLE",
-		"The snow report is unavailable right now", http.StatusServiceUnavailable)
-}
-
-func (h *SnowReportHandler) fresh() ([]byte, bool) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	if !h.hasValue || h.now().Sub(h.builtAt) >= h.ttl {
+	return h.cached, h.cached != nil
+}
+
+func (h *SnowReportHandler) fresh() (*snowReportCache, bool) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	if h.cached == nil || h.now().Sub(h.builtAt) >= h.ttl {
 		return nil, false
 	}
 
-	return h.body, true
+	return h.cached, true
 }
 
-func (h *SnowReportHandler) stale() ([]byte, bool) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	return h.body, h.hasValue
-}
-
-func (h *SnowReportHandler) refresh(ctx context.Context) ([]byte, error) {
+func (h *SnowReportHandler) refresh(ctx context.Context) (*snowReportCache, error) {
 	// Another request may have rebuilt it while this one waited for its turn.
-	if body, ok := h.fresh(); ok {
-		return body, nil
+	if cached, ok := h.fresh(); ok {
+		return cached, nil
 	}
 
 	now := h.now()
@@ -146,17 +194,26 @@ func (h *SnowReportHandler) refresh(ctx context.Context) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
-	if encodeErr := json.NewEncoder(&buf).Encode(report); encodeErr != nil {
+	if encodeErr := json.NewEncoder(&buf).Encode(report.Top(snowreport.TopResorts)); encodeErr != nil {
 		return nil, fmt.Errorf("encoding snow report: %w", encodeErr)
 	}
 
+	cached := &snowReportCache{report: report, body: buf.Bytes()}
+
 	h.mu.Lock()
-	h.body = buf.Bytes()
+	h.cached = cached
 	h.builtAt = now
-	h.hasValue = true
 	h.mu.Unlock()
 
-	return buf.Bytes(), nil
+	return cached, nil
+}
+
+func cacheControl(stale bool) string {
+	if stale {
+		return snowReportStaleCacheControl
+	}
+
+	return snowReportCacheControl
 }
 
 func writeSnowReport(w http.ResponseWriter, body []byte, cacheControl string) {

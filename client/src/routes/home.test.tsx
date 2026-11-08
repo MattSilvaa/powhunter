@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import {
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+	within,
+} from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Home from './home'
-import { SnowReport } from '../shared/snowReport.ts'
+import { LiveResort, RecapResort, SnowReport } from '../shared/snowReport.ts'
 
 const fetchStub = globalThis as unknown as { fetch: unknown }
 const originalFetch = globalThis.fetch
@@ -26,14 +32,17 @@ const LIVE: SnowReport = {
 	updated_at: '2026-01-15T12:00:00Z',
 	live: {
 		days: 10,
+		resort_count: 2,
 		resorts: [
 			{
+				rank: 1,
 				name: 'Palisades Tahoe',
 				total_in: 18,
 				through: '2026-01-18',
 				daily: days([0, 6, 0, 12, 0, 0, 0, 0, 0, 0]),
 			},
 			{
+				rank: 2,
 				name: 'Alta',
 				total_in: 4,
 				through: '2026-01-16',
@@ -44,6 +53,16 @@ const LIVE: SnowReport = {
 	recap: null,
 }
 
+const RECAP_ALTA: RecapResort = {
+	rank: 1,
+	name: 'Alta',
+	total_in: 402,
+	days_6in_plus: 21,
+	biggest_storm_in: 41,
+	biggest_storm_start: '2025-12-20',
+	biggest_storm_end: '2025-12-22',
+}
+
 const RECAP: SnowReport = {
 	mode: 'recap',
 	updated_at: '2026-11-08T12:00:00Z',
@@ -52,22 +71,56 @@ const RECAP: SnowReport = {
 		season: '2025-26',
 		start: '2025-11-01',
 		end: '2026-04-30',
-		resorts: [
-			{
-				name: 'Alta',
-				total_in: 402,
-				days_6in_plus: 21,
-				biggest_storm_in: 41,
-				biggest_storm_start: '2025-12-20',
-				biggest_storm_end: '2025-12-22',
-			},
-		],
+		resort_count: 1,
+		resorts: [RECAP_ALTA],
+		biggest_storm: RECAP_ALTA,
 	},
 }
+
+// A board with more resorts than the home page shows, so the rest are found
+// through search. Alta sits at 14th.
+const peak = (rank: number): LiveResort => ({
+	rank,
+	name: `Peak ${rank}`,
+	total_in: 30 - rank,
+	through: '2026-01-17',
+	daily: days([0, 0, 30 - rank, 0, 0, 0, 0, 0, 0, 0]),
+})
+
+const LIVE_TOP_5: SnowReport = {
+	...LIVE,
+	live: { days: 10, resort_count: 28, resorts: [1, 2, 3, 4, 5].map(peak) },
+}
+
+const ALTA_14: LiveResort = { ...peak(14), name: 'Alta', total_in: 9 }
 
 const respondWith = (status: number, body: unknown) => {
 	fetchStub.fetch = () =>
 		Promise.resolve(new Response(JSON.stringify(body), { status }))
+}
+
+// Types into a field the way a person does: focused first. MUI's
+// Autocomplete clears text typed into an unfocused field.
+const typeInto = (input: HTMLElement, text: string) => {
+	input.focus()
+	fireEvent.change(input, { target: { value: text } })
+}
+
+// Answers the report and the search separately, recording search queries.
+const respondWithReportAndSearch = (
+	report: SnowReport,
+	search: unknown
+): string[] => {
+	const searches: string[] = []
+	fetchStub.fetch = (url: string) => {
+		const { pathname, searchParams } = new URL(url)
+		if (pathname === '/api/snow-report/search') {
+			searches.push(searchParams.get('q') ?? '')
+			return Promise.resolve(new Response(JSON.stringify(search)))
+		}
+		return Promise.resolve(new Response(JSON.stringify(report)))
+	}
+	return searches
 }
 
 const renderHome = (
@@ -181,5 +234,64 @@ describe('Home', () => {
 
 		expect(screen.getByRole('region', { name: 'Snow report' })).toBeTruthy()
 		expect(screen.queryByText("The snow report didn't load")).toBeNull()
+	})
+
+	test('every resort fits, so there is no search box', async () => {
+		respondWith(200, LIVE)
+		renderHome()
+
+		await screen.findByRole('region', { name: 'Snow report' })
+		expect(screen.queryByLabelText('Find your resort')).toBeNull()
+	})
+
+	// The board shows the top 5 the API sent; the rest are a search away.
+	test('finds a resort outside the top 5', async () => {
+		const searches = respondWithReportAndSearch(LIVE_TOP_5, {
+			mode: 'live',
+			live: [ALTA_14],
+			recap: [],
+		})
+		renderHome()
+
+		const board = await screen.findByRole('region', { name: 'Snow report' })
+		expect(within(board).getAllByRole('listitem')).toHaveLength(5)
+
+		typeInto(within(board).getByLabelText('Find your resort'), 'alt')
+		fireEvent.click(await screen.findByRole('option', { name: 'Alta' }))
+
+		expect(searches).toEqual(['alt'])
+		const rows = within(board).getAllByRole('listitem')
+		expect(rows).toHaveLength(6)
+		const alta = rows[5]
+		expect(alta.textContent).toContain('14')
+		expect(within(alta).getByText('9″')).toBeTruthy()
+		expect(
+			within(alta).getByRole('link', { name: 'Alta' }).getAttribute('href')
+		).toBe('/resorts/alta')
+		expect(
+			within(alta)
+				.getByRole('link', { name: 'Get Alta alerts' })
+				.getAttribute('href')
+		).toBe('/signup?resort=alta')
+	})
+
+	test('finds a resort in the season recap', async () => {
+		const vail: RecapResort = {
+			...RECAP_ALTA,
+			rank: 20,
+			name: 'Vail',
+			total_in: 188,
+		}
+		respondWithReportAndSearch(
+			{ ...RECAP, recap: { ...RECAP.recap!, resort_count: 28 } },
+			{ mode: 'recap', live: [], recap: [vail] }
+		)
+		renderHome()
+
+		const recap = await screen.findByRole('region', { name: 'Season recap' })
+		typeInto(within(recap).getByLabelText('Find your resort'), 'vail')
+		fireEvent.click(await screen.findByRole('option', { name: 'Vail' }))
+
+		expect(within(recap).getByText('188″')).toBeTruthy()
 	})
 })

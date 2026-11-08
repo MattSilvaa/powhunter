@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useQuery, UseQueryResult } from '@tanstack/react-query'
 import { apiRequest, retryOnlyTransport } from './apiClient.ts'
 import { CATALOG } from './catalog.ts'
@@ -11,6 +12,7 @@ export type SnowReportDay = {
 }
 
 export type LiveResort = {
+	rank: number
 	name: string
 	total_in: number
 	through: string | null
@@ -18,6 +20,7 @@ export type LiveResort = {
 }
 
 export type RecapResort = {
+	rank: number
 	name: string
 	total_in: number
 	days_6in_plus: number
@@ -29,14 +32,30 @@ export type RecapResort = {
 export type SnowReport = {
 	mode: 'live' | 'recap'
 	updated_at: string | null
-	live: { days: number; resorts: LiveResort[] } | null
+	// resorts holds only the top few; resort_count is the full board, and
+	// the rest are reached through search.
+	live: { days: number; resort_count: number; resorts: LiveResort[] } | null
 	recap: {
 		season: string
 		start: string
 		end: string
+		resort_count: number
 		resorts: RecapResort[]
+		biggest_storm: RecapResort | null
 	} | null
 }
+
+// The shape of GET /api/snow-report/search: matches in board order, in the
+// list for the current mode.
+export type SnowReportSearch = {
+	mode: 'live' | 'recap'
+	live: LiveResort[]
+	recap: RecapResort[]
+}
+
+// The server rejects shorter searches, so the client never sends them.
+export const SEARCH_MIN_LENGTH = 2
+const SEARCH_DEBOUNCE_MS = 250
 
 const SNOW_REPORT_RETRIES = 2
 // The server rebuilds the report at most every five minutes and the forecast
@@ -47,6 +66,37 @@ export function useSnowReport(): UseQueryResult<SnowReport> {
 	return useQuery<SnowReport>({
 		queryKey: ['snow-report'],
 		queryFn: () => apiRequest<SnowReport>('/api/snow-report'),
+		staleTime: SNOW_REPORT_STALE_TIME_MS,
+		retry: retryOnlyTransport(SNOW_REPORT_RETRIES),
+	})
+}
+
+// Returns value once it has stopped changing for delayMs.
+export function useDebouncedValue<T>(value: T, delayMs: number): T {
+	const [debounced, setDebounced] = useState(value)
+
+	useEffect(() => {
+		const timer = setTimeout(() => setDebounced(value), delayMs)
+		return () => clearTimeout(timer)
+	}, [value, delayMs])
+
+	return debounced
+}
+
+// Searches the whole board on the server, so it works the same with 28
+// resorts or thousands. Typing is debounced, and short queries never run.
+export function useSnowReportSearch(
+	query: string
+): UseQueryResult<SnowReportSearch> {
+	const q = useDebouncedValue(query.trim(), SEARCH_DEBOUNCE_MS)
+
+	return useQuery<SnowReportSearch>({
+		queryKey: ['snow-report-search', q.toLowerCase()],
+		queryFn: () =>
+			apiRequest<SnowReportSearch>(
+				`/api/snow-report/search?q=${encodeURIComponent(q)}`
+			),
+		enabled: q.length >= SEARCH_MIN_LENGTH,
 		staleTime: SNOW_REPORT_STALE_TIME_MS,
 		retry: retryOnlyTransport(SNOW_REPORT_RETRIES),
 	})

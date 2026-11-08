@@ -91,6 +91,8 @@ type Day struct {
 
 // LiveResort is one row of the live board.
 type LiveResort struct {
+	// Rank is the resort's place on the full board, 1 for the most snow.
+	Rank    int     `json:"rank"`
 	Name    string  `json:"name"`
 	TotalIn float64 `json:"total_in"`
 	// Through is the last day with at least ThroughMinIn of snow, for copy
@@ -154,6 +156,10 @@ func BuildLive(days []ResortDay, today time.Time) []LiveResort {
 
 		return resorts[i].Name < resorts[j].Name
 	})
+
+	for i := range resorts {
+		resorts[i].Rank = i + 1
+	}
 
 	return resorts
 }
@@ -257,20 +263,31 @@ type Report struct {
 
 // Live is the in-season board.
 type Live struct {
-	Days    int          `json:"days"`
-	Resorts []LiveResort `json:"resorts"`
+	Days int `json:"days"`
+	// ResortCount is how many resorts the full board has, which can be more
+	// than Resorts holds once the report is cut to the top few.
+	ResortCount int          `json:"resort_count"`
+	Resorts     []LiveResort `json:"resorts"`
 }
 
 // Recap is last season's stats.
 type Recap struct {
-	Season  string        `json:"season"`
-	Start   string        `json:"start"`
-	End     string        `json:"end"`
-	Resorts []RecapResort `json:"resorts"`
+	Season string `json:"season"`
+	Start  string `json:"start"`
+	End    string `json:"end"`
+	// ResortCount is how many resorts the full recap has.
+	ResortCount int           `json:"resort_count"`
+	Resorts     []RecapResort `json:"resorts"`
+	// BiggestStorm is the resort with the most snow over StormWindowDays,
+	// found across every resort rather than only the ones in Resorts. Nil
+	// when no resort had snow.
+	BiggestStorm *RecapResort `json:"biggest_storm"`
 }
 
 // RecapResort is one row of the recap.
 type RecapResort struct {
+	// Rank is the resort's place by season total, 1 for the most snow.
+	Rank              int     `json:"rank"`
 	Name              string  `json:"name"`
 	TotalIn           float64 `json:"total_in"`
 	DeepDays          int32   `json:"days_6in_plus"`
@@ -304,7 +321,8 @@ func Build(ctx context.Context, store ReportStore, now time.Time) (Report, error
 	report := Report{Mode: DetermineMode(days, today), UpdatedAt: updated}
 
 	if report.Mode == ModeLive {
-		report.Live = &Live{Days: ForecastDays, Resorts: BuildLive(days, today)}
+		resorts := BuildLive(days, today)
+		report.Live = &Live{Days: ForecastDays, ResortCount: len(resorts), Resorts: resorts}
 
 		return report, nil
 	}
@@ -317,14 +335,17 @@ func Build(ctx context.Context, store ReportStore, now time.Time) (Report, error
 	}
 
 	report.Recap = &Recap{
-		Season:  season.Name,
-		Start:   season.Start.Format(dateLayout),
-		End:     season.End.Format(dateLayout),
-		Resorts: make([]RecapResort, 0, len(stats)),
+		Season:      season.Name,
+		Start:       season.Start.Format(dateLayout),
+		End:         season.End.Format(dateLayout),
+		ResortCount: len(stats),
+		Resorts:     make([]RecapResort, 0, len(stats)),
 	}
 
-	for _, stat := range stats {
+	// The query already sorts by total, most first.
+	for i, stat := range stats {
 		report.Recap.Resorts = append(report.Recap.Resorts, RecapResort{
+			Rank:              i + 1,
 			Name:              stat.ResortName,
 			TotalIn:           round1(stat.TotalSnowfallIn),
 			DeepDays:          stat.Days6inPlus,
@@ -332,6 +353,14 @@ func Build(ctx context.Context, store ReportStore, now time.Time) (Report, error
 			BiggestStormStart: nullDate(stat.BiggestStormStart.Time, stat.BiggestStormStart.Valid),
 			BiggestStormEnd:   nullDate(stat.BiggestStormEnd.Time, stat.BiggestStormEnd.Valid),
 		})
+	}
+
+	for i := range report.Recap.Resorts {
+		resort := report.Recap.Resorts[i]
+		if resort.BiggestStormIn > 0 &&
+			(report.Recap.BiggestStorm == nil || resort.BiggestStormIn > report.Recap.BiggestStorm.BiggestStormIn) {
+			report.Recap.BiggestStorm = &resort
+		}
 	}
 
 	return report, nil

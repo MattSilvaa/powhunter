@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -37,7 +39,22 @@ func (b *countingBuilder) build(_ context.Context, _ time.Time) (snowreport.Repo
 		return snowreport.Report{}, errors.New("database down")
 	}
 
-	return snowreport.Report{Mode: snowreport.ModeLive, Live: &snowreport.Live{Days: 10}}, nil
+	return testReport(), nil
+}
+
+// testReport is a live board of 12 resorts, more than the home page shows.
+func testReport() snowreport.Report {
+	resorts := make([]snowreport.LiveResort, 12)
+	for i := range resorts {
+		resorts[i] = snowreport.LiveResort{Rank: i + 1, Name: fmt.Sprintf("Peak %02d", i+1)}
+	}
+
+	resorts[6].Name = "Alta"
+
+	return snowreport.Report{
+		Mode: snowreport.ModeLive,
+		Live: &snowreport.Live{Days: 10, ResortCount: len(resorts), Resorts: resorts},
+	}
 }
 
 type testClock struct {
@@ -155,4 +172,74 @@ func TestSnowReportUnavailableWithNothingCached(t *testing.T) {
 	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
 	assert.Contains(t, rec.Body.String(), "SNOW_REPORT_UNAVAILABLE")
 	assert.NotContains(t, rec.Body.String(), "database down", "internal errors are not leaked")
+}
+
+func TestSnowReportServesOnlyTheTopResorts(t *testing.T) {
+	handler, _ := newSnowReportTest(&countingBuilder{})
+
+	var body snowreport.Report
+	require.NoError(t, json.Unmarshal(getSnowReport(handler, "").Body.Bytes(), &body))
+
+	assert.Len(t, body.Live.Resorts, snowreport.TopResorts)
+	assert.Equal(t, 12, body.Live.ResortCount)
+}
+
+func searchSnowReport(handler *SnowReportHandler, query string) *httptest.ResponseRecorder {
+	rec := httptest.NewRecorder()
+	handler.Search(rec, httptest.NewRequest(http.MethodGet, "/api/snow-report/search"+query, nil))
+
+	return rec
+}
+
+// Search reads the cached report, so a stream of searches costs no more
+// database reads than the home page does.
+func TestSnowReportSearchIsAnsweredFromTheCache(t *testing.T) {
+	builder := &countingBuilder{}
+	handler, _ := newSnowReportTest(builder)
+
+	getSnowReport(handler, "")
+	rec := searchSnowReport(handler, "?q=alta")
+	searchSnowReport(handler, "?q=peak")
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, int32(1), builder.calls.Load())
+	assert.Equal(t, snowReportCacheControl, rec.Header().Get("Cache-Control"))
+
+	var result snowreport.SearchResult
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &result))
+	require.Len(t, result.Live, 1)
+	assert.Equal(t, 7, result.Live[0].Rank, "a resort outside the top 5 is still found")
+}
+
+func TestSnowReportSearchCapsResults(t *testing.T) {
+	handler, _ := newSnowReportTest(&countingBuilder{})
+
+	var result snowreport.SearchResult
+	require.NoError(t, json.Unmarshal(searchSnowReport(handler, "?q=peak").Body.Bytes(), &result))
+
+	assert.Len(t, result.Live, snowreport.SearchMaxResults)
+}
+
+func TestSnowReportSearchRejectsBadQueries(t *testing.T) {
+	builder := &countingBuilder{}
+	handler, _ := newSnowReportTest(builder)
+
+	for _, query := range []string{"", "?q=", "?q=a", "?q=%20a%20", "?q=" + strings.Repeat("a", 65)} {
+		rec := searchSnowReport(handler, query)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code, query)
+		assert.Contains(t, rec.Body.String(), "INVALID_QUERY", query)
+	}
+
+	assert.Zero(t, builder.calls.Load(), "a rejected query never builds the report")
+}
+
+func TestSnowReportSearchUnavailableWithNothingCached(t *testing.T) {
+	builder := &countingBuilder{}
+	builder.fail.Store(true)
+	handler, _ := newSnowReportTest(builder)
+
+	rec := searchSnowReport(handler, "?q=alta")
+
+	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
 }

@@ -2,6 +2,7 @@ import React from 'react'
 import { Link } from 'react-router'
 import { Box, Link as MuiLink, Paper, Typography } from '@mui/material'
 import { tabularNums } from '../theme.ts'
+import ResortFinder from './resortFinder.tsx'
 import {
 	dateRange,
 	formatInches,
@@ -97,17 +98,15 @@ function RecapRow({ resort }: { resort: RecapResort }): React.ReactElement {
 	)
 }
 
-// The off-season board: last season, resort by resort.
+// The off-season board: last season's top resorts, the biggest storm, and a
+// search for every other resort.
 export default function SeasonRecap({
 	recap,
 }: {
 	recap: Recap
 }): React.ReactElement {
-	const biggest = recap.resorts.reduce<RecapResort | null>(
-		(best, resort) =>
-			!best || resort.biggest_storm_in > best.biggest_storm_in ? resort : best,
-		null
-	)
+	// Found by the server across every resort, not just the top rows here.
+	const biggest = recap.biggest_storm
 
 	return (
 		<Paper variant="outlined" component="section" aria-label="Season recap">
@@ -184,6 +183,13 @@ export default function SeasonRecap({
 					<RecapRow key={resort.name} resort={resort} />
 				))}
 			</Box>
+
+			{recap.resort_count > recap.resorts.length && (
+				<ResortFinder<RecapResort>
+					select={(result) => result.recap}
+					renderRow={(resort) => <RecapRow resort={resort} />}
+				/>
+			)}
 
 			<Typography
 				variant="body2"

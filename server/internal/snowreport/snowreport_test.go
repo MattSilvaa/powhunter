@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log/slog"
 	"testing"
 	"time"
@@ -94,6 +95,7 @@ func TestBuildLiveSortsByUpcomingSnow(t *testing.T) {
 
 	require.Len(t, live, 3)
 	assert.Equal(t, "Palisades Tahoe", live[0].Name)
+	assert.Equal(t, []int{1, 2, 3}, []int{live[0].Rank, live[1].Rank, live[2].Rank})
 	assert.InDelta(t, 18.5, live[0].TotalIn, 0.001)
 	require.NotNil(t, live[0].Through)
 	assert.Equal(t, "2026-01-18", *live[0].Through)
@@ -211,6 +213,7 @@ func TestBuildLiveReport(t *testing.T) {
 	assert.Nil(t, report.Recap)
 	assert.Equal(t, fetched, *report.UpdatedAt)
 	assert.Equal(t, "Alta", report.Live.Resorts[0].Name)
+	assert.Equal(t, 1, report.Live.ResortCount)
 }
 
 func TestBuildRecapReport(t *testing.T) {
@@ -231,6 +234,10 @@ func TestBuildRecapReport(t *testing.T) {
 	assert.Equal(t, "2026-04-30", report.Recap.End)
 	assert.InDelta(t, 401.3, report.Recap.Resorts[0].TotalIn, 0.001)
 	assert.Equal(t, "2025-12-20", *report.Recap.Resorts[0].BiggestStormStart)
+	assert.Equal(t, 1, report.Recap.Resorts[0].Rank)
+	assert.Equal(t, 1, report.Recap.ResortCount)
+	require.NotNil(t, report.Recap.BiggestStorm)
+	assert.Equal(t, "Alta", report.Recap.BiggestStorm.Name)
 }
 
 func TestBackfillStoresMissingSeasonsAndKeepsGoingAfterAFailure(t *testing.T) {
@@ -263,4 +270,24 @@ func TestBackfillStoresMissingSeasonsAndKeepsGoingAfterAFailure(t *testing.T) {
 	assert.Equal(t, "2025-26", store.saved[0].Season)
 	assert.InDelta(t, 12, store.saved[0].TotalSnowfallIn, 0.001)
 	assert.Equal(t, int32(1), store.saved[0].Days6inPlus)
+}
+
+// The recap's headline storm comes from every resort, not only the top few
+// by season total that the home page receives.
+func TestRecapBiggestStormLooksBeyondTheTop(t *testing.T) {
+	stats := make([]dbgen.ListSeasonStatsRow, 7)
+	for i := range stats {
+		stats[i] = dbgen.ListSeasonStatsRow{
+			ResortName: fmt.Sprintf("Resort %d", i+1), TotalSnowfallIn: float64(400 - i*10), BiggestStormIn: 20,
+		}
+	}
+	stats[6].BiggestStormIn = 48
+
+	report, err := snowreport.Build(t.Context(), &fakeStore{stats: stats}, time.Date(2026, 11, 8, 0, 0, 0, 0, time.UTC))
+
+	require.NoError(t, err)
+	top := report.Top(snowreport.TopResorts)
+	require.NotNil(t, top.Recap.BiggestStorm)
+	assert.Equal(t, "Resort 7", top.Recap.BiggestStorm.Name)
+	assert.Equal(t, 7, top.Recap.BiggestStorm.Rank)
 }

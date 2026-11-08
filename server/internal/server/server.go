@@ -80,6 +80,10 @@ func New(deps Deps) (http.Handler, func()) {
 	// global read limiter below still caps each client.
 	mux.Handle("GET /api/snow-report",
 		deps.Metrics.Instrument("snow_report", deps.Handlers.SnowReport))
+	// Search reads the same in-memory report with a bounded query, so it
+	// never reaches the database per request either.
+	mux.Handle("GET /api/snow-report/search",
+		deps.Metrics.Instrument("snow_report_search", http.HandlerFunc(deps.Handlers.SnowReport.Search)))
 	mux.Handle("GET /api/resorts",
 		deps.Metrics.Instrument("resorts", http.HandlerFunc(deps.Handlers.Resort.ListAllResorts)))
 	mux.Handle("POST /api/alerts",
