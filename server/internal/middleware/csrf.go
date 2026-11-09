@@ -8,13 +8,15 @@ import (
 // CrossOriginGuard rejects state-changing requests a browser sent on behalf of
 // a site that is not on the CORS allowlist.
 //
-// The session cookie is SameSite=None in production, because the web app and
-// the API are on different sites. That means a page on any site can make the
-// victim's browser send a POST carrying the cookie: a form or a no-cors fetch
-// with a text/plain body skips the CORS preflight, so the allowlist alone never
-// gets a say. This closes that gap the same way Go 1.25's
+// A form or a no-cors fetch with a text/plain body skips the CORS preflight, so
+// the allowlist alone never gets a say over whether the browser attaches the
+// session cookie. With SameSite=None (COOKIE_CROSS_SITE) any site can send it;
+// with the production default of SameSite=Lax, the web app at powhunter.app
+// calls api.powhunter.app as a same-site request, so any other powhunter.app
+// subdomain could too. This closes that gap the same way Go 1.25's
 // http.CrossOriginProtection does, using the Sec-Fetch-Site and Origin headers
-// browsers attach and pages cannot forge.
+// browsers attach and pages cannot forge. The web app passes because its
+// Origin is on the allowlist.
 //
 // Requests without either header did not come from a browser, so there is no
 // ambient cookie to abuse and they are let through.

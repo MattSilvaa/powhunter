@@ -22,7 +22,19 @@ func TestCrossOriginGuard(t *testing.T) {
 			headers: map[string]string{"Origin": "https://powhunter.app", "Sec-Fetch-Site": "cross-site"},
 			want:    http.StatusOK,
 		},
-		// A form or no-cors fetch from another site carries the SameSite=None
+		// Production: powhunter.app calling api.powhunter.app.
+		"the web app on the same site": {
+			method:  http.MethodPost,
+			headers: map[string]string{"Origin": "https://powhunter.app", "Sec-Fetch-Site": "same-site"},
+			want:    http.StatusOK,
+		},
+		// A SameSite=Lax cookie still rides along from any sibling subdomain.
+		"another subdomain of the same site": {
+			method:  http.MethodPost,
+			headers: map[string]string{"Origin": "https://evil.powhunter.app", "Sec-Fetch-Site": "same-site"},
+			want:    http.StatusForbidden,
+		},
+		// A form or no-cors fetch from another site carries a SameSite=None
 		// cookie and skips the CORS preflight.
 		"a cross-site form post": {
 			method:  http.MethodPost,

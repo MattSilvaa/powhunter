@@ -218,9 +218,9 @@ func TestLogoutRevokesTheSession(t *testing.T) {
 	require.ErrorIs(t, err, auth.ErrNoSession)
 }
 
-// The deployed web app and the API sit on different sites, so a SameSite=Lax
-// session cookie is discarded by the browser on arrival: the callback returns
-// 200, no cookie is kept, and the user lands back on the sign-in page.
+// When the web app and the API sit on different sites, a SameSite=Lax session
+// cookie is discarded by the browser on arrival: the callback returns 200, no
+// cookie is kept, and the user lands back on the sign-in page.
 func TestSetCookieIsUsableCrossSite(t *testing.T) {
 	service := auth.NewService(newFakeQueries(), true, true)
 
@@ -233,7 +233,7 @@ func TestSetCookieIsUsableCrossSite(t *testing.T) {
 	assert.True(t, cookie.HttpOnly)
 }
 
-// A same-origin deployment keeps the stricter policy.
+// A same-site deployment, as in production, keeps the stricter policy.
 func TestSetCookieStaysLaxSameSite(t *testing.T) {
 	service := auth.NewService(newFakeQueries(), true, false)
 

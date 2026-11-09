@@ -126,10 +126,13 @@ func Load() (Config, error) {
 		LoginRatePerSec:   envFloat("LOGIN_RATE_LIMIT_PER_SECOND", defaultLoginRatePerSec),
 		LoginRateBurst:    envInt("LOGIN_RATE_LIMIT_BURST", defaultLoginRateBurst),
 		AppBaseURL:        strings.TrimRight(envOrDefault("APP_BASE_URL", defaultAppBaseURL), "/"),
-		// The deployed web app and this API are served from different sites, so
-		// the session cookie has to be issued for cross-site use. A same-origin
-		// deployment can turn this off and get the stricter default back.
-		CookieCrossSite: envBool("COOKIE_CROSS_SITE", isProduction),
+		// The deployed web app (powhunter.app) and this API (api.powhunter.app)
+		// share a site, so the session cookie stays SameSite=Lax by default.
+		// Turn this on only when the app calls the API from a different site,
+		// such as the dev client on :3000 against :8080 without the Caddyfile
+		// proxy. Safari blocks third-party cookies, so a cross-site deploy
+		// cannot sign in from iOS at all.
+		CookieCrossSite: envBool("COOKIE_CROSS_SITE", false),
 		MailFrom:        envOrDefault("MAIL_FROM", defaultMailFrom),
 		SupportEmail:    envOrDefault("SUPPORT_EMAIL", defaultSupportEmail),
 		ResendAPIKey:    os.Getenv("RESEND_API_KEY"),
