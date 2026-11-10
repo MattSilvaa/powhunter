@@ -5,7 +5,7 @@
 **Never miss a powder day.**
 Pick your resorts and the snowfall worth chasing. Pow Hunter texts you when the forecast delivers.
 
-[![Test](https://github.com/MattSilvaa/powhunter/actions/workflows/test.yml/badge.svg)](https://github.com/MattSilvaa/powhunter/actions/workflows/test.yml)
+[![Deploy](https://github.com/MattSilvaa/powhunter/actions/workflows/deploy.yml/badge.svg)](https://github.com/MattSilvaa/powhunter/actions/workflows/deploy.yml)
 [![CodeQL](https://github.com/MattSilvaa/powhunter/actions/workflows/codeql.yml/badge.svg)](https://github.com/MattSilvaa/powhunter/actions/workflows/codeql.yml)
 ![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
@@ -60,6 +60,7 @@ Every setting is documented in [`server/.env.example`](server/.env.example).
 | `make dev` | Run the API and the web app with live reload |
 | `make test` | Server and client unit tests |
 | `make test-integration` | Server integration tests (needs the test database) |
+| `make test-functional` | End-to-end tests against a running API and web app |
 | `make lint` / `make typecheck` | golangci-lint, ESLint and TypeScript checks |
 | `make build` | Production client build and server binaries |
 | `make start-forecaster` | Run one forecast check |
@@ -79,6 +80,7 @@ server/monitoring/ Prometheus, Alertmanager and Grafana config
 
 - [Forecast pipeline](server/FORECAST.md)
 - [Testing](server/TESTING.md)
+- [Deploying](DEPLOY.md)
 - [Monitoring](server/monitoring/README.md)
 - [Frontend style guide](client/STYLEGUIDE.md)
 

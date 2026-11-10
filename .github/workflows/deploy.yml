@@ -1,0 +1,146 @@
+name: Deploy
+
+# Every push to main is checked, deployed to Render, then smoke-tested in
+# production. A failed smoke test rolls the release back. Any failure opens a
+# "deploy-failure" issue (or comments on the open one), and the next good
+# deploy closes it. See DEPLOY.md.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time, and never cancel one halfway through: a cancelled run
+# could leave production on a release nobody tested. Queued pushes run in order.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Checks
+    uses: ./.github/workflows/test.yml
+    permissions:
+      contents: read
+
+  deploy:
+    name: Deploy to production
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: production
+      url: ${{ vars.WEB_URL || 'https://powhunter.app' }}
+
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      API_SERVICE: ${{ vars.RENDER_API_SERVICE_ID }}
+      WEB_SERVICE: ${{ vars.RENDER_WEB_SERVICE_ID }}
+      FORECASTER_SERVICE: ${{ vars.RENDER_FORECASTER_SERVICE_ID }}
+      API_URL: ${{ vars.API_URL || 'https://api.powhunter.app' }}
+      WEB_URL: ${{ vars.WEB_URL || 'https://powhunter.app' }}
+      RENDER: ./.github/scripts/render.sh
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Check configuration
+        run: |
+          missing=0
+          for name in RENDER_API_KEY API_SERVICE WEB_SERVICE FORECASTER_SERVICE; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not configured. See DEPLOY.md."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      # What to roll back to if this release fails.
+      - name: Record live releases
+        id: before
+        run: |
+          echo "api=$($RENDER live "$API_SERVICE")" >> "$GITHUB_OUTPUT"
+          echo "web=$($RENDER live "$WEB_SERVICE")" >> "$GITHUB_OUTPUT"
+
+      # Migrations run in the API service's pre-deploy command, so a failed
+      # migration stops the release before it takes traffic.
+      - name: Deploy API
+        run: $RENDER deploy "$API_SERVICE" "$GITHUB_SHA"
+
+      - name: Deploy web app
+        run: $RENDER deploy "$WEB_SERVICE" "$GITHUB_SHA"
+
+      # Read-only: production never gets FUNCTIONAL_MAIL_LOG, so the tests that
+      # write data are skipped.
+      - name: Smoke test production
+        working-directory: server
+        env:
+          FUNCTIONAL_API_URL: ${{ env.API_URL }}
+          FUNCTIONAL_WEB_URL: ${{ env.WEB_URL }}
+          FUNCTIONAL_EXPECT_COMMIT: ${{ github.sha }}
+        run: go test -tags=functional -count=1 -v ./functional
+
+      # Last, so the alert job only ever runs code that passed the smoke test.
+      # If its build fails Render keeps the previous one, so it needs no rollback.
+      - name: Deploy forecaster
+        run: $RENDER deploy "$FORECASTER_SERVICE" "$GITHUB_SHA"
+
+      # Rolls back only services that moved. A deploy that failed to build never
+      # replaced the live one, so there is nothing to undo for it.
+      - name: Roll back
+        if: failure() && steps.before.outcome == 'success'
+        run: |
+          status=0
+          $RENDER rollback "$API_SERVICE" "${{ steps.before.outputs.api }}" || status=1
+          $RENDER rollback "$WEB_SERVICE" "${{ steps.before.outputs.web }}" || status=1
+          exit "$status"
+
+  report:
+    name: Report
+    needs: [checks, deploy]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open, update or close the deploy-failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          FAILED: ${{ needs.checks.result != 'success' || needs.deploy.result != 'success' }}
+          CHECKS: ${{ needs.checks.result }}
+          DEPLOY: ${{ needs.deploy.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+        run: |
+          label=deploy-failure
+          open=$(gh issue list --label "$label" --state open --json number --jq '.[0].number // empty')
+
+          if [ "$FAILED" = "true" ]; then
+            if [ "$CHECKS" != "success" ]; then
+              what="Checks failed on main, so nothing was deployed."
+            else
+              what="The deploy or the production smoke test failed. The workflow rolled production back to the previous release; check the run's Roll back step to confirm it succeeded."
+            fi
+            body=$(printf '%s\n\n- Commit: %s\n- Run: %s\n- Checks: `%s`, deploy: `%s`\n\nFix forward or revert the commit. The next successful deploy closes this issue.' \
+              "$what" "$COMMIT_URL" "$RUN_URL" "$CHECKS" "$DEPLOY")
+
+            if [ -n "$open" ]; then
+              gh issue comment "$open" --body "$body"
+            else
+              gh label create "$label" --color d73a4a --description "A deploy to production failed" 2>/dev/null || true
+              gh issue create --label "$label" --title "Deploy failed: ${GITHUB_SHA::7}" --body "$body"
+            fi
+            exit 0
+          fi
+
+          if [ -n "$open" ]; then
+            gh issue close "$open" --comment "Fixed: $COMMIT_URL deployed and passed the smoke test ($RUN_URL)."
+          fi

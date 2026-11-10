@@ -1,4 +1,4 @@
-.PHONY: dev dev-caddy build clean server client caddy db-setup db-migrate db-drop generate-db-code db-seed test test-integration lint typecheck monitoring-up monitoring-down
+.PHONY: dev dev-caddy build clean server client caddy db-setup db-migrate db-drop generate-db-code db-seed test test-integration test-functional lint typecheck monitoring-up monitoring-down
 
 dev:
 	@echo "Starting development environment..."
@@ -66,6 +66,14 @@ test:
 test-integration:
 	@echo "Running integration tests (requires a running test database)..."
 	@cd server && POWHUNTER_TEST_DB=1 go test -tags=integration -count=1 ./...
+
+# Writes data, so point it at a local stack only. FUNCTIONAL_MAIL_LOG (the API's
+# log file) additionally enables the sign-up and sign-in flow.
+test-functional:
+	@echo "Running functional tests..."
+	@cd server && FUNCTIONAL_API_URL=$${FUNCTIONAL_API_URL:-http://localhost:8080} \
+		FUNCTIONAL_WEB_URL=$${FUNCTIONAL_WEB_URL:-http://localhost:3000} \
+		go test -tags=functional -count=1 -v ./functional
 
 lint:
 	@echo "Linting..."
