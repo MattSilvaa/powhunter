@@ -26,6 +26,9 @@ type Deps struct {
 	Logger   *slog.Logger
 	DB       *sql.DB
 	Auth     middleware.Authenticator
+	// Commit is the git commit this build was made from. /health reports it so
+	// a post-deploy check can confirm it is talking to the new release.
+	Commit string
 }
 
 // New builds the fully wired HTTP handler.
@@ -38,7 +41,7 @@ func New(deps Deps) (http.Handler, func()) {
 
 	// Liveness stays deliberately cheap and dependency-free. Tying it to the
 	// database would turn a brief database blip into a restart loop.
-	mux.Handle("GET /health", deps.Metrics.Instrument("health", http.HandlerFunc(healthHandler)))
+	mux.Handle("GET /health", deps.Metrics.Instrument("health", healthHandler(deps.Commit)))
 	mux.Handle("GET /ready", deps.Metrics.Instrument("ready", readyHandler(deps.DB)))
 	// Only a scraper needs this, and it maps the service: request counts, route
 	// names and database pool statistics. It was served to anyone who asked.
@@ -158,8 +161,12 @@ func New(deps Deps) (http.Handler, func()) {
 	return handler, cleanup
 }
 
-func healthHandler(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+func healthHandler(commit string) http.HandlerFunc {
+	body := map[string]string{"status": "ok", "commit": commit}
+
+	return func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, body)
+	}
 }
 
 // readyHandler reports whether the service can actually serve traffic.

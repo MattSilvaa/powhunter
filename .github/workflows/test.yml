@@ -1,13 +1,16 @@
 name: Test
 
+# Runs on every pull request, and as the first stage of deploy.yml for every
+# push to main, so main is checked once and deployed only if this passes.
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_call:
 
+# Only pull requests cancel superseded runs. Under deploy.yml, the deploy
+# workflow's own concurrency group decides what runs.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: test-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   server:
@@ -122,3 +125,99 @@ jobs:
 
       - name: Test
         run: bun test
+
+  # Starts the real API, database and web build on the runner and drives them
+  # like a user would. The same suite runs against production after a deploy,
+  # minus the tests that write data.
+  functional:
+    name: Functional
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: powhunter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: powhunter
+      PORT: "8080"
+      ALLOWED_ORIGINS: http://localhost:3000
+      APP_BASE_URL: http://localhost:3000
+      RENDER_GIT_COMMIT: ${{ github.sha }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Build
+        working-directory: server
+        run: |
+          go build -o bin/powhunter ./cmd/api
+          go build -o bin/migrate ./cmd/migrate
+
+      # The same migration step a deploy runs, against an empty database.
+      - name: Migrate
+        working-directory: server
+        run: ./bin/migrate
+
+      # No RESEND_API_KEY, so emails (including sign-in links) go to this log,
+      # which is how the tests sign in.
+      - name: Start API
+        working-directory: server
+        run: |
+          ./bin/powhunter > "$RUNNER_TEMP/api.log" 2>&1 &
+          for _ in $(seq 30); do
+            curl -fs http://localhost:8080/health && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/api.log"
+          exit 1
+
+      - name: Build and serve web app
+        working-directory: client
+        env:
+          VITE_BASE_SERVER_URL: http://localhost:8080
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+          bun x serve@14 build/client -p 3000 > "$RUNNER_TEMP/web.log" 2>&1 &
+          for _ in $(seq 30); do
+            curl -fs http://localhost:3000/ > /dev/null && exit 0
+            sleep 1
+          done
+          exit 1
+
+      - name: Functional tests
+        working-directory: server
+        env:
+          FUNCTIONAL_API_URL: http://localhost:8080
+          FUNCTIONAL_WEB_URL: http://localhost:3000
+          FUNCTIONAL_EXPECT_COMMIT: ${{ github.sha }}
+          FUNCTIONAL_MAIL_LOG: ${{ runner.temp }}/api.log
+        run: go test -tags=functional -count=1 -v ./functional
+
+      - name: API log
+        if: failure()
+        run: cat "$RUNNER_TEMP/api.log"

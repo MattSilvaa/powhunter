@@ -70,6 +70,15 @@ cd server && go test -tags=integration ./...
 
 Note: Unit tests don't use the `integration` build tag, so they will run alongside integration tests.
 
+### Functional Tests
+Black-box tests in `functional/` that call a running API and web app over HTTP.
+CI runs them on every pull request, and the deploy workflow runs them read-only
+against production after each release. See [DEPLOY.md](../DEPLOY.md).
+
+```bash
+make test-functional
+```
+
 ## Test Coverage
 
 Integration tests cover:
