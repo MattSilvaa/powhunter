@@ -49,32 +49,26 @@ successful deploy closes it. GitHub emails you about new issues by default.
 
 ## One-time setup
 
-1. **Turn off auto-deploy in Render** for `powhunter-public-api`, the web app's
-   static site and the forecaster cron job (Settings → Build & Deploy →
-   Auto-Deploy: Off). Otherwise Render deploys every push itself, before any
-   test has run. The monitoring services in `render.yaml` can stay on
-   auto-deploy.
-2. **Run migrations before the API starts.** The API's pre-deploy command
-   should run the migrate binary, e.g. build with
-   `go build -o bin/migrate ./cmd/migrate` and set Pre-Deploy Command to
-   `./bin/migrate`.
-3. **Create a Render API key** (Account Settings → API Keys).
-4. **In GitHub**, Settings → Environments → New environment `production`, then
-   add:
+Already in place: the API's pre-deploy command runs `./bin/migrate`, and the
+workflow knows the Render service IDs (override them with repository variables
+`RENDER_API_SERVICE_ID`, `RENDER_WEB_SERVICE_ID`, `RENDER_FORECASTER_SERVICE_ID`
+if a service is ever recreated). Three steps remain, all in a browser:
 
-   | Kind | Name | Value |
-   | --- | --- | --- |
-   | Secret | `RENDER_API_KEY` | the key from step 3 |
-   | Variable | `RENDER_API_SERVICE_ID` | `srv-…` of the API |
-   | Variable | `RENDER_WEB_SERVICE_ID` | `srv-…` of the static site |
-   | Variable | `RENDER_FORECASTER_SERVICE_ID` | `crn-…` of the forecaster |
-   | Variable | `API_URL` | optional, default `https://api.powhunter.app` |
-   | Variable | `WEB_URL` | optional, default `https://powhunter.app` |
+1. **Add the Render API key to GitHub.** In Render, Account Settings → API Keys
+   → Create API Key. In GitHub, Settings → Secrets and variables → Actions →
+   New repository secret, named `RENDER_API_KEY`.
+2. **Turn off auto-deploy in Render** for `powhunter-public-api`,
+   `powhunter-web-static` and `powhunter-forecaster-cron-job` (Settings →
+   Build & Deploy → Auto-Deploy: Off). Otherwise Render deploys every push
+   itself, before any test has run. Leave the monitoring services as they are.
+   Do this after step 1, so there is no window where nothing deploys.
+3. **Protect `main`.** Settings → Rules → Rulesets (or Branches), require a pull
+   request and the `Test` checks (Server, Server lint, Client, Functional) to
+   pass before merging. A broken change is then stopped at the pull request, and
+   the deploy-time run is a second line of defence.
 
-   Service IDs are in each service's URL in the Render dashboard.
-5. **Protect `main`** (Settings → Branches): require the `Test` checks to pass
-   before merging, so a broken change is stopped at the pull request and the
-   deploy-time run is a second line of defence.
+`API_URL` and `WEB_URL` repository variables override the default production
+addresses, `https://api.powhunter.app` and `https://powhunter.app`.
 
 ## Writing migrations that can be rolled back
 

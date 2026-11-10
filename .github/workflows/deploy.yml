@@ -36,9 +36,11 @@ jobs:
 
     env:
       RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-      API_SERVICE: ${{ vars.RENDER_API_SERVICE_ID }}
-      WEB_SERVICE: ${{ vars.RENDER_WEB_SERVICE_ID }}
-      FORECASTER_SERVICE: ${{ vars.RENDER_FORECASTER_SERVICE_ID }}
+      # Render service IDs (not secret): powhunter-public-api,
+      # powhunter-web-static and powhunter-forecaster-cron-job.
+      API_SERVICE: ${{ vars.RENDER_API_SERVICE_ID || 'srv-d1e0pmje5dus73e2q3i0' }}
+      WEB_SERVICE: ${{ vars.RENDER_WEB_SERVICE_ID || 'srv-d3q20s6r433s73apfnm0' }}
+      FORECASTER_SERVICE: ${{ vars.RENDER_FORECASTER_SERVICE_ID || 'crn-d1fa6shr0fns73cksoeg' }}
       API_URL: ${{ vars.API_URL || 'https://api.powhunter.app' }}
       WEB_URL: ${{ vars.WEB_URL || 'https://powhunter.app' }}
       RENDER: ./.github/scripts/render.sh
