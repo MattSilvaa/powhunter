@@ -104,17 +104,12 @@ var updateTaglines = []string{
 //	POW DAY at Crystal Mountain
 //	8" forecast tomorrow. Set the alarm early.
 //	https://example.com/go/Ab12Cd34
-//	Share: powhunter.app
 //
-// It adds link when one is given, then a line inviting the reader to share
-// shareHost (such as "powhunter.app") when that is given.
-//
-// Extra text can push an alert into a second segment, which doubles what that
-// message costs. So the share line is only added when the message still fits
-// in one segment, trying the shorter share line and then dropping the
-// tagline first. The link is kept either way: with a link, the tagline is dropped
-// when that makes it fit.
-func FormatSnowAlertMessage(alert db.AlertToSend, link, shareHost string) string {
+// It adds link on its own line when one is given. Extra text can push an alert
+// into a second segment, which doubles what that message costs, so the tagline
+// is dropped when that keeps the message in one segment. The link is kept
+// either way.
+func FormatSnowAlertMessage(alert db.AlertToSend, link string) string {
 	when := forecastDay(alert.ForecastDate, time.Now())
 	tagline := pickLine(alert, updateTaglines)
 
@@ -136,35 +131,17 @@ func FormatSnowAlertMessage(alert db.AlertToSend, link, shareHost string) string
 	lead := headline + "\n" + facts + "."
 	wordings := []string{lead + " " + tagline, lead}
 
-	var withLink string
-	if link != "" {
-		withLink = "\n" + link
-	}
-
-	// The tagline gives an alert its character, so it outranks the longer share
-	// wording, but any share line outranks the tagline: a friend signing up is
-	// worth more than a quip.
-	if shareHost != "" {
-		for _, wording := range wordings {
-			for _, share := range []string{"\nSend to your ski crew: ", "\nShare: "} {
-				if message := wording + withLink + share + shareHost; SMSSegments(message) == 1 {
-					return message
-				}
-			}
-		}
-	}
-
 	if link == "" {
 		return wordings[0]
 	}
 
 	for _, wording := range wordings {
-		if message := wording + withLink; SMSSegments(message) == 1 {
+		if message := wording + "\n" + link; SMSSegments(message) == 1 {
 			return message
 		}
 	}
 
-	return wordings[len(wordings)-1] + withLink
+	return wordings[len(wordings)-1] + "\n" + link
 }
 
 // forecastDay describes the forecast date relative to now: "today",

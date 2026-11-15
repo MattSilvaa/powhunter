@@ -22,11 +22,9 @@ The phone number should be in E.164 format (e.g., `+12025551234`).
 // Credentials come from TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN.
 twilioClient := notify.NewTwilioClient(os.Getenv("TWILIO_FROM_NUMBER"))
 
-// The second argument is an optional tracked link (see LINK_BASE_URL), and the
-// third an optional address to invite friends to (from APP_BASE_URL). Optional
-// phrases are dropped so the link stays within one segment, and the share line
-// is only added when it fits.
-message := notify.FormatSnowAlertMessage(alert, "https://api.example.com/go/Ab12Cd34", "powhunter.app")
+// The second argument is an optional tracked link (see LINK_BASE_URL). The
+// tagline is dropped when that keeps the link within one segment.
+message := notify.FormatSnowAlertMessage(alert, "https://api.example.com/go/Ab12Cd34")
 segments := notify.SMSSegments(message) // what Twilio will bill
 
 if err := twilioClient.SendSMS(alert.UserPhone, message); err != nil {
@@ -39,7 +37,7 @@ if err := twilioClient.SendSMS(alert.UserPhone, message); err != nil {
 The service includes a helper function to format snow alert messages:
 
 ```go
-FormatSnowAlertMessage(alert db.AlertToSend, link, shareHost string) string
+FormatSnowAlertMessage(alert db.AlertToSend, link string) string
 ```
 
 The headline scales with the forecast (FRESH SNOW under 3", POWDER ALERT, POW DAY
@@ -50,11 +48,10 @@ tagline. It generates a message like:
 POW DAY at Crystal Mountain
 8.5" forecast on Wed, Jan 15. Set the alarm early.
 https://powhunter.app/go/Ab12Cd34
-Share: powhunter.app
 ```
 
 Messages stay within the GSM character set and one 160-character segment; the
-tagline and longer share line are dropped first when space runs out.
+tagline is dropped first when space runs out.
 
 ### Error Handling
 
