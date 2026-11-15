@@ -146,7 +146,7 @@ func TestASentAlertCarriesATrackedLinkToTheResortReport(t *testing.T) {
 	h.store.EXPECT().RecordAlertSent(gomock.Any(), alert, gomock.Any()).
 		DoAndReturn(func(_ context.Context, _ db.AlertToSend, sent db.SentAlert) error {
 			assert.True(t, notify.IsLinkCode(sent.LinkCode))
-			assert.True(t, strings.HasSuffix(message, " https://api.example.com/go/"+sent.LinkCode),
+			assert.True(t, strings.HasSuffix(message, "\nhttps://api.example.com/go/"+sent.LinkCode),
 				"the SMS should end with the link that is recorded, got %q", message)
 			assert.Equal(t, "https://www.vail.com/snow-report", sent.LinkDestination)
 			assert.Equal(t, int32(1), sent.SMSSegments)

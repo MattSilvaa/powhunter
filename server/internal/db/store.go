@@ -269,6 +269,9 @@ type AlertToSend struct {
 	SnowAmount   float64
 	ForecastDate time.Time
 	IsUpdate     bool
+	// PreviousSnowAmount is the amount in the last alert for this forecast, set
+	// only on updates.
+	PreviousSnowAmount float64
 }
 
 // GetAlertMatches finds alerts that match a specific resort, date, and snow amount.
@@ -359,14 +362,15 @@ func (s *Store) GetAlertMatches(
 				}
 
 				alertsToSend = append(alertsToSend, AlertToSend{
-					UserUuid:     userToAlert.Uuid,
-					UserEmail:    userToAlert.Email,
-					UserPhone:    userToAlert.Phone.String,
-					ResortName:   resortToAlertUserOn.Name,
-					ResortUUID:   resortToAlertUserOn.Uuid,
-					SnowAmount:   predictedSnowAmount,
-					ForecastDate: forecastDate,
-					IsUpdate:     true,
+					UserUuid:           userToAlert.Uuid,
+					UserEmail:          userToAlert.Email,
+					UserPhone:          userToAlert.Phone.String,
+					ResortName:         resortToAlertUserOn.Name,
+					ResortUUID:         resortToAlertUserOn.Uuid,
+					SnowAmount:         predictedSnowAmount,
+					ForecastDate:       forecastDate,
+					IsUpdate:           true,
+					PreviousSnowAmount: lastAlertSnowAmount,
 				})
 			}
 		}

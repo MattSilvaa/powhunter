@@ -39,11 +39,22 @@ if err := twilioClient.SendSMS(alert.UserPhone, message); err != nil {
 The service includes a helper function to format snow alert messages:
 
 ```go
-FormatSnowAlertMessage(resortName string, snowAmount float64, forecastDate time.Time) string
+FormatSnowAlertMessage(alert db.AlertToSend, link, shareHost string) string
 ```
 
-This generates a formatted message like:
-> Powder Alert! Crystal Mountain is expecting 8.5 inches of snow on Wednesday, Jan 15. Time to hit the slopes!
+The headline scales with the forecast (FRESH SNOW under 3", POWDER ALERT, POW DAY
+from 6", DEEP DAY from 12", STORM UPGRADE when a forecast grows), with a rotating
+tagline. It generates a message like:
+
+```
+POW DAY at Crystal Mountain
+8.5" forecast on Wed, Jan 15. Set the alarm early.
+https://powhunter.app/go/Ab12Cd34
+Share: powhunter.app
+```
+
+Messages stay within the GSM character set and one 160-character segment; the
+tagline and longer share line are dropped first when space runs out.
 
 ### Error Handling
 
