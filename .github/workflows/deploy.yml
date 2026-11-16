@@ -30,6 +30,9 @@ jobs:
     needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    outputs:
+      forecaster: ${{ steps.forecaster.outcome }}
+      rollback: ${{ steps.rollback.outcome }}
     environment:
       name: production
       url: ${{ vars.WEB_URL || 'https://powhunter.app' }}
@@ -91,13 +94,28 @@ jobs:
 
       # Last, so the alert job only ever runs code that passed the smoke test.
       # If its build fails Render keeps the previous one, so it needs no rollback.
+      #
+      # Render cannot deploy a named commit to a cron job, only the head of
+      # main. If main has moved on, that head is untested here, so leave the
+      # forecaster to the run for the newer commit, which is queued behind
+      # this one.
       - name: Deploy forecaster
-        run: $RENDER deploy "$FORECASTER_SERVICE" "$GITHUB_SHA"
+        id: forecaster
+        run: |
+          head="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [ "$head" != "$GITHUB_SHA" ]; then
+            echo "::notice::main is now at ${head::7}; its own deploy run will update the forecaster."
+            exit 0
+          fi
+          $RENDER deploy "$FORECASTER_SERVICE"
 
       # Rolls back only services that moved. A deploy that failed to build never
-      # replaced the live one, so there is nothing to undo for it.
+      # replaced the live one, so there is nothing to undo for it. A forecaster
+      # failure leaves the API and web app alone: they already passed the smoke
+      # test, and the forecaster keeps its previous build.
       - name: Roll back
-        if: failure() && steps.before.outcome == 'success'
+        id: rollback
+        if: failure() && steps.before.outcome == 'success' && steps.forecaster.outcome != 'failure'
         run: |
           status=0
           $RENDER rollback "$API_SERVICE" "${{ steps.before.outputs.api }}" || status=1
@@ -119,6 +137,8 @@ jobs:
           FAILED: ${{ needs.checks.result != 'success' || needs.deploy.result != 'success' }}
           CHECKS: ${{ needs.checks.result }}
           DEPLOY: ${{ needs.deploy.result }}
+          FORECASTER: ${{ needs.deploy.outputs.forecaster }}
+          ROLLBACK: ${{ needs.deploy.outputs.rollback }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
         run: |
@@ -128,8 +148,14 @@ jobs:
           if [ "$FAILED" = "true" ]; then
             if [ "$CHECKS" != "success" ]; then
               what="Checks failed on main, so nothing was deployed."
+            elif [ "$FORECASTER" = "failure" ]; then
+              what="The API and web app deployed and passed the smoke test, but the forecaster deploy failed. It is still running its previous build."
+            elif [ "$ROLLBACK" = "success" ]; then
+              what="The deploy or the production smoke test failed, and production was rolled back to the previous release."
+            elif [ "$ROLLBACK" = "failure" ]; then
+              what="The deploy or the production smoke test failed, and the rollback failed too. Production may be on an untested release: check Render now."
             else
-              what="The deploy or the production smoke test failed. The workflow rolled production back to the previous release; check the run's Roll back step to confirm it succeeded."
+              what="The deploy failed before anything changed in production."
             fi
             body=$(printf '%s\n\n- Commit: %s\n- Run: %s\n- Checks: `%s`, deploy: `%s`\n\nFix forward or revert the commit. The next successful deploy closes this issue.' \
               "$what" "$COMMIT_URL" "$RUN_URL" "$CHECKS" "$DEPLOY")
