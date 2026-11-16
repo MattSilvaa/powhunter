@@ -2,8 +2,12 @@
 # Small wrapper around the Render API for the deploy workflow.
 #
 #   render.sh live <service-id>              print the live deploy's id
-#   render.sh deploy <service-id> <commit>   deploy a commit and wait for it
+#   render.sh deploy <service-id> [commit]   deploy a commit (default: the
+#                                            branch head) and wait for it
 #   render.sh rollback <service-id> <deploy> roll back to an earlier deploy
+#
+# Cron jobs cannot deploy a named commit through the API, so pass no commit
+# for them.
 #
 # Needs RENDER_API_KEY. RENDER_API_URL and RENDER_WAIT_SECONDS can be
 # overridden for testing.
@@ -17,13 +21,18 @@ POLL_SECONDS="${RENDER_POLL_SECONDS:-10}"
 
 render() {
 	local method="$1" path="$2" body="${3:-}"
-	local args=(-fsS --retry 3 --retry-all-errors -X "$method"
+	local args=(-sS --fail-with-body --retry 3 -X "$method"
 		-H "Authorization: Bearer $RENDER_API_KEY"
 		-H "Accept: application/json")
 	if [ -n "$body" ]; then
 		args+=(-H "Content-Type: application/json" -d "$body")
 	fi
-	curl "${args[@]}" "$API$path"
+	local out
+	if ! out="$(curl "${args[@]}" "$API$path")"; then
+		echo "::error::Render API $method $path failed: $out" >&2
+		return 1
+	fi
+	printf '%s\n' "$out"
 }
 
 live_deploy() {
@@ -58,11 +67,11 @@ live)
 	live_deploy "$2"
 	;;
 deploy)
-	service="$2" commit="$3"
+	service="$2" commit="${3:-}"
 	deploy="$(render POST "/services/$service/deploys" \
-		"$(jq -nc --arg c "$commit" '{commitId: $c, clearCache: "do_not_clear"}')" |
+		"$(jq -nc --arg c "$commit" '{clearCache: "do_not_clear"} + (if $c == "" then {} else {commitId: $c} end)')" |
 		jq -r '.id')"
-	echo "started deploy $deploy of $commit on $service" >&2
+	echo "started deploy $deploy of ${commit:-the branch head} on $service" >&2
 	wait_for "$service" "$deploy"
 	;;
 rollback)

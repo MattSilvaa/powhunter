@@ -37,11 +37,15 @@ at a time, never cancelled midway:
    the old release. Tests that write data are skipped, because they only run
    when they can read the API's mail log, which only CI has.
 5. Deploys the forecaster last, so the job that texts people only ever runs
-   code that passed step 4.
+   code that passed step 4. Render can't deploy a named commit to a cron job,
+   so this deploys the head of `main`, and is skipped if `main` has moved on
+   since this run started (the newer commit's own run updates it).
 
-**Rollback.** If any step after step 2 fails, the API and web app go back to the
+**Rollback.** If steps 3 or 4 fail, the API and web app go back to the
 releases recorded in step 2. A service whose new build failed was never
-replaced, so it is left alone.
+replaced, so it is left alone. If only the forecaster fails, nothing is rolled
+back: the API and web app already passed the smoke test, and the forecaster
+keeps running its previous build.
 
 **Issue.** Any failure opens an issue labelled `deploy-failure` with links to
 the commit and the run, or comments on the one already open. The next
