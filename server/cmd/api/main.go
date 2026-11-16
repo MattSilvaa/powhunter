@@ -88,6 +88,8 @@ func run(logger *slog.Logger) error {
 		Logger:   logger,
 		DB:       h.Store().DB(),
 		Auth:     h.AuthService(),
+		// Render sets this on every build.
+		Commit: os.Getenv("RENDER_GIT_COMMIT"),
 	})
 	defer cleanup()
 
