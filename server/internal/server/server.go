@@ -15,6 +15,9 @@ import (
 	"github.com/MattSilvaa/powhunter/internal/middleware"
 )
 
+// statusField is the key every probe response reports its state under.
+const statusField = "status"
+
 // readinessTimeout bounds the database check behind the readiness probe.
 const readinessTimeout = 2 * time.Second
 
@@ -162,7 +165,7 @@ func New(deps Deps) (http.Handler, func()) {
 }
 
 func healthHandler(commit string) http.HandlerFunc {
-	body := map[string]string{"status": "ok", "commit": commit}
+	body := map[string]string{statusField: "ok", "commit": commit}
 
 	return func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, body)
@@ -177,8 +180,8 @@ func readyHandler(database *sql.DB) http.HandlerFunc {
 
 		if database == nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-				"status": "unavailable",
-				"reason": "no database configured",
+				statusField: "unavailable",
+				"reason":    "no database configured",
 			})
 
 			return
@@ -186,14 +189,14 @@ func readyHandler(database *sql.DB) http.HandlerFunc {
 
 		if err := database.PingContext(ctx); err != nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-				"status": "unavailable",
-				"reason": "database unreachable",
+				statusField: "unavailable",
+				"reason":    "database unreachable",
 			})
 
 			return
 		}
 
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
+		writeJSON(w, http.StatusOK, map[string]string{statusField: "ready"})
 	}
 }
 
